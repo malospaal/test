@@ -1,0 +1,24 @@
+# Android / Gradle
+.gradle/
+build/
+**/build/
+local.properties
+*.iml
+
+# IDE
+.idea/
+
+# Local helper dirs
+.android-local/
+.gradle-local/
+
+# Expo / Node
+expo/node_modules/
+expo/.expo/
+expo/android/
+expo/ios/
+expo/dist/
+
+# OS
+.DS_Store
+Thumbs.db

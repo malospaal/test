@@ -58,6 +58,7 @@ data class HabitTask(
     val timesPerWeek: Int = 3,
     val reminderHour: Int = 8,
     val reminderMinute: Int = 0,
+    val reminderEnabled: Boolean = true,
     val startDate: LocalDate = LocalDate.now(),
     val customDays: Set<Int> = emptySet(),
     val isArchived: Boolean = false
@@ -114,6 +115,7 @@ class HabitRepository(private val context: Context) {
                     timesPerWeek = obj.optInt("timesPerWeek", 3).coerceIn(1, 7),
                     reminderHour = obj.optInt("reminderHour", 8).coerceIn(0, 23),
                     reminderMinute = obj.optInt("reminderMinute", 0).coerceIn(0, 59),
+                    reminderEnabled = obj.optBoolean("reminderEnabled", true),
                     startDate = startDate,
                     customDays = custom,
                     isArchived = obj.optBoolean("isArchived", false)
@@ -132,6 +134,7 @@ class HabitRepository(private val context: Context) {
         timesPerWeek: Int,
         reminderHour: Int,
         reminderMinute: Int,
+        reminderEnabled: Boolean,
         startDate: LocalDate
     ): HabitTask {
         val task = HabitTask(
@@ -144,6 +147,7 @@ class HabitRepository(private val context: Context) {
             timesPerWeek = timesPerWeek.coerceIn(1, 7),
             reminderHour = reminderHour.coerceIn(0, 23),
             reminderMinute = reminderMinute.coerceIn(0, 59),
+            reminderEnabled = reminderEnabled,
             startDate = startDate,
             customDays = sanitizeCustomDays(customDays),
             isArchived = false
@@ -165,6 +169,7 @@ class HabitRepository(private val context: Context) {
         timesPerWeek: Int,
         reminderHour: Int,
         reminderMinute: Int,
+        reminderEnabled: Boolean,
         startDate: LocalDate
     ) {
         val updated = getTasks().map { task ->
@@ -178,6 +183,7 @@ class HabitRepository(private val context: Context) {
                     timesPerWeek = timesPerWeek.coerceIn(1, 7),
                     reminderHour = reminderHour.coerceIn(0, 23),
                     reminderMinute = reminderMinute.coerceIn(0, 59),
+                    reminderEnabled = reminderEnabled,
                     startDate = startDate,
                     customDays = sanitizeCustomDays(customDays)
                 )
@@ -562,6 +568,7 @@ class HabitRepository(private val context: Context) {
                 .put("timesPerWeek", task.timesPerWeek)
                 .put("reminderHour", task.reminderHour)
                 .put("reminderMinute", task.reminderMinute)
+                .put("reminderEnabled", task.reminderEnabled)
                 .put("startDate", task.startDate.format(formatter))
                 .put("isArchived", task.isArchived)
             val custom = JSONArray()

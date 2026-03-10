@@ -48,7 +48,7 @@ class HabitReminderScheduler(
             return
         }
         tasks.forEach { task ->
-            if (task.isArchived) {
+            if (task.isArchived || !task.reminderEnabled) {
                 cancelReminder(task.id)
             } else {
                 scheduleReminder(task)
@@ -58,7 +58,7 @@ class HabitReminderScheduler(
 
     fun syncReminderForTask(taskId: String) {
         val task = repository.getTasks().firstOrNull { it.id == taskId }
-        if (task == null || task.isArchived || !repository.getNotificationsEnabled()) {
+        if (task == null || task.isArchived || !task.reminderEnabled || !repository.getNotificationsEnabled()) {
             cancelReminder(taskId)
             return
         }
@@ -74,7 +74,7 @@ class HabitReminderScheduler(
 
     fun onReminderTriggered(taskId: String) {
         val task = repository.getTasks().firstOrNull { it.id == taskId }
-        if (task == null || task.isArchived || !repository.getNotificationsEnabled()) {
+        if (task == null || task.isArchived || !task.reminderEnabled || !repository.getNotificationsEnabled()) {
             cancelReminder(taskId)
             return
         }

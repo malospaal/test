@@ -40,7 +40,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.animation.AnimatedVisibility
@@ -49,6 +48,12 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.Icons
@@ -104,6 +109,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.text.font.FontWeight
@@ -155,6 +161,7 @@ import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private enum class AppPage {
@@ -176,6 +183,11 @@ private enum class NotificationPermissionAction {
     ENABLE_REMINDERS,
     SAVE_EDITOR_REMINDER
 }
+
+private data class StreakOverlayModel(
+    val streak: Int,
+    val milestone: Boolean
+)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -443,7 +455,11 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                     onDismiss = vm::closeEditor,
                     vm = vm,
                     onSaveRequest = {
-                        ensureNotificationPermissionAndRun(NotificationPermissionAction.SAVE_EDITOR_REMINDER)
+                        if (state.editorReminderEnabled) {
+                            ensureNotificationPermissionAndRun(NotificationPermissionAction.SAVE_EDITOR_REMINDER)
+                        } else {
+                            vm.saveEditor()
+                        }
                     }
                 )
             }
@@ -568,52 +584,104 @@ private fun TrackerPage(
     val canAdd = state.plan == SubscriptionPlan.PRO || state.tasks.size < 1
     val spacing = AppTheme.spacing
     var pendingDeleteTaskId by rememberSaveable { mutableStateOf<String?>(null) }
+    var previousTotalCompletions by remember(state.selectedTaskId) { mutableStateOf(state.totalCompletions) }
+    var streakOverlay by remember { mutableStateOf<StreakOverlayModel?>(null) }
+    var overlayVisible by remember { mutableStateOf(false) }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = spacing.x2, top = spacing.x1, end = spacing.x2, bottom = spacing.x2),
-        verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
-    ) {
-        if (state.tasks.isEmpty()) {
-            item { OnboardingCard(vm, state) }
-        } else {
-            item {
-                TaskControlsRow(
-                    canAddTask = canAdd,
-                    onCreate = { if (canAdd) vm.openCreateTask() else onUpgrade() },
-                    onEdit = { selectedTask?.id?.let(vm::openEditTask) },
-                    onDelete = { selectedTask?.id?.let { pendingDeleteTaskId = it } },
-                    canEditDelete = selectedTask != null
-                )
+    LaunchedEffect(state.selectedTaskId) {
+        previousTotalCompletions = state.totalCompletions
+        streakOverlay = null
+        overlayVisible = false
+    }
+    LaunchedEffect(state.totalCompletions, state.selectedDateDone, state.streak) {
+        if (state.selectedDateDone && state.totalCompletions > previousTotalCompletions) {
+            streakOverlay = StreakOverlayModel(
+                streak = state.streak,
+                milestone = isStreakMilestone(state.streak)
+            )
+            overlayVisible = true
+        }
+        previousTotalCompletions = state.totalCompletions
+    }
+    LaunchedEffect(streakOverlay, overlayVisible) {
+        if (overlayVisible && streakOverlay != null) {
+            delay(if (streakOverlay?.milestone == true) 2300 else 1700)
+            overlayVisible = false
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = spacing.x2, top = spacing.x1, end = spacing.x2, bottom = spacing.x2),
+            verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
+        ) {
+            if (state.tasks.isEmpty()) {
+                item { OnboardingCard(vm, state) }
+            } else {
+                item {
+                    TaskControlsRow(
+                        canAddTask = canAdd,
+                        onCreate = { if (canAdd) vm.openCreateTask() else onUpgrade() },
+                        onEdit = { selectedTask?.id?.let(vm::openEditTask) },
+                        onDelete = { selectedTask?.id?.let { pendingDeleteTaskId = it } },
+                        canEditDelete = selectedTask != null
+                    )
+                }
+                item { TaskSelector(state.tasks, state.selectedTaskId, vm::selectTask) }
+                item {
+                    HeroCard(
+                        task = selectedTask,
+                        selectedDate = state.selectedDate,
+                        done = state.selectedDateDone,
+                        scheduled = state.selectedDateScheduled,
+                        onDone = vm::toggleSelectedDateDone
+                    )
+                }
+                item {
+                    StatsRow(
+                        streak = state.streak,
+                        bestStreak = state.bestStreak,
+                        progress = state.progressPercent,
+                        total = state.totalCompletions
+                    )
+                }
+                item {
+                    SevenDayChart(
+                        points = state.last7Days,
+                        scheduled = state.last7DaysScheduled,
+                        anchorDate = state.selectedDate
+                    )
+                }
+                item {
+                    CalendarCard(
+                        month = state.currentMonth,
+                        selectedDate = state.selectedDate,
+                        selectedTask = selectedTask,
+                        doneDates = state.doneDatesInCurrentMonth,
+                        scheduledDates = state.scheduledDatesInCurrentMonth,
+                        onMoveMonth = vm::moveMonth,
+                        onToday = vm::jumpToToday,
+                        onDateSelect = vm::selectDate
+                    )
+                }
             }
-            item { TaskSelector(state.tasks, state.selectedTaskId, vm::selectTask) }
-            item {
-                HeroCard(
-                    task = selectedTask,
-                    selectedDate = state.selectedDate,
-                    done = state.selectedDateDone,
-                    scheduled = state.selectedDateScheduled,
-                    onDone = vm::toggleSelectedDateDone
-                )
-            }
-            item {
-                StatsRow(
-                    streak = state.streak,
-                    progress = state.progressPercent,
-                    total = state.totalCompletions
-                )
-            }
-            item { SevenDayChart(points = state.last7Days, anchorDate = state.selectedDate) }
-            item {
-                CalendarCard(
-                    month = state.currentMonth,
-                    selectedDate = state.selectedDate,
-                    selectedTask = selectedTask,
-                    doneDates = state.doneDatesInCurrentMonth,
-                    onMoveMonth = vm::moveMonth,
-                    onToday = vm::jumpToToday,
-                    onDateSelect = vm::selectDate
-                )
+        }
+
+        AnimatedVisibility(
+            visible = overlayVisible && streakOverlay != null,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = spacing.x1_5),
+            enter = fadeIn(tween(180)) +
+                slideInVertically(initialOffsetY = { -it / 2 }, animationSpec = tween(180, easing = FastOutSlowInEasing)) +
+                scaleIn(initialScale = 0.92f, animationSpec = tween(180, easing = FastOutSlowInEasing)),
+            exit = fadeOut(tween(180)) +
+                slideOutVertically(targetOffsetY = { -it / 3 }, animationSpec = tween(180, easing = FastOutSlowInEasing)) +
+                scaleOut(targetScale = 0.96f, animationSpec = tween(180, easing = FastOutSlowInEasing))
+        ) {
+            streakOverlay?.let { model ->
+                StreakRewardOverlay(model = model)
             }
         }
     }
@@ -650,6 +718,7 @@ private fun HabitsPage(
     onOpenHabit: () -> Unit,
     onUpgrade: () -> Unit
 ) {
+    val context = LocalContext.current
     val spacing = AppTheme.spacing
     val colors = AppTheme.colors
     val canAdd = state.plan == SubscriptionPlan.PRO || state.tasks.size < 1
@@ -698,6 +767,11 @@ private fun HabitsPage(
                     )
                 }
                 items(items = activeHabits, key = { it.id }) { habit ->
+                    val reminderStatus = if (habit.reminderEnabled) {
+                        tf("Reminder: %s", formatTimeForDevice(context, habit.reminderHour, habit.reminderMinute))
+                    } else {
+                        t("Reminder off")
+                    }
                     HabitCard(
                         habit = HabitCardModel(
                             emoji = habit.emoji,
@@ -706,6 +780,7 @@ private fun HabitsPage(
                             trackingType = habit.trackingType,
                             streak = habit.streak,
                             frequency = habit.frequency,
+                            reminderStatus = reminderStatus,
                             completionRate = habit.completionRate,
                             isArchived = habit.isArchived
                         ),
@@ -731,6 +806,11 @@ private fun HabitsPage(
                     )
                 }
                 items(items = archivedHabits, key = { it.id }) { habit ->
+                    val reminderStatus = if (habit.reminderEnabled) {
+                        tf("Reminder: %s", formatTimeForDevice(context, habit.reminderHour, habit.reminderMinute))
+                    } else {
+                        t("Reminder off")
+                    }
                     HabitCard(
                         habit = HabitCardModel(
                             emoji = habit.emoji,
@@ -739,6 +819,7 @@ private fun HabitsPage(
                             trackingType = habit.trackingType,
                             streak = habit.streak,
                             frequency = habit.frequency,
+                            reminderStatus = reminderStatus,
                             completionRate = habit.completionRate,
                             isArchived = habit.isArchived
                         ),
@@ -976,13 +1057,13 @@ private fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
         return
     }
 
-    val selectedState = when {
-        state.selectedDate.isAfter(today) -> CalendarDayState.FUTURE
-        state.selectedDateDone -> CalendarDayState.COMPLETED
-        state.selectedDate == today -> CalendarDayState.TODAY
-        state.selectedDateScheduled -> CalendarDayState.MISSED
-        else -> CalendarDayState.FUTURE
-    }
+    val selectedState = dayStateFor(
+        date = state.selectedDate,
+        doneDates = state.doneDatesInCurrentMonth,
+        scheduledDates = state.scheduledDatesInCurrentMonth,
+        today = today
+    )
+    val selectedIsTodayPending = state.selectedDate == today && !state.selectedDateDone
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -1052,21 +1133,27 @@ private fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
                     monthGrid(state.currentMonth).forEach { week ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
-                            week.forEach { day ->
+                            week.forEachIndexed { _, day ->
+                                val dayState = dayStateFor(
+                                    date = day,
+                                    doneDates = state.doneDatesInCurrentMonth,
+                                    scheduledDates = state.scheduledDatesInCurrentMonth,
+                                    today = today
+                                )
+                                val dayDate = day
+                                val done = dayDate != null && dayDate in state.doneDatesInCurrentMonth
                                 CalendarDay(
                                     modifier = Modifier.weight(1f),
-                                    date = day,
-                                    state = dayStateFor(
-                                        date = day,
-                                        doneDates = state.doneDatesInCurrentMonth,
-                                        scheduledDates = state.scheduledDatesInCurrentMonth,
-                                        today = today
-                                    ),
-                                    selected = day == state.selectedDate,
-                                    enabled = day != null,
-                                    onClick = { day?.let(vm::selectDate) }
+                                    date = dayDate,
+                                    state = dayState,
+                                    selected = dayDate == state.selectedDate,
+                                    today = dayDate == today,
+                                    connectLeft = done && dayDate != null && dayDate.minusDays(1) in state.doneDatesInCurrentMonth,
+                                    connectRight = done && dayDate != null && dayDate.plusDays(1) in state.doneDatesInCurrentMonth,
+                                    enabled = dayDate != null,
+                                    onClick = { dayDate?.let(vm::selectDate) }
                                 )
                             }
                         }
@@ -1090,13 +1177,16 @@ private fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
                         color = colors.textSecondary
                     )
                     Text(
-                        text = statusLabel(selectedState, state.language),
+                        text = if (selectedIsTodayPending) t("Today") else statusLabel(selectedState, state.language),
                         style = MaterialTheme.typography.titleMedium,
-                        color = when (selectedState) {
+                        color = when {
+                            selectedIsTodayPending -> colors.primary
+                            else -> when (selectedState) {
                             CalendarDayState.COMPLETED -> colors.success
                             CalendarDayState.MISSED -> colors.danger
-                            CalendarDayState.TODAY -> colors.primary
+                            CalendarDayState.NOT_SCHEDULED -> colors.textSecondary
                             CalendarDayState.FUTURE -> colors.textSecondary
+                            }
                         }
                     )
                 }
@@ -1114,15 +1204,15 @@ private fun dayStateFor(
     if (date == null) return CalendarDayState.FUTURE
     if (date.isAfter(today)) return CalendarDayState.FUTURE
     if (date in doneDates) return CalendarDayState.COMPLETED
-    if (date == today) return CalendarDayState.TODAY
-    return if (date in scheduledDates) CalendarDayState.MISSED else CalendarDayState.FUTURE
+    if (date in scheduledDates && date.isBefore(today)) return CalendarDayState.MISSED
+    return CalendarDayState.NOT_SCHEDULED
 }
 
 private fun statusLabel(state: CalendarDayState, language: AppLanguage): String {
     return when (state) {
         CalendarDayState.COMPLETED -> translate(language, "Completed")
         CalendarDayState.MISSED -> translate(language, "Missed")
-        CalendarDayState.TODAY -> translate(language, "Today")
+        CalendarDayState.NOT_SCHEDULED -> translate(language, "Not scheduled")
         CalendarDayState.FUTURE -> translate(language, "Future")
     }
 }
@@ -1274,15 +1364,16 @@ private fun SettingsPage(
                 SettingsRow(
                     title = t("Reminder time"),
                     subtitle = t("Daily notification time"),
-                    value = formatTime(state.defaultReminderHour, state.defaultReminderMinute),
+                    value = formatTimeForDevice(context, state.defaultReminderHour, state.defaultReminderMinute),
                     enabled = state.notificationsEnabled,
                     onClick = {
+                        val is24HourView = android.text.format.DateFormat.is24HourFormat(context)
                         TimePickerDialog(
                             context,
                             { _, hour, minute -> onSetDefaultReminder(hour, minute) },
                             state.defaultReminderHour,
                             state.defaultReminderMinute,
-                            true
+                            is24HourView
                         ).show()
                     }
                 )
@@ -1969,35 +2060,119 @@ private fun HeroCard(
 }
 
 @Composable
-private fun StatsRow(streak: Int, progress: Int, total: Int) {
+private fun StreakRewardOverlay(model: StreakOverlayModel) {
     val spacing = AppTheme.spacing
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(spacing.x1),
+    val radius = AppTheme.radius
+    val stroke = AppTheme.stroke
+    val colors = AppTheme.colors
+    val container by animateColorAsState(
+        targetValue = if (model.milestone) colors.primary else colors.backgroundSurface,
+        animationSpec = tween(durationMillis = 220),
+        label = "streakOverlayContainer"
+    )
+    val contentColor by animateColorAsState(
+        targetValue = if (model.milestone) MaterialTheme.colorScheme.onPrimary else colors.textPrimary,
+        animationSpec = tween(durationMillis = 220),
+        label = "streakOverlayContent"
+    )
+
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(IntrinsicSize.Min)
+            .padding(horizontal = spacing.x2),
+        colors = CardDefaults.cardColors(containerColor = container),
+        shape = RoundedCornerShape(radius.lg),
+        elevation = CardDefaults.cardElevation(defaultElevation = AppTheme.elevation.lg)
     ) {
-        StatTile(
+        Column(
             modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight(),
-            label = t("Current streak"),
-            value = "${streak}d"
-        )
-        StatTile(
+                .fillMaxWidth()
+                .padding(horizontal = spacing.x2, vertical = spacing.x1_5)
+                .border(
+                    width = stroke.thin,
+                    color = if (model.milestone) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.3f) else colors.borderSubtle,
+                    shape = RoundedCornerShape(radius.md)
+                )
+                .padding(horizontal = spacing.x1_5, vertical = spacing.x1),
+            verticalArrangement = Arrangement.spacedBy(spacing.x0_5)
+        ) {
+            Text(
+                text = "🔥 ${tf("%d day streak", model.streak)}",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = contentColor
+            )
+            Text(
+                text = if (model.milestone) t("Milestone reached!") else t("Streak updated"),
+                style = MaterialTheme.typography.bodySmall,
+                color = if (model.milestone) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f) else colors.textSecondary
+            )
+            if (model.milestone) {
+                Text(
+                    text = "✦  ✦  ✦",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f)
+                )
+            }
+        }
+    }
+}
+
+private fun isStreakMilestone(streak: Int): Boolean {
+    if (streak <= 0) return false
+    if (streak in setOf(1, 7, 15, 30, 60, 90, 120)) return true
+    return streak > 120 && streak % 30 == 0
+}
+
+@Composable
+private fun StatsRow(streak: Int, bestStreak: Int, progress: Int, total: Int) {
+    val spacing = AppTheme.spacing
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(spacing.x1)
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(spacing.x1),
             modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight(),
-            label = t("30 day completion"),
-            value = "${progress}%"
-        )
-        StatTile(
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min)
+        ) {
+            StatTile(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                label = t("Current streak"),
+                value = if (streak >= 7) "🔥 ${streak}d" else "${streak}d"
+            )
+            StatTile(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                label = t("Best streak"),
+                value = "${bestStreak}d"
+            )
+        }
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(spacing.x1),
             modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight(),
-            label = t("Total completions"),
-            value = "$total"
-        )
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min)
+        ) {
+            StatTile(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                label = t("30 day completion"),
+                value = "${progress}%"
+            )
+            StatTile(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight(),
+                label = t("Total completions"),
+                value = "$total"
+            )
+        }
     }
 }
 
@@ -2033,10 +2208,15 @@ private fun StatTile(modifier: Modifier = Modifier, label: String, value: String
 }
 
 @Composable
-private fun SevenDayChart(points: List<Int>, anchorDate: LocalDate) {
+private fun SevenDayChart(
+    points: List<Int>,
+    scheduled: List<Boolean>,
+    anchorDate: LocalDate
+) {
     val spacing = AppTheme.spacing
     val locale = appLocale()
     val safe = if (points.size == 7) points else List(7) { 0 }
+    val safeScheduled = if (scheduled.size == 7) scheduled else List(7) { false }
     val today = LocalDate.now()
 
     GlassCard(contentPadding = PaddingValues(spacing.x2)) {
@@ -2044,15 +2224,38 @@ private fun SevenDayChart(points: List<Int>, anchorDate: LocalDate) {
             Text(t("7 day chart"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 safe.forEachIndexed { index, value ->
                     val date = anchorDate.minusDays((6 - index).toLong())
                     val isToday = date == today
+                    val isFuture = date.isAfter(today)
+                    val isDone = value == 1
+                    val isScheduled = safeScheduled[index]
+                    val state = when {
+                        isFuture -> CalendarDayState.FUTURE
+                        isDone -> CalendarDayState.COMPLETED
+                        isScheduled && date.isBefore(today) -> CalendarDayState.MISSED
+                        else -> CalendarDayState.NOT_SCHEDULED
+                    }
+                    val leftDone = if (index > 0) {
+                        val leftDate = anchorDate.minusDays((6 - (index - 1)).toLong())
+                        safe[index - 1] == 1 && !leftDate.isAfter(today)
+                    } else {
+                        false
+                    }
+                    val rightDone = if (index < safe.lastIndex) {
+                        val rightDate = anchorDate.minusDays((6 - (index + 1)).toLong())
+                        safe[index + 1] == 1 && !rightDate.isAfter(today)
+                    } else {
+                        false
+                    }
                     DayBar(
                         modifier = Modifier.weight(1f),
-                        done = value == 1,
+                        state = state,
                         isToday = isToday,
+                        connectLeft = isDone && leftDone,
+                        connectRight = isDone && rightDone,
                         label = date.dayOfWeek.getDisplayName(TextStyle.SHORT, locale)
                     )
                 }
@@ -2062,10 +2265,58 @@ private fun SevenDayChart(points: List<Int>, anchorDate: LocalDate) {
 }
 
 @Composable
-private fun DayBar(modifier: Modifier = Modifier, done: Boolean, isToday: Boolean, label: String) {
+private fun DayBar(
+    modifier: Modifier = Modifier,
+    state: CalendarDayState,
+    isToday: Boolean,
+    connectLeft: Boolean,
+    connectRight: Boolean,
+    label: String
+) {
     val spacing = AppTheme.spacing
     val radius = AppTheme.radius
+    val stroke = AppTheme.stroke
     val semantic = AppTheme.colors
+    val completionProgress by animateFloatAsState(
+        targetValue = if (state == CalendarDayState.COMPLETED) 1f else 0f,
+        animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
+        label = "dayBarCompletionProgress"
+    )
+    val connectorProgress by animateFloatAsState(
+        targetValue = if (
+            state == CalendarDayState.COMPLETED &&
+            (connectLeft || connectRight)
+        ) {
+            if (connectLeft && connectRight) 1f else 0.7f
+        } else {
+            0f
+        },
+        animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
+        label = "dayBarConnectorProgress"
+    )
+    val backgroundColor by animateColorAsState(
+        targetValue = when (state) {
+            CalendarDayState.COMPLETED -> semantic.success.copy(alpha = 0.90f)
+            CalendarDayState.MISSED -> semantic.danger.copy(alpha = 0.08f)
+            CalendarDayState.NOT_SCHEDULED -> semantic.neutralMuted.copy(alpha = 0.42f)
+            CalendarDayState.FUTURE -> semantic.backgroundSurfaceMuted.copy(alpha = 0.28f)
+        },
+        animationSpec = tween(durationMillis = 220),
+        label = "dayBarBackgroundColor"
+    )
+    val borderColor = when (state) {
+        CalendarDayState.COMPLETED -> Color.Transparent
+        CalendarDayState.MISSED -> semantic.danger.copy(alpha = 0.45f)
+        CalendarDayState.NOT_SCHEDULED -> semantic.borderSubtle
+        CalendarDayState.FUTURE -> semantic.borderSubtle.copy(alpha = 0.4f)
+    }
+    val dayColor = when (state) {
+        CalendarDayState.COMPLETED -> MaterialTheme.colorScheme.onPrimary
+        CalendarDayState.MISSED -> semantic.danger
+        CalendarDayState.NOT_SCHEDULED -> semantic.textSecondary
+        CalendarDayState.FUTURE -> semantic.textTertiary
+    }
+
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -2075,17 +2326,48 @@ private fun DayBar(modifier: Modifier = Modifier, done: Boolean, isToday: Boolea
             modifier = Modifier
                 .fillMaxWidth()
                 .height(spacing.x5 + spacing.x1)
-                .clip(RoundedCornerShape(radius.sm))
-                .background(if (isToday) semantic.primaryMuted else semantic.backgroundSurfaceMuted),
-            contentAlignment = Alignment.BottomCenter
+                .clip(RoundedCornerShape(radius.sm)),
+            contentAlignment = Alignment.Center
         ) {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(if (done) spacing.x5 else spacing.x2)
-                    .clip(RoundedCornerShape(radius.sm))
-                    .background(if (done) semantic.chartDone else semantic.chartMissed)
+                    .fillMaxWidth(connectorProgress)
+                    .height(spacing.x1)
+                    .background(semantic.successMuted.copy(alpha = completionProgress), RoundedCornerShape(radius.full))
+                    .align(Alignment.Center)
             )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(spacing.x5 + spacing.x1)
+                    .background(
+                        color = backgroundColor,
+                        shape = RoundedCornerShape(
+                            topStart = if (state == CalendarDayState.COMPLETED && connectLeft) 4.dp else radius.sm,
+                            topEnd = if (state == CalendarDayState.COMPLETED && connectRight) 4.dp else radius.sm,
+                            bottomStart = if (state == CalendarDayState.COMPLETED && connectLeft) 4.dp else radius.sm,
+                            bottomEnd = if (state == CalendarDayState.COMPLETED && connectRight) 4.dp else radius.sm
+                        )
+                    )
+                    .border(stroke.thin, borderColor, RoundedCornerShape(radius.sm)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isToday) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(spacing.x5 + spacing.x1)
+                            .padding(1.dp)
+                            .border(stroke.thin, semantic.calendarTodayRing, RoundedCornerShape(radius.sm))
+                    )
+                }
+                Text(
+                    text = if (state == CalendarDayState.COMPLETED) "✓" else "",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = dayColor,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
         Text(
             text = label.replaceFirstChar { it.titlecase() },
@@ -2103,6 +2385,7 @@ private fun CalendarCard(
     selectedDate: LocalDate,
     selectedTask: HabitTask?,
     doneDates: Set<LocalDate>,
+    scheduledDates: Set<LocalDate>,
     onMoveMonth: (Long) -> Unit,
     onToday: () -> Unit,
     onDateSelect: (LocalDate) -> Unit
@@ -2162,78 +2445,32 @@ private fun CalendarCard(
             monthGrid(month).forEach { week ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    week.forEach { day ->
-                        CalendarCell(
-                            modifier = Modifier.weight(1f),
+                    week.forEachIndexed { _, day ->
+                        val state = dayStateFor(
                             date = day,
-                            selected = day == selectedDate,
-                            done = day != null && day in doneDates,
+                            doneDates = doneDates,
+                            scheduledDates = scheduledDates,
+                            today = LocalDate.now()
+                        )
+                        val dayDate = day
+                        val done = dayDate != null && dayDate in doneDates
+                        CalendarDay(
+                            modifier = Modifier.weight(1f),
+                            date = dayDate,
+                            state = state,
+                            selected = dayDate == selectedDate,
+                            today = dayDate == LocalDate.now(),
+                            connectLeft = done && dayDate != null && dayDate.minusDays(1) in doneDates,
+                            connectRight = done && dayDate != null && dayDate.plusDays(1) in doneDates,
                             enabled = selectedTask != null,
-                            onClick = { day?.let(onDateSelect) }
+                            onClick = { dayDate?.let(onDateSelect) }
                         )
                     }
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun CalendarCell(
-    modifier: Modifier = Modifier,
-    date: LocalDate?,
-    selected: Boolean,
-    done: Boolean,
-    enabled: Boolean,
-    onClick: () -> Unit
-) {
-    val spacing = AppTheme.spacing
-    val radius = AppTheme.radius
-    val stroke = AppTheme.stroke
-    val semantic = AppTheme.colors
-
-    if (date == null) {
-        Box(modifier = modifier.height(spacing.x5 + spacing.x0_5))
-        return
-    }
-
-    val isToday = date == LocalDate.now()
-    val borderColor = when {
-        selected -> semantic.primary
-        isToday -> semantic.calendarTodayRing
-        else -> Color.Transparent
-    }
-
-    Column(
-        modifier = modifier
-            .height(spacing.x5 + spacing.x0_5)
-            .clip(RoundedCornerShape(radius.sm))
-            .border(stroke.thin, borderColor, RoundedCornerShape(radius.sm))
-            .background(if (selected) semantic.primary else Color.Transparent)
-            .clickable(enabled = enabled, onClick = onClick),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = date.dayOfMonth.toString(),
-            style = MaterialTheme.typography.bodySmall,
-            color = when {
-                selected -> MaterialTheme.colorScheme.onPrimary
-                isToday -> semantic.primary
-                else -> semantic.textPrimary
-            }
-        )
-        Box(
-            modifier = Modifier
-                .padding(top = spacing.x0_5)
-                .size(spacing.x0_5)
-                .background(
-                    if (!done) Color.Transparent else if (selected) MaterialTheme.colorScheme.onPrimary else semantic.calendarDoneDot,
-                    CircleShape
-                )
-        )
     }
 }
 
@@ -2277,6 +2514,7 @@ private fun TaskEditorDialog(
     val stroke = AppTheme.stroke
     val context = LocalContext.current
     val locale = appLocale()
+    val is24HourView = android.text.format.DateFormat.is24HourFormat(context)
     val selectedColor = parseColorHex(state.editorColorHex)
     val pickerTheme = R.style.ThemeOverlay_MicroHabit_Picker
     val pickerActionColor = colors.primary.toArgb()
@@ -2450,6 +2688,50 @@ private fun TaskEditorDialog(
                     }
                 }
 
+                FormSection(title = t("Reminders")) {
+                    Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+                        SettingsSwitchRow(
+                            title = t("Reminders"),
+                            subtitle = t("Enable habit reminder notifications"),
+                            checked = state.editorReminderEnabled,
+                            onCheckedChange = vm::setEditorReminderEnabled
+                        )
+                        AnimatedVisibility(visible = state.editorReminderEnabled) {
+                            OutlinedButton(
+                                onClick = {
+                                    showThemedTimePicker(
+                                        context = context,
+                                        themeResId = pickerTheme,
+                                        initialHour = state.editorReminderHour,
+                                        initialMinute = state.editorReminderMinute,
+                                        is24HourView = is24HourView,
+                                        actionColorArgb = pickerActionColor,
+                                        onTimeSet = vm::setEditorReminder
+                                    )
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(AppTheme.radius.md),
+                                border = BorderStroke(stroke.thin, colors.primary),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    containerColor = Color.Transparent,
+                                    contentColor = colors.primary
+                                )
+                            ) {
+                                Text(
+                                    tf(
+                                        "Reminder: %s",
+                                        formatTimeForDevice(
+                                            context,
+                                            state.editorReminderHour,
+                                            state.editorReminderMinute
+                                        )
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+
                 TextButton(onClick = { vm.setEditorShowAdvanced(!state.editorShowAdvanced) }) {
                     Text(if (state.editorShowAdvanced) t("Hide advanced settings") else t("Show advanced settings"))
                 }
@@ -2458,29 +2740,6 @@ private fun TaskEditorDialog(
                     Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
                         FormSection(title = t("Advanced settings")) {
                             Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
-                                OutlinedButton(
-                                    onClick = {
-                                        showThemedTimePicker(
-                                            context = context,
-                                            themeResId = pickerTheme,
-                                            initialHour = state.editorReminderHour,
-                                            initialMinute = state.editorReminderMinute,
-                                            is24HourView = true,
-                                            actionColorArgb = pickerActionColor,
-                                            onTimeSet = vm::setEditorReminder
-                                        )
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(AppTheme.radius.md),
-                                    border = BorderStroke(stroke.thin, colors.primary),
-                                    colors = ButtonDefaults.outlinedButtonColors(
-                                        containerColor = Color.Transparent,
-                                        contentColor = colors.primary
-                                    )
-                                ) {
-                                    Text(tf("Reminder: %s", formatTime(state.editorReminderHour, state.editorReminderMinute)))
-                                }
-
                                 OutlinedButton(
                                     onClick = {
                                         showThemedDatePicker(
@@ -2591,8 +2850,15 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
     else -> null
 }
 
-private fun formatTime(hour: Int, minute: Int): String =
-    String.format(Locale.ENGLISH, "%02d:%02d", hour, minute)
+private fun formatTimeForDevice(context: Context, hour: Int, minute: Int): String {
+    val calendar = java.util.Calendar.getInstance().apply {
+        set(java.util.Calendar.HOUR_OF_DAY, hour.coerceIn(0, 23))
+        set(java.util.Calendar.MINUTE, minute.coerceIn(0, 59))
+        set(java.util.Calendar.SECOND, 0)
+        set(java.util.Calendar.MILLISECOND, 0)
+    }
+    return android.text.format.DateFormat.getTimeFormat(context).format(calendar.time)
+}
 
 private fun localizedMonthYear(month: YearMonth, language: AppLanguage, locale: Locale): String {
     val raw = month.format(DateTimeFormatter.ofPattern(translate(language, "LLLL yyyy"), locale))

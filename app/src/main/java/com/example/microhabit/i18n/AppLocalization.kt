@@ -113,6 +113,7 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "Completion details" to v("Details zur Erfullung", "Details de realisation", "Detalles de cumplimiento", "Dettagli completamento", "Детали выполнения"),
     "Completed" to v("Abgeschlossen", "Termine", "Completado", "Completato", "Выполнено"),
     "Missed" to v("Verpasst", "Manque", "Perdido", "Saltato", "Пропущено"),
+    "Not scheduled" to v("Nicht geplant", "Non planifie", "No programado", "Non pianificato", "Не запланировано"),
     "Future" to v("Zukunft", "Futur", "Futuro", "Futuro", "Будущее"),
     "You are on PRO. Manage options in Premium." to v(
         "Du hast PRO. Verwalte Optionen im Premium-Bereich.",
@@ -162,6 +163,7 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "Enable habit reminder notifications" to v("Erinnerungen fur Gewohnheiten aktivieren", "Activer les rappels d'habitude", "Activar recordatorios de habitos", "Abilita promemoria abitudini", "Включить уведомления-напоминания"),
     "Reminder time" to v("Erinnerungszeit", "Heure de rappel", "Hora del recordatorio", "Orario promemoria", "Время напоминания"),
     "Daily notification time" to v("Tagliche Benachrichtigungszeit", "Heure quotidienne de notification", "Hora diaria de notificacion", "Orario notifica giornaliera", "Ежедневное время уведомления"),
+    "Reminder off" to v("Erinnerung aus", "Rappel desactive", "Recordatorio desactivado", "Promemoria disattivato", "Напоминание выключено"),
     "Notifications are disabled" to v(
         "Benachrichtigungen sind deaktiviert",
         "Les notifications sont desactivees",
@@ -333,6 +335,9 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "Not scheduled for this date" to v("Nicht fur dieses Datum geplant", "Non prevu pour cette date", "No programado para esta fecha", "Non previsto per questa data", "Не запланировано на эту дату"),
     "Mark as done" to v("Als erledigt markieren", "Marquer comme fait", "Marcar como hecho", "Segna come completata", "Отметить как выполнено"),
     "Great job, your streak is safe." to v("Super, deine Serie ist gesichert.", "Bravo, votre serie est preservee.", "Buen trabajo, tu racha esta a salvo.", "Ottimo lavoro, la tua serie e salva.", "Отлично, ваша серия сохранена."),
+    "%d day streak" to v("%d Tage Serie", "Serie de %d jours", "Racha de %d dias", "Serie di %d giorni", "Серия %d дней"),
+    "Milestone reached!" to v("Meilenstein erreicht!", "Palier atteint !", "Hito alcanzado!", "Traguardo raggiunto!", "Достигнут рубеж!"),
+    "Streak updated" to v("Serie aktualisiert", "Serie mise a jour", "Racha actualizada", "Serie aggiornata", "Серия обновлена"),
     "7 day chart" to v("7-Tage-Chart", "Graphique sur 7 jours", "Grafico de 7 dias", "Grafico 7 giorni", "График за 7 дней"),
     "W" to v("KW ", "S", "S", "S", "Н"),
     "Tracking type" to v("Tracking-Typ", "Type de suivi", "Tipo de seguimiento", "Tipo di monitoraggio", "Тип отслеживания"),

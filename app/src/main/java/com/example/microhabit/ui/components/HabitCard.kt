@@ -37,6 +37,7 @@ data class HabitCardModel(
     val trackingType: TrackingType,
     val streak: Int,
     val frequency: String,
+    val reminderStatus: String,
     val completionRate: Int,
     val isArchived: Boolean
 )
@@ -106,6 +107,13 @@ fun HabitCard(
                         text = habit.frequency,
                         style = MaterialTheme.typography.bodySmall,
                         color = colors.textSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = habit.reminderStatus,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.textTertiary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )

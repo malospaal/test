@@ -32,6 +32,9 @@ data class HabitListItem(
     val streak: Int,
     val frequency: String,
     val completionRate: Int,
+    val reminderEnabled: Boolean,
+    val reminderHour: Int,
+    val reminderMinute: Int,
     val isArchived: Boolean
 )
 
@@ -52,6 +55,7 @@ data class HabitUiState(
     val totalCompletions: Int = 0,
     val progressPercent: Int = 0,
     val last7Days: List<Int> = List(7) { 0 },
+    val last7DaysScheduled: List<Boolean> = List(7) { false },
     val monthlyProgress: List<Int> = emptyList(),
     val weekdayConsistency: List<Int> = List(7) { 0 },
     val doneDatesInCurrentMonth: Set<LocalDate> = emptySet(),
@@ -67,6 +71,7 @@ data class HabitUiState(
     val editorCustomDays: Set<Int> = setOf(1, 2, 3, 4, 5),
     val editorReminderHour: Int = 8,
     val editorReminderMinute: Int = 0,
+    val editorReminderEnabled: Boolean = false,
     val editorStartDate: LocalDate = LocalDate.now(),
     val editorShowAdvanced: Boolean = false,
     val plan: SubscriptionPlan = SubscriptionPlan.FREE,
@@ -218,6 +223,7 @@ class MainViewModel(
                 editorCustomDays = setOf(1, 2, 3, 4, 5),
                 editorReminderHour = reminderHour,
                 editorReminderMinute = reminderMinute,
+                editorReminderEnabled = false,
                 editorStartDate = LocalDate.now(),
                 editorShowAdvanced = false
             )
@@ -241,6 +247,7 @@ class MainViewModel(
                     .toSet(),
                 editorReminderHour = task.reminderHour,
                 editorReminderMinute = task.reminderMinute,
+                editorReminderEnabled = task.reminderEnabled,
                 editorStartDate = task.startDate,
                 editorShowAdvanced = false
             )
@@ -292,6 +299,10 @@ class MainViewModel(
                 editorReminderMinute = minute.coerceIn(0, 59)
             )
         }
+    }
+
+    fun setEditorReminderEnabled(value: Boolean) {
+        _state.update { it.copy(editorReminderEnabled = value) }
     }
 
     fun setEditorStartDate(value: LocalDate) {
@@ -353,6 +364,7 @@ class MainViewModel(
                     timesPerWeek = current.editorTimesPerWeek,
                     reminderHour = current.editorReminderHour,
                     reminderMinute = current.editorReminderMinute,
+                    reminderEnabled = current.editorReminderEnabled,
                     startDate = current.editorStartDate
                 )
                 repository.setSelectedTask(task.id)
@@ -369,6 +381,7 @@ class MainViewModel(
                     timesPerWeek = current.editorTimesPerWeek,
                     reminderHour = current.editorReminderHour,
                     reminderMinute = current.editorReminderMinute,
+                    reminderEnabled = current.editorReminderEnabled,
                     startDate = current.editorStartDate
                 )
                 current.editingTaskId
@@ -456,6 +469,9 @@ class MainViewModel(
                                 streak = repository.calculateStreak(task),
                                 frequency = frequencyLabel(task, language),
                                 completionRate = repository.progressForLast30Days(task),
+                                reminderEnabled = task.reminderEnabled,
+                                reminderHour = task.reminderHour,
+                                reminderMinute = task.reminderMinute,
                                 isArchived = task.isArchived
                             )
                         }
@@ -475,6 +491,12 @@ class MainViewModel(
                     totalCompletions = selectedTask?.let { repository.totalCompletions(it) } ?: 0,
                     progressPercent = selectedTask?.let { repository.progressForLast30Days(it, date) } ?: 0,
                     last7Days = selectedTask?.let { repository.last7Days(it, date) } ?: List(7) { 0 },
+                    last7DaysScheduled = selectedTask?.let { task ->
+                        (6L downTo 0L).map { offset ->
+                            val day = date.minusDays(offset)
+                            repository.isScheduledOn(task, day)
+                        }
+                    } ?: List(7) { false },
                     monthlyProgress = selectedTask?.let { repository.monthlyWeeklyProgress(it, state.currentMonth) } ?: emptyList(),
                     weekdayConsistency = selectedTask?.let { repository.weekdayConsistency(it, 84, date) } ?: List(7) { 0 },
                     doneDatesInCurrentMonth = selectedTask?.let { task ->
@@ -515,6 +537,12 @@ class MainViewModel(
                 totalCompletions = selectedTask?.let { repository.totalCompletions(it) } ?: 0,
                 progressPercent = selectedTask?.let { repository.progressForLast30Days(it, date) } ?: 0,
                 last7Days = selectedTask?.let { repository.last7Days(it, date) } ?: List(7) { 0 },
+                last7DaysScheduled = selectedTask?.let { task ->
+                    (6L downTo 0L).map { offset ->
+                        val day = date.minusDays(offset)
+                        repository.isScheduledOn(task, day)
+                    }
+                } ?: List(7) { false },
                 monthlyProgress = selectedTask?.let { repository.monthlyWeeklyProgress(it, month) } ?: emptyList(),
                 weekdayConsistency = selectedTask?.let { repository.weekdayConsistency(it, 84, date) } ?: List(7) { 0 },
                 doneDatesInCurrentMonth = selectedTask?.let { task ->

@@ -118,13 +118,13 @@ import java.util.Locale
 import kotlinx.coroutines.launch
 
 private enum class AppPage(val title: String) {
-    TRACKER("Трекер"),
+    TRACKER("Tracker"),
     HABITS("Habits"),
     ANALYTICS("Analytics"),
     CALENDAR("Calendar"),
     PAYWALL("Premium"),
-    ACCOUNT("Аккаунт"),
-    SETTINGS("Настройки")
+    ACCOUNT("Account"),
+    SETTINGS("Settings")
 }
 
 private enum class BillingCycle {
@@ -302,13 +302,13 @@ private fun DrawerContent(current: AppPage, plan: SubscriptionPlan, onNavigate: 
         ) {
             Text("Micro-habit", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
             Text(
-                if (plan == SubscriptionPlan.PRO) "План: PRO" else "План: Free",
+                if (plan == SubscriptionPlan.PRO) "Plan: PRO" else "Plan: Free",
                 color = semantic.textSecondary,
                 style = MaterialTheme.typography.bodyMedium
             )
 
             NavigationDrawerItem(
-                label = { Text("Трекер") },
+                label = { Text("Tracker") },
                 selected = current == AppPage.TRACKER,
                 onClick = { onNavigate(AppPage.TRACKER) },
                 icon = { Icon(Icons.Rounded.Home, contentDescription = null) },
@@ -343,14 +343,14 @@ private fun DrawerContent(current: AppPage, plan: SubscriptionPlan, onNavigate: 
                 colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = colors.primary.copy(alpha = 0.15f))
             )
             NavigationDrawerItem(
-                label = { Text("Аккаунт") },
+                label = { Text("Account") },
                 selected = current == AppPage.ACCOUNT,
                 onClick = { onNavigate(AppPage.ACCOUNT) },
                 icon = { Icon(Icons.Rounded.AccountCircle, contentDescription = null) },
                 colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = colors.primary.copy(alpha = 0.15f))
             )
             NavigationDrawerItem(
-                label = { Text("Настройки") },
+                label = { Text("Settings") },
                 selected = current == AppPage.SETTINGS,
                 onClick = { onNavigate(AppPage.SETTINGS) },
                 icon = { Icon(Icons.Rounded.Settings, contentDescription = null) },
@@ -878,19 +878,19 @@ private fun AccountPage(
         }
         item {
             PlanCard(
-                title = "Бесплатный",
-                subtitle = "1 задача",
+                title = "Free",
+                subtitle = "1 habit",
                 selected = state.plan == SubscriptionPlan.FREE,
-                actionLabel = if (state.plan == SubscriptionPlan.FREE) "Текущий" else "Выбрать",
+                actionLabel = if (state.plan == SubscriptionPlan.FREE) "Current" else "Choose",
                 onAction = { onSetPlan(SubscriptionPlan.FREE) }
             )
         }
         item {
             PlanCard(
                 title = "PRO",
-                subtitle = "Безлимит задач",
+                subtitle = "Unlimited habits",
                 selected = state.plan == SubscriptionPlan.PRO,
-                actionLabel = if (state.plan == SubscriptionPlan.PRO) "Текущий" else "Выбрать PRO",
+                actionLabel = if (state.plan == SubscriptionPlan.PRO) "Current" else "Choose PRO",
                 onAction = { onSetPlan(SubscriptionPlan.PRO) }
             )
         }
@@ -1416,9 +1416,9 @@ private fun OnboardingCard(vm: MainViewModel, state: HabitUiState) {
     val canAdd = state.plan == SubscriptionPlan.PRO || state.tasks.size < 1
     GlassCard {
         Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
-            Text("Создай первую задачу", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text("Create your first habit", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Text(
-                text = "Заполни базовые параметры и при желании открой дополнительные настройки.",
+                text = "Set up the basics first and add advanced options if needed.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = colors.textSecondary
             )
@@ -1427,7 +1427,7 @@ private fun OnboardingCard(vm: MainViewModel, state: HabitUiState) {
                 enabled = canAdd,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(if (canAdd) "Создать привычку" else "Upgrade to PRO")
+                Text(if (canAdd) "Create habit" else "Upgrade to PRO")
             }
         }
     }
@@ -1442,7 +1442,7 @@ private fun TrackerHeader(
     val spacing = AppTheme.spacing
     val radius = AppTheme.radius
     val semantic = AppTheme.colors
-    val title = if (habitTitle.isBlank()) "Без активной задачи" else habitTitle
+    val title = if (habitTitle.isBlank()) "No active habit" else habitTitle
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -1487,7 +1487,7 @@ private fun TrackerHeader(
             shadowElevation = AppTheme.elevation.md
         ) {
             IconButton(onClick = onOpenSettings, modifier = Modifier.size(spacing.x5)) {
-                Icon(Icons.Rounded.Settings, contentDescription = "Настройки")
+                Icon(Icons.Rounded.Settings, contentDescription = "Settings")
             }
         }
     }
@@ -1508,20 +1508,20 @@ private fun TaskControlsRow(
     ) {
         TaskControlButton(
             modifier = Modifier.weight(1f),
-            label = if (canAddTask) "Новая" else "PRO",
+            label = if (canAddTask) "New" else "PRO",
             icon = if (canAddTask) Icons.Rounded.AddCircle else Icons.Rounded.WorkspacePremium,
             onClick = onCreate
         )
         TaskControlButton(
             modifier = Modifier.weight(1f),
-            label = "Редактировать",
+            label = "Edit",
             icon = Icons.Rounded.Edit,
             onClick = onEdit,
             enabled = canEditDelete
         )
         TaskControlButton(
             modifier = Modifier.weight(1f),
-            label = "Удалить",
+            label = "Delete",
             icon = Icons.Rounded.Delete,
             onClick = onDelete,
             enabled = canEditDelete,
@@ -1629,12 +1629,12 @@ private fun HeroCard(
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = selectedDate.format(DateTimeFormatter.ofPattern("dd MMM yyyy", Locale("ru"))),
+                text = selectedDate.format(DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ENGLISH)),
                 style = MaterialTheme.typography.bodySmall,
                 color = semantic.textSecondary
             )
             Text(
-                text = "Сегодня сделал?",
+                text = "Did you complete it today?",
                 style = MaterialTheme.typography.headlineSmall
             )
             Button(
@@ -1652,7 +1652,7 @@ private fun HeroCard(
                 )
             ) {
                 Text(
-                    text = if (!scheduled) "Не по расписанию" else if (done) "Выполнено сегодня" else "Отметить выполнение",
+                    text = if (!scheduled) "Not scheduled today" else if (done) "Completed today" else "Mark as done",
                     style = MaterialTheme.typography.labelLarge
                 )
             }
@@ -1669,7 +1669,7 @@ private fun HeroCard(
                         modifier = Modifier.size(spacing.x2 + spacing.x0_5)
                     )
                     Text(
-                        "Отлично, ты сохранил серию.",
+                        "Great job, your streak is safe.",
                         style = MaterialTheme.typography.bodySmall,
                         color = semantic.textSecondary
                     )
@@ -1728,7 +1728,7 @@ private fun SevenDayChart(points: List<Int>, anchorDate: LocalDate) {
 
     GlassCard(contentPadding = PaddingValues(spacing.x2)) {
         Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
-            Text("График 7 дней", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text("7 day chart", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(spacing.x1)
@@ -1740,7 +1740,7 @@ private fun SevenDayChart(points: List<Int>, anchorDate: LocalDate) {
                         modifier = Modifier.weight(1f),
                         done = value == 1,
                         isToday = isToday,
-                        label = date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale("ru"))
+                        label = date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.ENGLISH)
                     )
                 }
             }
@@ -1806,7 +1806,7 @@ private fun CalendarCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    month.format(DateTimeFormatter.ofPattern("LLLL yyyy", Locale("ru"))),
+                    month.format(DateTimeFormatter.ofPattern("LLLL yyyy", Locale.ENGLISH)),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = semantic.textPrimary
@@ -1825,10 +1825,10 @@ private fun CalendarCard(
                 modifier = Modifier.fillMaxWidth().height(spacing.x5),
                 shape = RoundedCornerShape(radius.md)
             ) {
-                Text("Сегодня")
+                Text("Today")
             }
 
-            val days = listOf("Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс")
+            val days = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(spacing.x1)

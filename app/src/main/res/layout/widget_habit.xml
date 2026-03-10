@@ -12,7 +12,7 @@
         android:layout_height="wrap_content"
         android:textStyle="bold"
         android:textSize="16sp"
-        android:text="Привычка" />
+        android:text="Habit" />
 
     <TextView
         android:id="@+id/widgetStreak"
@@ -36,6 +36,6 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
-        android:text="Прогресс: 0%"
+        android:text="Progress: 0%"
         android:textSize="13sp" />
 </LinearLayout>

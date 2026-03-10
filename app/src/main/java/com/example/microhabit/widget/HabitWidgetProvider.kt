@@ -45,7 +45,7 @@ class HabitWidgetProvider : AppWidgetProvider() {
                 setTextViewText(R.id.widgetHabit, taskName)
                 setTextViewText(R.id.widgetStreak, "Streak: $streak")
                 setProgressBar(R.id.widgetProgressBar, 100, progress, false)
-                setTextViewText(R.id.widgetProgressText, "Прогресс: $progress%")
+                setTextViewText(R.id.widgetProgressText, "Progress: $progress%")
                 setOnClickPendingIntent(R.id.widgetHabit, openAppIntent)
                 setOnClickPendingIntent(R.id.widgetStreak, openAppIntent)
                 setOnClickPendingIntent(R.id.widgetProgressText, openAppIntent)

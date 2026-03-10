@@ -11,6 +11,7 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 import java.time.YearMonth
+import java.time.temporal.ChronoUnit
 
 enum class TaskFrequency {
     DAILY,
@@ -41,7 +42,7 @@ enum class AppLanguage(val label: String) {
     FR("Français"),
     ES("Español"),
     IT("Italiano"),
-    RU("Русский")
+    RU("Russian")
 }
 
 data class HabitTask(
@@ -329,8 +330,7 @@ class HabitRepository(private val context: Context) {
 
     fun calculateStreak(task: HabitTask, fromDate: LocalDate = LocalDate.now()): Int {
         if (task.frequency == TaskFrequency.TIMES_PER_WEEK) {
-            // For times-per-week habits we keep a simple day streak over completed days.
-            return calculateDailyLikeStreak(task, fromDate)
+            return calculateWeeklyStreak(task, fromDate)
         }
         return calculateDailyLikeStreak(task, fromDate)
     }
@@ -338,19 +338,45 @@ class HabitRepository(private val context: Context) {
     private fun calculateDailyLikeStreak(task: HabitTask, fromDate: LocalDate): Int {
         var streak = 0
         var cursor = fromDate
+        val today = LocalDate.now()
 
         repeat(3650) {
-            if (!isScheduledOn(task, cursor)) {
-                cursor = cursor.minusDays(1)
-                return@repeat
+            val scheduled = isScheduledOn(task, cursor)
+            if (scheduled) {
+                if (isDone(task.id, cursor)) {
+                    streak++
+                } else if (cursor != today) {
+                    return streak
+                }
+            }
+            cursor = cursor.minusDays(1)
+            if (cursor.isBefore(task.startDate)) return streak
+        }
+        return streak
+    }
+
+    private fun calculateWeeklyStreak(task: HabitTask, fromDate: LocalDate): Int {
+        var streak = 0
+        var currentWeekStart = fromDate.minusDays((fromDate.dayOfWeek.value - 1).toLong())
+        val today = LocalDate.now()
+        val thisWeekStart = today.minusDays((today.dayOfWeek.value - 1).toLong())
+
+        repeat(520) {
+            var completionsInWeek = 0
+            for (i in 0..6) {
+                val day = currentWeekStart.plusDays(i.toLong())
+                if (day.isAfter(today)) continue
+                if (isDone(task.id, day)) completionsInWeek++
             }
 
-            if (isDone(task.id, cursor)) {
-                streak += 1
-                cursor = cursor.minusDays(1)
-            } else {
+            if (completionsInWeek >= task.timesPerWeek) {
+                streak++
+            } else if (currentWeekStart != thisWeekStart) {
                 return streak
             }
+            
+            currentWeekStart = currentWeekStart.minusWeeks(1)
+            if (currentWeekStart.plusDays(6).isBefore(task.startDate)) return streak
         }
         return streak
     }
@@ -363,27 +389,7 @@ class HabitRepository(private val context: Context) {
     }
 
     fun progressForLast30Days(task: HabitTask, anchorDate: LocalDate = LocalDate.now()): Int {
-        if (task.frequency == TaskFrequency.TIMES_PER_WEEK) {
-            var completed = 0
-            for (offset in 0L until 30L) {
-                val day = anchorDate.minusDays(offset)
-                if (!day.isBefore(task.startDate) && isDone(task.id, day)) completed += 1
-            }
-            val target = ((task.timesPerWeek / 7f) * 30f).toInt().coerceAtLeast(1)
-            return (completed * 100 / target).coerceIn(0, 100)
-        }
-
-        var scheduled = 0
-        var completed = 0
-        for (offset in 0L until 30L) {
-            val day = anchorDate.minusDays(offset)
-            if (isScheduledOn(task, day)) {
-                scheduled += 1
-                if (isDone(task.id, day)) completed += 1
-            }
-        }
-        if (scheduled == 0) return 0
-        return (completed * 100 / scheduled)
+        return completionRate(task, 30, anchorDate)
     }
 
     fun completionRate(task: HabitTask, days: Int, anchorDate: LocalDate = LocalDate.now()): Int {
@@ -392,7 +398,7 @@ class HabitRepository(private val context: Context) {
             var completed = 0
             for (offset in 0L until days.toLong()) {
                 val day = anchorDate.minusDays(offset)
-                if (!day.isBefore(task.startDate) && isDone(task.id, day)) completed += 1
+                if (isDone(task.id, day)) completed += 1
             }
             val target = ceil((task.timesPerWeek / 7f) * days).toInt().coerceAtLeast(1)
             return (completed * 100 / target).coerceIn(0, 100)
@@ -402,7 +408,7 @@ class HabitRepository(private val context: Context) {
         var completed = 0
         for (offset in 0L until days.toLong()) {
             val day = anchorDate.minusDays(offset)
-            if (isScheduledOn(task, day)) {
+            if (isScheduledByFrequency(task, day)) {
                 scheduled += 1
                 if (isDone(task.id, day)) completed += 1
             }
@@ -411,7 +417,20 @@ class HabitRepository(private val context: Context) {
         return (completed * 100 / scheduled)
     }
 
+    // Uses the habit pattern only; does not clamp by start date.
+    private fun isScheduledByFrequency(task: HabitTask, date: LocalDate): Boolean {
+        return when (task.frequency) {
+            TaskFrequency.DAILY -> true
+            TaskFrequency.SELECTED_DAYS -> date.dayOfWeek.value in task.customDays
+            TaskFrequency.TIMES_PER_WEEK -> true
+        }
+    }
+
     fun bestStreak(task: HabitTask, upToDate: LocalDate = LocalDate.now()): Int {
+        if (task.frequency == TaskFrequency.TIMES_PER_WEEK) {
+             // Simplified for times per week: just return current if we don't have historical best logic yet
+             return calculateWeeklyStreak(task, upToDate)
+        }
         var best = 0
         var current = 0
         var cursor = upToDate
@@ -483,7 +502,7 @@ class HabitRepository(private val context: Context) {
     fun selectedTaskWidgetSummary(): Triple<String, Int, Int> {
         val tasks = getTasks().filterNot { it.isArchived }
         val selected = tasks.firstOrNull { it.id == getSelectedTaskId() } ?: tasks.firstOrNull()
-        if (selected == null) return Triple("Создай задачу", 0, 0)
+        if (selected == null) return Triple("Create a habit", 0, 0)
 
         val streak = calculateStreak(selected)
         val progress = progressForLast30Days(selected)

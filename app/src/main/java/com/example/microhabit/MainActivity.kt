@@ -2,9 +2,11 @@ package com.example.microhabit
 
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
+import android.content.Context
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -15,6 +17,8 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -85,12 +89,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.microhabit.data.AppLanguage
 import com.example.microhabit.data.AppThemeMode
@@ -2123,6 +2126,7 @@ private fun TaskEditorDialog(state: HabitUiState, onDismiss: () -> Unit, vm: Mai
     val locale = appLocale()
     val selectedColor = parseColorHex(state.editorColorHex)
     val pickerTheme = R.style.ThemeOverlay_MicroHabit_Picker
+    val pickerActionColor = colors.primary.toArgb()
 
     val trackingOptions = listOf(
         ChoiceOption(TrackingType.YES_NO, t("Yes / No")),
@@ -2136,11 +2140,13 @@ private fun TaskEditorDialog(state: HabitUiState, onDismiss: () -> Unit, vm: Mai
     )
     val palette = listOf("#1F6F64", "#3B7EA1", "#7B6BC9", "#3E8E5F", "#B36A3C", "#C65C74", "#5D6D7E")
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
+    BackHandler(onBack = onDismiss)
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = colors.backgroundCanvas
     ) {
         Scaffold(
+            modifier = Modifier.fillMaxSize(),
             topBar = {
                 CenterAlignedTopAppBar(
                     title = {
@@ -2162,6 +2168,10 @@ private fun TaskEditorDialog(state: HabitUiState, onDismiss: () -> Unit, vm: Mai
             },
             bottomBar = {
                 Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .imePadding(),
                     color = colors.backgroundSurface,
                     tonalElevation = AppTheme.elevation.sm
                 ) {
@@ -2297,14 +2307,15 @@ private fun TaskEditorDialog(state: HabitUiState, onDismiss: () -> Unit, vm: Mai
                             Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
                                 OutlinedButton(
                                     onClick = {
-                                        TimePickerDialog(
-                                            context,
-                                            pickerTheme,
-                                            { _, hour, minute -> vm.setEditorReminder(hour, minute) },
-                                            state.editorReminderHour,
-                                            state.editorReminderMinute,
-                                            true
-                                        ).show()
+                                        showThemedTimePicker(
+                                            context = context,
+                                            themeResId = pickerTheme,
+                                            initialHour = state.editorReminderHour,
+                                            initialMinute = state.editorReminderMinute,
+                                            is24HourView = true,
+                                            actionColorArgb = pickerActionColor,
+                                            onTimeSet = vm::setEditorReminder
+                                        )
                                     },
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(AppTheme.radius.md),
@@ -2319,16 +2330,15 @@ private fun TaskEditorDialog(state: HabitUiState, onDismiss: () -> Unit, vm: Mai
 
                                 OutlinedButton(
                                     onClick = {
-                                        DatePickerDialog(
-                                            context,
-                                            pickerTheme,
-                                            { _, year, month, day ->
+                                        showThemedDatePicker(
+                                            context = context,
+                                            themeResId = pickerTheme,
+                                            initialDate = state.editorStartDate,
+                                            actionColorArgb = pickerActionColor,
+                                            onDateSet = { year, month, day ->
                                                 vm.setEditorStartDate(LocalDate.of(year, month + 1, day))
-                                            },
-                                            state.editorStartDate.year,
-                                            state.editorStartDate.monthValue - 1,
-                                            state.editorStartDate.dayOfMonth
-                                        ).show()
+                                            }
+                                        )
                                     },
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(AppTheme.radius.md),
@@ -2349,9 +2359,57 @@ private fun TaskEditorDialog(state: HabitUiState, onDismiss: () -> Unit, vm: Mai
                         }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(spacing.x2))
             }
         }
     }
+}
+
+private fun showThemedTimePicker(
+    context: Context,
+    themeResId: Int,
+    initialHour: Int,
+    initialMinute: Int,
+    is24HourView: Boolean,
+    actionColorArgb: Int,
+    onTimeSet: (hour: Int, minute: Int) -> Unit
+) {
+    val dialog = TimePickerDialog(
+        context,
+        themeResId,
+        { _, hour, minute -> onTimeSet(hour, minute) },
+        initialHour,
+        initialMinute,
+        is24HourView
+    )
+    dialog.setOnShowListener {
+        dialog.getButton(TimePickerDialog.BUTTON_POSITIVE)?.setTextColor(actionColorArgb)
+        dialog.getButton(TimePickerDialog.BUTTON_NEGATIVE)?.setTextColor(actionColorArgb)
+    }
+    dialog.show()
+}
+
+private fun showThemedDatePicker(
+    context: Context,
+    themeResId: Int,
+    initialDate: LocalDate,
+    actionColorArgb: Int,
+    onDateSet: (year: Int, month: Int, day: Int) -> Unit
+) {
+    val dialog = DatePickerDialog(
+        context,
+        themeResId,
+        { _, year, month, day -> onDateSet(year, month, day) },
+        initialDate.year,
+        initialDate.monthValue - 1,
+        initialDate.dayOfMonth
+    )
+    dialog.setOnShowListener {
+        dialog.getButton(DatePickerDialog.BUTTON_POSITIVE)?.setTextColor(actionColorArgb)
+        dialog.getButton(DatePickerDialog.BUTTON_NEGATIVE)?.setTextColor(actionColorArgb)
+    }
+    dialog.show()
 }
 
 private fun formatTime(hour: Int, minute: Int): String =

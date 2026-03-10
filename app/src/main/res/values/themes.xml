@@ -5,5 +5,8 @@
     <style name="ThemeOverlay.MicroHabit.Picker" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="colorPrimary">@color/microhabit_primary</item>
         <item name="colorAccent">@color/microhabit_primary</item>
+        <item name="colorControlActivated">@color/microhabit_primary</item>
+        <item name="android:colorAccent">@color/microhabit_primary</item>
+        <item name="android:colorControlActivated">@color/microhabit_primary</item>
     </style>
 </resources>

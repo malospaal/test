@@ -12,6 +12,7 @@ import com.example.microhabit.data.TaskFrequency
 import com.example.microhabit.data.TrackingType
 import com.example.microhabit.i18n.localeForLanguage
 import com.example.microhabit.i18n.translate
+import com.example.microhabit.notifications.HabitReminderScheduler
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -76,7 +77,10 @@ data class HabitUiState(
     val defaultReminderMinute: Int = 0
 )
 
-class MainViewModel(private val repository: HabitRepository) : ViewModel() {
+class MainViewModel(
+    private val repository: HabitRepository,
+    private val reminderScheduler: HabitReminderScheduler
+) : ViewModel() {
     private val _state = MutableStateFlow(HabitUiState())
     val state: StateFlow<HabitUiState> = _state.asStateFlow()
 
@@ -135,6 +139,7 @@ class MainViewModel(private val repository: HabitRepository) : ViewModel() {
     fun setNotificationsEnabled(enabled: Boolean) {
         viewModelScope.launch {
             repository.setNotificationsEnabled(enabled)
+            reminderScheduler.syncAllReminders()
             _state.update { it.copy(notificationsEnabled = enabled) }
         }
     }
@@ -163,7 +168,9 @@ class MainViewModel(private val repository: HabitRepository) : ViewModel() {
 
     fun deleteAccount() {
         viewModelScope.launch {
+            val existingIds = repository.getTasks().map { it.id }
             repository.deleteAccount()
+            existingIds.forEach(reminderScheduler::cancelReminder)
             repository.refreshWidget()
             refresh()
         }
@@ -305,7 +312,7 @@ class MainViewModel(private val repository: HabitRepository) : ViewModel() {
         }
 
         viewModelScope.launch {
-            if (current.editingTaskId == null) {
+            val affectedTaskId = if (current.editingTaskId == null) {
                 val task = repository.createTask(
                     title = title,
                     emoji = current.editorEmoji,
@@ -319,6 +326,7 @@ class MainViewModel(private val repository: HabitRepository) : ViewModel() {
                     startDate = current.editorStartDate
                 )
                 repository.setSelectedTask(task.id)
+                task.id
             } else {
                 repository.updateTask(
                     taskId = current.editingTaskId,
@@ -333,7 +341,9 @@ class MainViewModel(private val repository: HabitRepository) : ViewModel() {
                     reminderMinute = current.editorReminderMinute,
                     startDate = current.editorStartDate
                 )
+                current.editingTaskId
             }
+            reminderScheduler.syncReminderForTask(affectedTaskId)
             repository.refreshWidget()
             refresh()
             _state.update { it.copy(showEditor = false) }
@@ -343,6 +353,7 @@ class MainViewModel(private val repository: HabitRepository) : ViewModel() {
     fun deleteTask(taskId: String) {
         viewModelScope.launch {
             repository.deleteTask(taskId)
+            reminderScheduler.cancelReminder(taskId)
             repository.refreshWidget()
             refresh()
         }
@@ -351,6 +362,7 @@ class MainViewModel(private val repository: HabitRepository) : ViewModel() {
     fun archiveTask(taskId: String) {
         viewModelScope.launch {
             repository.archiveTask(taskId, archived = true)
+            reminderScheduler.cancelReminder(taskId)
             repository.refreshWidget()
             refresh()
         }
@@ -359,6 +371,7 @@ class MainViewModel(private val repository: HabitRepository) : ViewModel() {
     fun unarchiveTask(taskId: String) {
         viewModelScope.launch {
             repository.archiveTask(taskId, archived = false)
+            reminderScheduler.syncReminderForTask(taskId)
             repository.refreshWidget()
             refresh()
         }
@@ -524,10 +537,13 @@ class MainViewModel(private val repository: HabitRepository) : ViewModel() {
         }
     }
 
-    class Factory(private val repository: HabitRepository) : ViewModelProvider.Factory {
+    class Factory(
+        private val repository: HabitRepository,
+        private val reminderScheduler: HabitReminderScheduler
+    ) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             @Suppress("UNCHECKED_CAST")
-            return MainViewModel(repository) as T
+            return MainViewModel(repository, reminderScheduler) as T
         }
     }
 }

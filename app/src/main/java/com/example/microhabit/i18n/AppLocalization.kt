@@ -162,6 +162,15 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "Enable habit reminder notifications" to v("Erinnerungen fur Gewohnheiten aktivieren", "Activer les rappels d'habitude", "Activar recordatorios de habitos", "Abilita promemoria abitudini", "Включить уведомления-напоминания"),
     "Reminder time" to v("Erinnerungszeit", "Heure de rappel", "Hora del recordatorio", "Orario promemoria", "Время напоминания"),
     "Daily notification time" to v("Tagliche Benachrichtigungszeit", "Heure quotidienne de notification", "Hora diaria de notificacion", "Orario notifica giornaliera", "Ежедневное время уведомления"),
+    "Habit reminder" to v("Gewohnheits-Erinnerung", "Rappel d'habitude", "Recordatorio de habito", "Promemoria abitudine", "Напоминание о привычке"),
+    "Time to complete: %s" to v("Zeit fur: %s", "Il est temps de faire : %s", "Hora de completar: %s", "E ora di completare: %s", "Пора выполнить: %s"),
+    "Notification permission denied. Reminders are disabled." to v(
+        "Benachrichtigungsberechtigung verweigert. Erinnerungen sind deaktiviert.",
+        "Autorisation de notification refusee. Les rappels sont desactives.",
+        "Permiso de notificaciones denegado. Los recordatorios estan desactivados.",
+        "Permesso notifiche negato. I promemoria sono disattivati.",
+        "Разрешение на уведомления отклонено. Напоминания отключены."
+    ),
     "Subscription" to v("Abonnement", "Abonnement", "Suscripcion", "Abbonamento", "Подписка"),
     "Manage Free and PRO plans." to v("Free- und PRO-Plane verwalten.", "Gerer les offres Free et PRO.", "Gestiona planes Free y PRO.", "Gestisci i piani Free e PRO.", "Управляйте тарифами Free и PRO."),
     "Manage subscription" to v("Abo verwalten", "Gerer l'abonnement", "Gestionar suscripcion", "Gestisci abbonamento", "Управление подпиской"),

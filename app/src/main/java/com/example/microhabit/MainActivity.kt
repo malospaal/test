@@ -1,13 +1,17 @@
 package com.example.microhabit
 
+import android.Manifest
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.content.Context
+import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -79,6 +83,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -110,6 +115,7 @@ import com.example.microhabit.i18n.t
 import com.example.microhabit.i18n.tf
 import com.example.microhabit.i18n.translate
 import com.example.microhabit.i18n.weekdayLabels
+import com.example.microhabit.notifications.HabitReminderScheduler
 import com.example.microhabit.ui.components.ChoiceOption
 import com.example.microhabit.ui.components.CalendarDay
 import com.example.microhabit.ui.components.CalendarDayState
@@ -159,9 +165,14 @@ private enum class BillingCycle {
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val repository = HabitRepository(applicationContext)
+        val reminderScheduler = HabitReminderScheduler(applicationContext, repository)
+        reminderScheduler.ensureNotificationChannel()
+        reminderScheduler.syncAllReminders()
+
         setContent {
             val vm: MainViewModel = viewModel(
-                factory = MainViewModel.Factory(HabitRepository(applicationContext))
+                factory = MainViewModel.Factory(repository, reminderScheduler)
             )
             val state by vm.state.collectAsState()
 
@@ -198,6 +209,35 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
     val semantic = AppTheme.colors
     val context = LocalContext.current
     val language = state.language
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            vm.setNotificationsEnabled(true)
+        } else {
+            vm.setNotificationsEnabled(false)
+            Toast.makeText(
+                context,
+                translate(language, "Notification permission denied. Reminders are disabled."),
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    LaunchedEffect(state.notificationsEnabled) {
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            state.notificationsEnabled &&
+            !HabitReminderScheduler.hasNotificationPermission(context)
+        ) {
+            vm.setNotificationsEnabled(false)
+            Toast.makeText(
+                context,
+                translate(language, "Notification permission denied. Reminders are disabled."),
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
 
     CompositionLocalProvider(LocalAppLanguage provides state.language) {
         ModalNavigationDrawer(
@@ -319,7 +359,17 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                         state = state,
                         onSetTheme = vm::setThemeMode,
                         onSetLanguage = vm::setLanguage,
-                        onSetNotificationsEnabled = vm::setNotificationsEnabled,
+                        onSetNotificationsEnabled = { enabled ->
+                            if (!enabled) {
+                                vm.setNotificationsEnabled(false)
+                            } else if (HabitReminderScheduler.hasNotificationPermission(context)) {
+                                vm.setNotificationsEnabled(true)
+                            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            } else {
+                                vm.setNotificationsEnabled(true)
+                            }
+                        },
                         onSetDefaultReminder = vm::setDefaultReminder,
                         onOpenPaywall = {
                             previousPage = AppPage.SETTINGS

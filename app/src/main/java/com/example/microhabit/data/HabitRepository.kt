@@ -281,6 +281,12 @@ class HabitRepository(private val context: Context) {
             .apply()
     }
 
+    fun isOnboardingCompleted(): Boolean = prefs.getBoolean(KEY_ONBOARDING_COMPLETED, false)
+
+    fun setOnboardingCompleted(completed: Boolean) {
+        prefs.edit().putBoolean(KEY_ONBOARDING_COMPLETED, completed).apply()
+    }
+
     fun exportData(): Result<String> = runCatching {
         val tasksArray = runCatching {
             JSONArray(prefs.getString(KEY_TASKS_JSON, "[]") ?: "[]")
@@ -596,5 +602,6 @@ class HabitRepository(private val context: Context) {
         private const val KEY_NOTIFICATIONS_ENABLED = "notifications_enabled"
         private const val KEY_DEFAULT_REMINDER_HOUR = "default_reminder_hour"
         private const val KEY_DEFAULT_REMINDER_MINUTE = "default_reminder_minute"
+        private const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"
     }
 }

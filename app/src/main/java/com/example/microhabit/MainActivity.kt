@@ -136,8 +136,11 @@ import com.airbnb.lottie.compose.animateLottieCompositionAsState
 import com.airbnb.lottie.compose.rememberLottieComposition
 import com.example.microhabit.data.AppLanguage
 import com.example.microhabit.data.AppThemeMode
+import com.example.microhabit.data.HabitCategory
 import com.example.microhabit.data.HabitRepository
 import com.example.microhabit.data.HabitTask
+import com.example.microhabit.data.HabitTemplate
+import com.example.microhabit.data.HabitTemplateCatalog
 import com.example.microhabit.data.SubscriptionPlan
 import com.example.microhabit.data.TaskFrequency
 import com.example.microhabit.data.TrackingType
@@ -202,9 +205,28 @@ private enum class NotificationPermissionAction {
     SAVE_EDITOR_REMINDER
 }
 
+private enum class OnboardingStep {
+    WELCOME,
+    CATEGORY,
+    TEMPLATE,
+    SETUP,
+    READY
+}
+
 private data class StreakOverlayModel(
     val streak: Int,
     val milestone: Boolean
+)
+
+private data class OnboardingHabitDraft(
+    val name: String,
+    val category: HabitCategory,
+    val template: HabitTemplate,
+    val frequency: TaskFrequency,
+    val customDays: Set<Int>,
+    val reminderEnabled: Boolean,
+    val reminderHour: Int,
+    val reminderMinute: Int
 )
 
 class MainActivity : ComponentActivity() {
@@ -254,6 +276,9 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
     var showNotificationsBlockedDialog by rememberSaveable { mutableStateOf(false) }
     var pendingPermissionAction by remember { mutableStateOf<NotificationPermissionAction?>(null) }
     var pendingSettingsAction by remember { mutableStateOf<NotificationPermissionAction?>(null) }
+    var highlightCompletionButton by rememberSaveable { mutableStateOf(false) }
+    var showOnboardingWizard by rememberSaveable { mutableStateOf(false) }
+    var onboardingDismissedSession by rememberSaveable { mutableStateOf(false) }
     val semantic = AppTheme.colors
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -327,197 +352,247 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
         }
     }
 
-    CompositionLocalProvider(LocalAppLanguage provides state.language) {
-        ModalNavigationDrawer(
-            drawerState = drawerState,
-            drawerContent = {
-                DrawerContent(
-                    current = page,
-                    plan = state.plan,
-                    onNavigate = {
-                        if (it != AppPage.PAYWALL) previousPage = it
-                        page = it
-                        scope.launch { drawerState.close() }
-                    }
-                )
-            }
+    LaunchedEffect(state.isLoaded, state.onboardingCompleted, state.tasks.size, onboardingDismissedSession) {
+        if (
+            state.isLoaded &&
+            !state.onboardingCompleted &&
+            state.tasks.isEmpty() &&
+            !onboardingDismissedSession
         ) {
-            Scaffold(
-                topBar = {
-                    CenterAlignedTopAppBar(
-                        title = {
-                            Text(
-                                pageTitle(page),
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                        },
-                        navigationIcon = {
-                            IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                                Icon(Icons.Rounded.Menu, contentDescription = t("Menu"))
-                            }
-                        },
-                        actions = {
-                            when (page) {
-                                AppPage.HABITS -> {
-                                    val canAdd = state.plan == SubscriptionPlan.PRO || state.tasks.size < 1
-                                    TextButton(onClick = {
-                                        if (canAdd) {
-                                            vm.openCreateTask()
-                                        } else {
-                                            previousPage = page
-                                            page = AppPage.PAYWALL
-                                        }
-                                    }) {
-                                        Text(if (canAdd) t("Add") else t("Upgrade"))
-                                    }
-                                }
-                                else -> Unit
-                            }
-                        },
-                        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                            containerColor = semantic.backgroundSurface
-                        )
-                    )
-                }
-            ) { padding ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(semantic.backgroundCanvas)
-                    .padding(padding)
-            ) {
-                when (page) {
-                    AppPage.TRACKER -> TrackerPage(
-                        state = state,
-                        vm = vm,
-                        onUpgrade = {
-                            previousPage = AppPage.TRACKER
-                            page = AppPage.PAYWALL
-                        }
-                    )
-                    AppPage.HABITS -> HabitsPage(
-                        state = state,
-                        vm = vm,
-                        onOpenHabit = {
-                            page = AppPage.TRACKER
-                        },
-                        onUpgrade = {
-                            previousPage = AppPage.HABITS
-                            page = AppPage.PAYWALL
-                        }
-                    )
-                    AppPage.ANALYTICS -> AnalyticsPage(state = state)
-                    AppPage.CALENDAR -> CalendarScreen(state = state, vm = vm)
-                    AppPage.PAYWALL -> PaywallPage(
-                        currentPlan = state.plan,
-                        selectedBilling = selectedBilling,
-                        onSelectBilling = { selectedBilling = it },
-                        onSubscribe = {
-                            vm.setPlan(SubscriptionPlan.PRO)
-                            Toast.makeText(
-                                context,
-                                if (selectedBilling == BillingCycle.YEARLY) {
-                                    translate(language, "PRO yearly activated (debug)")
-                                } else {
-                                    translate(language, "PRO monthly activated (debug)")
-                                },
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        },
-                        onRestorePurchase = {
-                            vm.setPlan(SubscriptionPlan.PRO)
-                            Toast.makeText(
-                                context,
-                                translate(language, "Purchases restored (debug)"),
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        },
-                        onClose = { page = previousPage }
-                    )
-                    AppPage.ACCOUNT -> AccountPage(
-                        state = state,
-                        onSetPlan = vm::setPlan,
-                        onOpenPaywall = {
-                            previousPage = AppPage.ACCOUNT
-                            page = AppPage.PAYWALL
-                        }
-                    )
-                    AppPage.SETTINGS -> SettingsPage(
-                        state = state,
-                        onSetTheme = vm::setThemeMode,
-                        onSetLanguage = vm::setLanguage,
-                        onSetNotificationsEnabled = { enabled ->
-                            if (!enabled) {
-                                vm.setNotificationsEnabled(false)
-                            } else {
-                                ensureNotificationPermissionAndRun(NotificationPermissionAction.ENABLE_REMINDERS)
-                            }
-                        },
-                        onSetDefaultReminder = vm::setDefaultReminder,
-                        onOpenPaywall = {
-                            previousPage = AppPage.SETTINGS
-                            page = AppPage.PAYWALL
-                        },
-                        onExportData = vm::exportData,
-                        onResetProgress = vm::resetProgress,
-                        onDeleteAccount = vm::deleteAccount
-                    )
-                }
-            }
-            }
+            showOnboardingWizard = true
+        }
+    }
 
-            if (state.showEditor) {
-                TaskEditorDialog(
-                    state = state,
-                    onDismiss = vm::closeEditor,
-                    vm = vm,
-                    onSaveRequest = {
-                        if (state.editorReminderEnabled) {
-                            ensureNotificationPermissionAndRun(NotificationPermissionAction.SAVE_EDITOR_REMINDER)
-                        } else {
-                            vm.saveEditor()
-                        }
+    CompositionLocalProvider(LocalAppLanguage provides state.language) {
+        if (showOnboardingWizard) {
+            OnboardingWizard(
+                state = state,
+                onSkip = {
+                    onboardingDismissedSession = true
+                    showOnboardingWizard = false
+                    vm.setOnboardingCompleted(true)
+                },
+                onCreateHabit = { draft ->
+                    vm.prepareOnboardingDraft(
+                        name = draft.name,
+                        category = draft.category,
+                        template = draft.template,
+                        frequency = draft.frequency,
+                        customDays = draft.customDays,
+                        reminderEnabled = draft.reminderEnabled,
+                        reminderHour = draft.reminderHour,
+                        reminderMinute = draft.reminderMinute
+                    )
+                    if (draft.reminderEnabled) {
+                        ensureNotificationPermissionAndRun(NotificationPermissionAction.SAVE_EDITOR_REMINDER)
+                    } else {
+                        vm.saveEditor()
                     }
-                )
-            }
-
-            if (showNotificationsBlockedDialog) {
-                AlertDialog(
-                    onDismissRequest = {
-                        showNotificationsBlockedDialog = false
-                        pendingSettingsAction = null
-                    },
-                    title = { Text(t("Notifications are disabled")) },
-                    text = { Text(t("Enable notifications in system settings to receive habit reminders.")) },
-                    confirmButton = {
-                        Button(
-                            onClick = {
-                                showNotificationsBlockedDialog = false
-                                val opened = openNotificationOrAppSettings(context)
-                                if (!opened) {
-                                    pendingSettingsAction = null
+                },
+                onHabitCreated = {
+                    vm.setOnboardingCompleted(true)
+                },
+                onFinish = {
+                    onboardingDismissedSession = true
+                    showOnboardingWizard = false
+                    highlightCompletionButton = true
+                    page = AppPage.TRACKER
+                }
+            )
+        } else {
+            ModalNavigationDrawer(
+                drawerState = drawerState,
+                drawerContent = {
+                    DrawerContent(
+                        current = page,
+                        plan = state.plan,
+                        onNavigate = {
+                            if (it != AppPage.PAYWALL) previousPage = it
+                            page = it
+                            scope.launch { drawerState.close() }
+                        }
+                    )
+                }
+            ) {
+                Scaffold(
+                    topBar = {
+                        CenterAlignedTopAppBar(
+                            title = {
+                                Text(
+                                    pageTitle(page),
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            },
+                            navigationIcon = {
+                                IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                                    Icon(Icons.Rounded.Menu, contentDescription = t("Menu"))
+                                }
+                            },
+                            actions = {
+                                when (page) {
+                                    AppPage.HABITS -> {
+                                        val canAdd = state.plan == SubscriptionPlan.PRO || state.tasks.size < 1
+                                        TextButton(onClick = {
+                                            if (canAdd) {
+                                                vm.openCreateTask()
+                                            } else {
+                                                previousPage = page
+                                                page = AppPage.PAYWALL
+                                            }
+                                        }) {
+                                            Text(if (canAdd) t("Add") else t("Upgrade"))
+                                        }
+                                    }
+                                    else -> Unit
+                                }
+                            },
+                            colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                                containerColor = semantic.backgroundSurface
+                            )
+                        )
+                    }
+                ) { padding ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(semantic.backgroundCanvas)
+                            .padding(padding)
+                    ) {
+                        when (page) {
+                            AppPage.TRACKER -> TrackerPage(
+                                state = state,
+                                vm = vm,
+                                onUpgrade = {
+                                    previousPage = AppPage.TRACKER
+                                    page = AppPage.PAYWALL
+                                },
+                                highlightCompletionButton = highlightCompletionButton,
+                                onHighlightConsumed = { highlightCompletionButton = false }
+                            )
+                            AppPage.HABITS -> HabitsPage(
+                                state = state,
+                                vm = vm,
+                                onOpenHabit = {
+                                    page = AppPage.TRACKER
+                                },
+                                onUpgrade = {
+                                    previousPage = AppPage.HABITS
+                                    page = AppPage.PAYWALL
+                                }
+                            )
+                            AppPage.ANALYTICS -> AnalyticsPage(state = state)
+                            AppPage.CALENDAR -> CalendarScreen(state = state, vm = vm)
+                            AppPage.PAYWALL -> PaywallPage(
+                                currentPlan = state.plan,
+                                selectedBilling = selectedBilling,
+                                onSelectBilling = { selectedBilling = it },
+                                onSubscribe = {
+                                    vm.setPlan(SubscriptionPlan.PRO)
                                     Toast.makeText(
                                         context,
-                                        translate(language, "Unable to open app settings."),
-                                        Toast.LENGTH_LONG
+                                        if (selectedBilling == BillingCycle.YEARLY) {
+                                            translate(language, "PRO yearly activated (debug)")
+                                        } else {
+                                            translate(language, "PRO monthly activated (debug)")
+                                        },
+                                        Toast.LENGTH_SHORT
                                     ).show()
+                                },
+                                onRestorePurchase = {
+                                    vm.setPlan(SubscriptionPlan.PRO)
+                                    Toast.makeText(
+                                        context,
+                                        translate(language, "Purchases restored (debug)"),
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                },
+                                onClose = { page = previousPage }
+                            )
+                            AppPage.ACCOUNT -> AccountPage(
+                                state = state,
+                                onSetPlan = vm::setPlan,
+                                onOpenPaywall = {
+                                    previousPage = AppPage.ACCOUNT
+                                    page = AppPage.PAYWALL
                                 }
-                            }
-                        ) {
-                            Text(t("Open Settings"))
-                        }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = {
-                            showNotificationsBlockedDialog = false
-                            pendingSettingsAction = null
-                        }) {
-                            Text(t("Cancel"))
+                            )
+                            AppPage.SETTINGS -> SettingsPage(
+                                state = state,
+                                onSetTheme = vm::setThemeMode,
+                                onSetLanguage = vm::setLanguage,
+                                onSetNotificationsEnabled = { enabled ->
+                                    if (!enabled) {
+                                        vm.setNotificationsEnabled(false)
+                                    } else {
+                                        ensureNotificationPermissionAndRun(NotificationPermissionAction.ENABLE_REMINDERS)
+                                    }
+                                },
+                                onSetDefaultReminder = vm::setDefaultReminder,
+                                onOpenPaywall = {
+                                    previousPage = AppPage.SETTINGS
+                                    page = AppPage.PAYWALL
+                                },
+                                onExportData = vm::exportData,
+                                onResetProgress = vm::resetProgress,
+                                onDeleteAccount = vm::deleteAccount
+                            )
                         }
                     }
-                )
+                }
             }
+        }
+
+        if (state.showEditor) {
+            TaskEditorDialog(
+                state = state,
+                onDismiss = vm::closeEditor,
+                vm = vm,
+                onSaveRequest = {
+                    if (state.editorReminderEnabled) {
+                        ensureNotificationPermissionAndRun(NotificationPermissionAction.SAVE_EDITOR_REMINDER)
+                    } else {
+                        vm.saveEditor()
+                    }
+                }
+            )
+        }
+
+        if (showNotificationsBlockedDialog) {
+            AlertDialog(
+                onDismissRequest = {
+                    showNotificationsBlockedDialog = false
+                    pendingSettingsAction = null
+                },
+                title = { Text(t("Notifications are disabled")) },
+                text = { Text(t("Enable notifications in system settings to receive habit reminders.")) },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showNotificationsBlockedDialog = false
+                            val opened = openNotificationOrAppSettings(context)
+                            if (!opened) {
+                                pendingSettingsAction = null
+                                Toast.makeText(
+                                    context,
+                                    translate(language, "Unable to open app settings."),
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }
+                    ) {
+                        Text(t("Open Settings"))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = {
+                        showNotificationsBlockedDialog = false
+                        pendingSettingsAction = null
+                    }) {
+                        Text(t("Cancel"))
+                    }
+                }
+            )
         }
     }
 }
@@ -596,7 +671,9 @@ private fun DrawerContent(current: AppPage, plan: SubscriptionPlan, onNavigate: 
 private fun TrackerPage(
     state: HabitUiState,
     vm: MainViewModel,
-    onUpgrade: () -> Unit
+    onUpgrade: () -> Unit,
+    highlightCompletionButton: Boolean,
+    onHighlightConsumed: () -> Unit
 ) {
     val selectedTask = state.tasks.firstOrNull { it.id == state.selectedTaskId }
     val canAdd = state.plan == SubscriptionPlan.PRO || state.tasks.size < 1
@@ -641,6 +718,12 @@ private fun TrackerPage(
             overlayVisible = false
         }
     }
+    LaunchedEffect(highlightCompletionButton) {
+        if (highlightCompletionButton) {
+            delay(8000)
+            onHighlightConsumed()
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
@@ -667,7 +750,9 @@ private fun TrackerPage(
                         selectedDate = state.selectedDate,
                         done = state.selectedDateDone,
                         scheduled = state.selectedDateScheduled,
-                        onDone = vm::toggleSelectedDateDone
+                        onDone = vm::toggleSelectedDateDone,
+                        highlightMarkButton = highlightCompletionButton,
+                        onHighlightConsumed = onHighlightConsumed
                     )
                 }
                 item {
@@ -1878,6 +1963,632 @@ private fun OnboardingCard(vm: MainViewModel, state: HabitUiState) {
 }
 
 @Composable
+private fun OnboardingWizard(
+    state: HabitUiState,
+    onSkip: () -> Unit,
+    onCreateHabit: (OnboardingHabitDraft) -> Unit,
+    onHabitCreated: () -> Unit,
+    onFinish: () -> Unit
+) {
+    val spacing = AppTheme.spacing
+    val colors = AppTheme.colors
+    val stroke = AppTheme.stroke
+    val radius = AppTheme.radius
+    val context = LocalContext.current
+    val is24HourView = android.text.format.DateFormat.is24HourFormat(context)
+    val pickerTheme = R.style.ThemeOverlay_MicroHabit_Picker
+    val pickerActionColor = colors.primary.toArgb()
+    var step by rememberSaveable { mutableStateOf(OnboardingStep.WELCOME) }
+    var selectedCategory by rememberSaveable { mutableStateOf(HabitCategory.HEALTH) }
+    var selectedTemplateId by rememberSaveable { mutableStateOf(HabitTemplateCatalog.templatesFor(HabitCategory.HEALTH).first().id) }
+    var habitName by rememberSaveable { mutableStateOf("") }
+    var frequency by rememberSaveable { mutableStateOf(TaskFrequency.DAILY) }
+    var customDays by rememberSaveable { mutableStateOf(listOf(1, 2, 3, 4, 5)) }
+    var reminderEnabled by rememberSaveable { mutableStateOf(false) }
+    var reminderHour by rememberSaveable(state.defaultReminderHour, state.defaultReminderMinute) {
+        mutableStateOf(state.defaultReminderHour)
+    }
+    var reminderMinute by rememberSaveable(state.defaultReminderHour, state.defaultReminderMinute) {
+        mutableStateOf(state.defaultReminderMinute)
+    }
+    var miniCalendarFill by remember(step) { mutableStateOf(0) }
+    var templateRevealCount by remember(step, selectedCategory) { mutableStateOf(0) }
+    var pendingCreate by remember { mutableStateOf(false) }
+    var completionOverlayVisible by remember(step) { mutableStateOf(false) }
+    var habitCreatedNotified by remember { mutableStateOf(false) }
+    val templates = remember(selectedCategory) { HabitTemplateCatalog.templatesFor(selectedCategory) }
+    val selectedTemplate = templates.firstOrNull { it.id == selectedTemplateId } ?: templates.first()
+    val setupValid = remember(habitName, frequency, customDays) {
+        habitName.trim().isNotEmpty() && (frequency != TaskFrequency.SELECTED_DAYS || customDays.isNotEmpty())
+    }
+
+    LaunchedEffect(step) {
+        if (step == OnboardingStep.WELCOME) {
+            miniCalendarFill = 0
+            repeat(5) { index ->
+                delay(90)
+                miniCalendarFill = index + 1
+            }
+        }
+        if (step == OnboardingStep.READY) {
+            completionOverlayVisible = true
+        } else {
+            completionOverlayVisible = false
+        }
+    }
+
+    LaunchedEffect(step, selectedCategory) {
+        if (step == OnboardingStep.TEMPLATE) {
+            templateRevealCount = 0
+            val total = templates.size
+            repeat(total) { index ->
+                delay(55)
+                templateRevealCount = index + 1
+            }
+        }
+    }
+
+    LaunchedEffect(selectedCategory) {
+        selectedTemplateId = HabitTemplateCatalog.templatesFor(selectedCategory).first().id
+    }
+
+    LaunchedEffect(pendingCreate, state.tasks.size) {
+        if (pendingCreate && state.tasks.isNotEmpty()) {
+            pendingCreate = false
+            if (!habitCreatedNotified) {
+                onHabitCreated()
+                habitCreatedNotified = true
+            }
+            step = OnboardingStep.READY
+        }
+    }
+    LaunchedEffect(pendingCreate) {
+        if (pendingCreate) {
+            delay(3500)
+            if (state.tasks.isEmpty()) {
+                pendingCreate = false
+            }
+        }
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = colors.backgroundCanvas
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = spacing.x2, vertical = spacing.x1_5),
+            verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
+        ) {
+            OnboardingHeader(
+                onSkip = if (step == OnboardingStep.READY) null else onSkip
+            )
+
+            AnimatedContent(targetState = step, label = "onboardingStepTransition") { currentStep ->
+                when (currentStep) {
+                    OnboardingStep.WELCOME -> {
+                        GlassCard(
+                            contentPadding = PaddingValues(spacing.x2)
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(spacing.x1_5),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = "Micro Habit",
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    fontWeight = FontWeight.ExtraBold
+                                )
+                                Text(
+                                    text = t("Build powerful habits one day at a time"),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = colors.textSecondary,
+                                    textAlign = TextAlign.Center
+                                )
+                                OnboardingMiniCalendar(filledDays = miniCalendarFill)
+                                Button(
+                                    onClick = { step = OnboardingStep.CATEGORY },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(radius.md)
+                                ) {
+                                    Text(t("Start"))
+                                }
+                            }
+                        }
+                    }
+
+                    OnboardingStep.CATEGORY -> {
+                        GlassCard(
+                            contentPadding = PaddingValues(spacing.x2)
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
+                            ) {
+                                Text(
+                                    text = t("What do you want to improve?"),
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                HabitTemplateCatalog.categories.chunked(2).forEach { row ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+                                    ) {
+                                        row.forEach { category ->
+                                            OnboardingCategoryCard(
+                                                modifier = Modifier.weight(1f),
+                                                title = t(HabitTemplateCatalog.categoryTitleKey(category)),
+                                                selected = selectedCategory == category,
+                                                onClick = { selectedCategory = category }
+                                            )
+                                        }
+                                        if (row.size == 1) {
+                                            Spacer(modifier = Modifier.weight(1f))
+                                        }
+                                    }
+                                }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+                                ) {
+                                    OutlinedButton(
+                                        onClick = { step = OnboardingStep.WELCOME },
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(radius.md)
+                                    ) {
+                                        Text(t("Back"))
+                                    }
+                                    Button(
+                                        onClick = { step = OnboardingStep.TEMPLATE },
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(radius.md)
+                                    ) {
+                                        Text(t("Next"))
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    OnboardingStep.TEMPLATE -> {
+                        GlassCard(
+                            contentPadding = PaddingValues(spacing.x2)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .verticalScroll(rememberScrollState()),
+                                verticalArrangement = Arrangement.spacedBy(spacing.x1)
+                            ) {
+                                Text(
+                                    text = t("Pick a template"),
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                templates.forEachIndexed { index, template ->
+                                    AnimatedVisibility(
+                                        visible = index < templateRevealCount,
+                                        enter = fadeIn(tween(180)) + slideInVertically(
+                                            initialOffsetY = { it / 5 },
+                                            animationSpec = tween(180)
+                                        ),
+                                        exit = fadeOut(tween(120))
+                                    ) {
+                                        OnboardingTemplateCard(
+                                            title = t(template.titleKey),
+                                            emoji = template.emoji,
+                                            selected = template.id == selectedTemplateId,
+                                            onClick = { selectedTemplateId = template.id }
+                                        )
+                                    }
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+                                ) {
+                                    OutlinedButton(
+                                        onClick = { step = OnboardingStep.CATEGORY },
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(radius.md)
+                                    ) {
+                                        Text(t("Back"))
+                                    }
+                                    Button(
+                                        onClick = {
+                                            if (habitName.isBlank() && selectedTemplate.id != HabitTemplateCatalog.CUSTOM_TEMPLATE.id) {
+                                                habitName = translate(state.language, selectedTemplate.titleKey)
+                                            }
+                                            step = OnboardingStep.SETUP
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(radius.md)
+                                    ) {
+                                        Text(t("Next"))
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    OnboardingStep.SETUP -> {
+                        GlassCard(
+                            contentPadding = PaddingValues(spacing.x2)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .verticalScroll(rememberScrollState()),
+                                verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
+                            ) {
+                                Text(
+                                    text = t("Set up your habit"),
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+
+                                OutlinedTextField(
+                                    value = habitName,
+                                    onValueChange = { habitName = it },
+                                    label = { Text(t("Habit name")) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true
+                                )
+
+                                FormSection(title = t("Frequency")) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+                                        ) {
+                                            SelectChip(
+                                                title = t("Every day"),
+                                                selected = frequency == TaskFrequency.DAILY,
+                                                onClick = { frequency = TaskFrequency.DAILY }
+                                            )
+                                            SelectChip(
+                                                title = t("Selected weekdays"),
+                                                selected = frequency == TaskFrequency.SELECTED_DAYS,
+                                                onClick = { frequency = TaskFrequency.SELECTED_DAYS }
+                                            )
+                                        }
+                                        if (frequency == TaskFrequency.SELECTED_DAYS) {
+                                            WeekdaySelector(
+                                                selectedDays = customDays.toSet(),
+                                                onToggle = { day ->
+                                                    val next = customDays.toMutableSet()
+                                                    if (!next.add(day)) {
+                                                        next.remove(day)
+                                                    }
+                                                    customDays = next.toList().sorted()
+                                                }
+                                            )
+                                            if (customDays.isEmpty()) {
+                                                Text(
+                                                    text = t("Select at least one weekday."),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = colors.danger
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                FormSection(title = t("Reminders")) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+                                        SettingsSwitchRow(
+                                            title = t("Reminders"),
+                                            subtitle = t("Enable habit reminder notifications"),
+                                            checked = reminderEnabled,
+                                            onCheckedChange = { reminderEnabled = it }
+                                        )
+                                        AnimatedVisibility(visible = reminderEnabled) {
+                                            OutlinedButton(
+                                                onClick = {
+                                                    showThemedTimePicker(
+                                                        context = context,
+                                                        themeResId = pickerTheme,
+                                                        initialHour = reminderHour,
+                                                        initialMinute = reminderMinute,
+                                                        is24HourView = is24HourView,
+                                                        actionColorArgb = pickerActionColor,
+                                                        onTimeSet = { hour, minute ->
+                                                            reminderHour = hour.coerceIn(0, 23)
+                                                            reminderMinute = minute.coerceIn(0, 59)
+                                                        }
+                                                    )
+                                                },
+                                                modifier = Modifier.fillMaxWidth(),
+                                                shape = RoundedCornerShape(radius.md),
+                                                border = BorderStroke(stroke.thin, colors.primary),
+                                                colors = ButtonDefaults.outlinedButtonColors(
+                                                    containerColor = Color.Transparent,
+                                                    contentColor = colors.primary
+                                                )
+                                            ) {
+                                                Text(
+                                                    tf(
+                                                        "Reminder: %s",
+                                                        formatTimeForDevice(context, reminderHour, reminderMinute)
+                                                    )
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+                                ) {
+                                    OutlinedButton(
+                                        onClick = { step = OnboardingStep.TEMPLATE },
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(radius.md)
+                                    ) {
+                                        Text(t("Back"))
+                                    }
+                                    Button(
+                                        onClick = {
+                                            if (pendingCreate) return@Button
+                                            if (!setupValid) return@Button
+                                            pendingCreate = true
+                                            onCreateHabit(
+                                                OnboardingHabitDraft(
+                                                    name = habitName.trim(),
+                                                    category = selectedCategory,
+                                                    template = selectedTemplate,
+                                                    frequency = frequency,
+                                                    customDays = customDays.toSet(),
+                                                    reminderEnabled = reminderEnabled,
+                                                    reminderHour = reminderHour,
+                                                    reminderMinute = reminderMinute
+                                                )
+                                            )
+                                        },
+                                        enabled = setupValid,
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(radius.md)
+                                    ) {
+                                        Text(t("Create habit"))
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    OnboardingStep.READY -> {
+                        GlassCard(
+                            contentPadding = PaddingValues(spacing.x2)
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(spacing.x1_5),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.CheckCircle,
+                                    contentDescription = null,
+                                    tint = colors.success,
+                                    modifier = Modifier.size(spacing.x6)
+                                )
+                                Text(
+                                    text = t("Your habit is ready"),
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.ExtraBold
+                                )
+                                Text(
+                                    text = t("We highlighted the completion button so you can log your first win."),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = colors.textSecondary,
+                                    textAlign = TextAlign.Center
+                                )
+                                AnimatedVisibility(
+                                    visible = completionOverlayVisible,
+                                    enter = fadeIn(tween(180)) + scaleIn(initialScale = 0.9f, animationSpec = tween(180)),
+                                    exit = fadeOut(tween(140))
+                                ) {
+                                    StreakRewardOverlay(
+                                        model = StreakOverlayModel(streak = 1, milestone = false)
+                                    )
+                                }
+                                Button(
+                                    onClick = onFinish,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(radius.md)
+                                ) {
+                                    Text(t("Go to tracker"))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+            OnboardingProgressDots(
+                step = step,
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .padding(bottom = 25.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun OnboardingHeader(onSkip: (() -> Unit)?) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.End,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (onSkip != null) {
+            TextButton(onClick = onSkip) {
+                Text(t("Skip"))
+            }
+        }
+    }
+}
+
+@Composable
+private fun OnboardingProgressDots(step: OnboardingStep, modifier: Modifier = Modifier) {
+    val spacing = AppTheme.spacing
+    val colors = AppTheme.colors
+    val current = when (step) {
+        OnboardingStep.WELCOME -> 1
+        OnboardingStep.CATEGORY -> 2
+        OnboardingStep.TEMPLATE -> 3
+        OnboardingStep.SETUP -> 4
+        OnboardingStep.READY -> 4
+    }
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(spacing.x0_5),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        repeat(4) { index ->
+            Box(
+                modifier = Modifier
+                    .size(if (index < current) spacing.x1 else spacing.x0_5 + spacing.x1)
+                    .clip(RoundedCornerShape(AppTheme.radius.full))
+                    .background(if (index < current) colors.primary else colors.borderSubtle.copy(alpha = 0.55f))
+            )
+        }
+    }
+}
+
+@Composable
+private fun OnboardingMiniCalendar(filledDays: Int) {
+    val spacing = AppTheme.spacing
+    val colors = AppTheme.colors
+    val labels = remember { listOf("M", "T", "W", "T", "F", "S", "S") }
+    Column(verticalArrangement = Arrangement.spacedBy(spacing.x1), horizontalAlignment = Alignment.CenterHorizontally) {
+        Row(horizontalArrangement = Arrangement.spacedBy(spacing.x0_5)) {
+            labels.forEachIndexed { index, label ->
+                val filled = index < filledDays
+                val scale by animateFloatAsState(
+                    targetValue = if (filled) 1f else 0.95f,
+                    animationSpec = tween(durationMillis = 180),
+                    label = "onboardingCalendarScale$index"
+                )
+                Box(
+                    modifier = Modifier
+                        .size(spacing.x3)
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                        }
+                        .clip(RoundedCornerShape(AppTheme.radius.md))
+                        .background(
+                            if (filled) colors.success.copy(alpha = 0.9f)
+                            else colors.backgroundSurfaceMuted
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (filled) Color.White else colors.textSecondary
+                    )
+                }
+            }
+        }
+        Text(
+            text = tf("%d day streak", filledDays.coerceAtLeast(1)),
+            style = MaterialTheme.typography.labelLarge,
+            color = colors.textSecondary
+        )
+    }
+}
+
+@Composable
+private fun OnboardingCategoryCard(
+    modifier: Modifier = Modifier,
+    title: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val colors = AppTheme.colors
+    val scale by animateFloatAsState(
+        targetValue = if (selected) 1f else 0.97f,
+        animationSpec = tween(durationMillis = 150),
+        label = "onboardingCategoryScale"
+    )
+    Surface(
+        modifier = modifier
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clip(RoundedCornerShape(AppTheme.radius.md))
+            .clickable(onClick = onClick),
+        color = if (selected) colors.primaryMuted else colors.backgroundSurfaceMuted
+    ) {
+        Text(
+            text = title,
+            modifier = Modifier.padding(horizontal = AppTheme.spacing.x1_5, vertical = AppTheme.spacing.x1_5),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+            color = colors.textPrimary
+        )
+    }
+}
+
+@Composable
+private fun OnboardingTemplateCard(
+    title: String,
+    emoji: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val spacing = AppTheme.spacing
+    val colors = AppTheme.colors
+    val scale by animateFloatAsState(
+        targetValue = if (selected) 1f else 0.985f,
+        animationSpec = tween(durationMillis = 140),
+        label = "onboardingTemplateScale"
+    )
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clip(RoundedCornerShape(AppTheme.radius.md))
+            .clickable(onClick = onClick),
+        color = if (selected) colors.primaryMuted else colors.backgroundSurfaceMuted
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = spacing.x1_5, vertical = spacing.x1_5),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+        ) {
+            Text(text = emoji, style = MaterialTheme.typography.titleLarge)
+            Text(
+                text = title,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyLarge,
+                color = colors.textPrimary
+            )
+            if (selected) {
+                Icon(
+                    imageVector = Icons.Rounded.Check,
+                    contentDescription = t("Selected"),
+                    tint = colors.primary
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun TaskControlsRow(
     canAddTask: Boolean,
     onCreate: () -> Unit,
@@ -1993,7 +2704,9 @@ private fun HeroCard(
     selectedDate: LocalDate,
     done: Boolean,
     scheduled: Boolean,
-    onDone: () -> Unit
+    onDone: () -> Unit,
+    highlightMarkButton: Boolean,
+    onHighlightConsumed: () -> Unit
 ) {
     val spacing = AppTheme.spacing
     val radius = AppTheme.radius
@@ -2001,6 +2714,17 @@ private fun HeroCard(
     val semantic = AppTheme.colors
     val locale = appLocale()
     val canMarkForSelectedDate = scheduled
+    val highlightActive = highlightMarkButton && !done && canMarkForSelectedDate
+    val highlightPulseTransition = rememberInfiniteTransition(label = "heroHighlightPulse")
+    val highlightPulse by highlightPulseTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.04f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 880, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "heroHighlightPulseScale"
+    )
 
     GlassCard(contentPadding = PaddingValues(spacing.x2)) {
         Column(
@@ -2061,24 +2785,32 @@ private fun HeroCard(
                     label = "markButtonPressScale"
                 )
                 OutlinedButton(
-                    onClick = onDone,
+                    onClick = {
+                        if (highlightActive) onHighlightConsumed()
+                        onDone()
+                    },
                     enabled = canMarkForSelectedDate,
                     interactionSource = interactionSource,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(spacing.x5 + spacing.x1)
                         .graphicsLayer {
-                            scaleX = pressScale
-                            scaleY = pressScale
+                            val pulse = if (highlightActive) highlightPulse else 1f
+                            scaleX = pressScale * pulse
+                            scaleY = pressScale * pulse
                         },
                     shape = RoundedCornerShape(radius.lg),
                     border = BorderStroke(
-                        stroke.thin * 1.5f,
-                        if (canMarkForSelectedDate) semantic.primary else semantic.borderSubtle
+                        stroke.thin * if (highlightActive) 2.4f else 1.5f,
+                        when {
+                            !canMarkForSelectedDate -> semantic.borderSubtle
+                            highlightActive -> semantic.success
+                            else -> semantic.primary
+                        }
                     ),
                     colors = ButtonDefaults.outlinedButtonColors(
                         containerColor = Color.Transparent,
-                        contentColor = semantic.primary,
+                        contentColor = if (highlightActive) semantic.success else semantic.primary,
                         disabledContentColor = semantic.textSecondary
                     )
                 ) {

@@ -5,8 +5,11 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.microhabit.data.AppLanguage
 import com.example.microhabit.data.AppThemeMode
+import com.example.microhabit.data.HabitCategory
 import com.example.microhabit.data.HabitRepository
 import com.example.microhabit.data.HabitTask
+import com.example.microhabit.data.HabitTemplate
+import com.example.microhabit.data.HabitTemplateCatalog
 import com.example.microhabit.data.SubscriptionPlan
 import com.example.microhabit.data.TaskFrequency
 import com.example.microhabit.data.TrackingType
@@ -79,7 +82,9 @@ data class HabitUiState(
     val language: AppLanguage = AppLanguage.RU,
     val notificationsEnabled: Boolean = true,
     val defaultReminderHour: Int = 8,
-    val defaultReminderMinute: Int = 0
+    val defaultReminderMinute: Int = 0,
+    val onboardingCompleted: Boolean = false,
+    val isLoaded: Boolean = false
 )
 
 private data class EditorSavePayload(
@@ -165,6 +170,54 @@ class MainViewModel(
                     defaultReminderMinute = minute.coerceIn(0, 59)
                 )
             }
+        }
+    }
+
+    fun setOnboardingCompleted(completed: Boolean) {
+        viewModelScope.launch {
+            repository.setOnboardingCompleted(completed)
+            _state.update { it.copy(onboardingCompleted = completed) }
+        }
+    }
+
+    fun prepareOnboardingDraft(
+        name: String,
+        category: HabitCategory,
+        template: HabitTemplate,
+        frequency: TaskFrequency,
+        customDays: Set<Int>,
+        reminderEnabled: Boolean,
+        reminderHour: Int,
+        reminderMinute: Int
+    ) {
+        val normalizedName = name.trim()
+        val normalizedFrequency = if (frequency == TaskFrequency.SELECTED_DAYS) {
+            TaskFrequency.SELECTED_DAYS
+        } else {
+            TaskFrequency.DAILY
+        }
+        val normalizedCustomDays = if (normalizedFrequency == TaskFrequency.SELECTED_DAYS) {
+            customDays.filter { it in 1..7 }.toSet().ifEmpty { setOf(1) }
+        } else {
+            emptySet()
+        }
+        _state.update {
+            it.copy(
+                showEditor = false,
+                editingTaskId = null,
+                editorTitle = normalizedName,
+                editorEmoji = template.emoji.ifBlank { "✨" }.take(2),
+                editorColorHex = HabitTemplateCatalog.defaultColorHex(category),
+                editorTrackingType = TrackingType.YES_NO,
+                editorFrequency = normalizedFrequency,
+                editorTimesPerWeek = 3,
+                editorCustomDays = normalizedCustomDays,
+                editorReminderEnabled = reminderEnabled,
+                editorReminderHour = reminderHour.coerceIn(0, 23),
+                editorReminderMinute = reminderMinute.coerceIn(0, 59),
+                editorStartDate = LocalDate.now(),
+                editorShowAdvanced = false
+            )
         }
     }
 
@@ -444,6 +497,7 @@ class MainViewModel(
             val notificationsEnabled = repository.getNotificationsEnabled()
             val defaultReminderHour = repository.getDefaultReminderHour()
             val defaultReminderMinute = repository.getDefaultReminderMinute()
+            val onboardingCompleted = repository.isOnboardingCompleted()
 
             var selectedId = repository.getSelectedTaskId()
             if (selectedId == null || tasks.none { it.id == selectedId }) {
@@ -510,7 +564,9 @@ class MainViewModel(
                     language = language,
                     notificationsEnabled = notificationsEnabled,
                     defaultReminderHour = defaultReminderHour,
-                    defaultReminderMinute = defaultReminderMinute
+                    defaultReminderMinute = defaultReminderMinute,
+                    onboardingCompleted = onboardingCompleted,
+                    isLoaded = true
                 )
             }
         }

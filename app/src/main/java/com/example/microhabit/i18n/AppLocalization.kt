@@ -162,6 +162,28 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "Enable habit reminder notifications" to v("Erinnerungen fur Gewohnheiten aktivieren", "Activer les rappels d'habitude", "Activar recordatorios de habitos", "Abilita promemoria abitudini", "Включить уведомления-напоминания"),
     "Reminder time" to v("Erinnerungszeit", "Heure de rappel", "Hora del recordatorio", "Orario promemoria", "Время напоминания"),
     "Daily notification time" to v("Tagliche Benachrichtigungszeit", "Heure quotidienne de notification", "Hora diaria de notificacion", "Orario notifica giornaliera", "Ежедневное время уведомления"),
+    "Notifications are disabled" to v(
+        "Benachrichtigungen sind deaktiviert",
+        "Les notifications sont desactivees",
+        "Las notificaciones estan desactivadas",
+        "Le notifiche sono disattivate",
+        "Уведомления отключены"
+    ),
+    "Enable notifications in system settings to receive habit reminders." to v(
+        "Aktiviere Benachrichtigungen in den Systemeinstellungen, um Erinnerungen zu erhalten.",
+        "Activez les notifications dans les parametres systeme pour recevoir des rappels.",
+        "Activa las notificaciones en la configuracion del sistema para recibir recordatorios.",
+        "Attiva le notifiche nelle impostazioni di sistema per ricevere i promemoria.",
+        "Включите уведомления в системных настройках, чтобы получать напоминания о привычках."
+    ),
+    "Open Settings" to v("Einstellungen", "Ouvrir les parametres", "Abrir ajustes", "Apri impostazioni", "Открыть настройки"),
+    "Unable to open app settings." to v(
+        "App-Einstellungen konnen nicht geoffnet werden.",
+        "Impossible d'ouvrir les parametres de l'application.",
+        "No se pudieron abrir los ajustes de la aplicacion.",
+        "Impossibile aprire le impostazioni dell'app.",
+        "Не удалось открыть настройки приложения."
+    ),
     "Habit reminder" to v("Gewohnheits-Erinnerung", "Rappel d'habitude", "Recordatorio de habito", "Promemoria abitudine", "Напоминание о привычке"),
     "Time to complete: %s" to v("Zeit fur: %s", "Il est temps de faire : %s", "Hora de completar: %s", "E ora di completare: %s", "Пора выполнить: %s"),
     "Notification permission denied. Reminders are disabled." to v(

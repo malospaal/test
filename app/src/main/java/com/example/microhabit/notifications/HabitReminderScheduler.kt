@@ -130,7 +130,7 @@ class HabitReminderScheduler(
     }
 
     private fun showNotification(task: HabitTask) {
-        if (!hasNotificationPermission(context)) return
+        if (!canDeliverNotifications(context)) return
 
         val language = repository.getLanguage()
         val contentIntent = PendingIntent.getActivity(
@@ -182,8 +182,17 @@ class HabitReminderScheduler(
         private const val CHANNEL_ID = "habit_reminders"
 
         fun hasNotificationPermission(context: Context): Boolean {
+            return hasRuntimeNotificationPermission(context)
+        }
+
+        fun hasRuntimeNotificationPermission(context: Context): Boolean {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true
             return context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+        }
+
+        fun canDeliverNotifications(context: Context): Boolean {
+            val appNotificationsEnabled = NotificationManagerCompat.from(context).areNotificationsEnabled()
+            return hasRuntimeNotificationPermission(context) && appNotificationsEnabled
         }
     }
 }

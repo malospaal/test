@@ -77,6 +77,13 @@ data class HabitUiState(
     val defaultReminderMinute: Int = 0
 )
 
+private data class EditorSavePayload(
+    val current: HabitUiState,
+    val title: String,
+    val frequency: TaskFrequency,
+    val customDays: Set<Int>
+)
+
 class MainViewModel(
     private val repository: HabitRepository,
     private val reminderScheduler: HabitReminderScheduler
@@ -296,13 +303,28 @@ class MainViewModel(
     }
 
     fun saveEditor() {
-        val current = _state.value
-        val title = current.editorTitle.trim()
-        if (!canSaveEditor()) return
-
-        if (current.editingTaskId == null && !canCreateTask(current.tasks.size, current.plan)) {
-            return
+        val payload = editorSavePayloadOrNull() ?: return
+        viewModelScope.launch {
+            persistEditor(payload)
         }
+    }
+
+    fun saveEditorWithNotificationsEnabled() {
+        val payload = editorSavePayloadOrNull() ?: return
+        viewModelScope.launch {
+            if (!repository.getNotificationsEnabled()) {
+                repository.setNotificationsEnabled(true)
+                reminderScheduler.syncAllReminders()
+                _state.update { it.copy(notificationsEnabled = true) }
+            }
+            persistEditor(payload)
+        }
+    }
+
+    private fun editorSavePayloadOrNull(): EditorSavePayload? {
+        val current = _state.value
+        if (!canSaveEditor()) return null
+        if (current.editingTaskId == null && !canCreateTask(current.tasks.size, current.plan)) return null
 
         val frequency = current.editorFrequency
         val customDays = if (frequency == TaskFrequency.SELECTED_DAYS) {
@@ -310,16 +332,24 @@ class MainViewModel(
         } else {
             emptySet()
         }
+        return EditorSavePayload(
+            current = current,
+            title = current.editorTitle.trim(),
+            frequency = frequency,
+            customDays = customDays
+        )
+    }
 
-        viewModelScope.launch {
-            val affectedTaskId = if (current.editingTaskId == null) {
+    private fun persistEditor(payload: EditorSavePayload) {
+        val current = payload.current
+        val affectedTaskId = if (current.editingTaskId == null) {
                 val task = repository.createTask(
-                    title = title,
+                    title = payload.title,
                     emoji = current.editorEmoji,
                     colorHex = current.editorColorHex,
                     trackingType = current.editorTrackingType,
-                    frequency = frequency,
-                    customDays = customDays,
+                    frequency = payload.frequency,
+                    customDays = payload.customDays,
                     timesPerWeek = current.editorTimesPerWeek,
                     reminderHour = current.editorReminderHour,
                     reminderMinute = current.editorReminderMinute,
@@ -330,24 +360,23 @@ class MainViewModel(
             } else {
                 repository.updateTask(
                     taskId = current.editingTaskId,
-                    title = title,
+                    title = payload.title,
                     emoji = current.editorEmoji,
                     colorHex = current.editorColorHex,
                     trackingType = current.editorTrackingType,
-                    frequency = frequency,
-                    customDays = customDays,
+                    frequency = payload.frequency,
+                    customDays = payload.customDays,
                     timesPerWeek = current.editorTimesPerWeek,
                     reminderHour = current.editorReminderHour,
                     reminderMinute = current.editorReminderMinute,
                     startDate = current.editorStartDate
                 )
                 current.editingTaskId
-            }
-            reminderScheduler.syncReminderForTask(affectedTaskId)
-            repository.refreshWidget()
-            refresh()
-            _state.update { it.copy(showEditor = false) }
         }
+        reminderScheduler.syncReminderForTask(affectedTaskId)
+        repository.refreshWidget()
+        refresh()
+        _state.update { it.copy(showEditor = false) }
     }
 
     fun deleteTask(taskId: String) {

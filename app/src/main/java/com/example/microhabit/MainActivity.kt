@@ -1,11 +1,16 @@
 package com.example.microhabit
 
 import android.Manifest
+import android.app.Activity
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.content.Context
+import android.content.ContextWrapper
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -83,10 +88,12 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -96,6 +103,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -162,6 +172,11 @@ private enum class BillingCycle {
     YEARLY
 }
 
+private enum class NotificationPermissionAction {
+    ENABLE_REMINDERS,
+    SAVE_EDITOR_REMINDER
+}
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -206,36 +221,79 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
     var page by rememberSaveable { mutableStateOf(AppPage.TRACKER) }
     var previousPage by rememberSaveable { mutableStateOf(AppPage.TRACKER) }
     var selectedBilling by rememberSaveable { mutableStateOf(BillingCycle.YEARLY) }
+    var showNotificationsBlockedDialog by rememberSaveable { mutableStateOf(false) }
+    var pendingPermissionAction by remember { mutableStateOf<NotificationPermissionAction?>(null) }
+    var pendingSettingsAction by remember { mutableStateOf<NotificationPermissionAction?>(null) }
     val semantic = AppTheme.colors
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val language = state.language
+    val runActionWithNotifications = { action: NotificationPermissionAction ->
+        when (action) {
+            NotificationPermissionAction.ENABLE_REMINDERS -> vm.setNotificationsEnabled(true)
+            NotificationPermissionAction.SAVE_EDITOR_REMINDER -> vm.saveEditorWithNotificationsEnabled()
+        }
+    }
+    val showNotificationsBlocked = { action: NotificationPermissionAction? ->
+        pendingPermissionAction = null
+        pendingSettingsAction = action
+        if (state.notificationsEnabled) {
+            vm.setNotificationsEnabled(false)
+        }
+        showNotificationsBlockedDialog = true
+    }
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
-        if (granted) {
-            vm.setNotificationsEnabled(true)
+        val action = pendingPermissionAction
+        pendingPermissionAction = null
+        if (granted && HabitReminderScheduler.canDeliverNotifications(context)) {
+            pendingSettingsAction = null
+            if (action != null) runActionWithNotifications(action)
         } else {
-            vm.setNotificationsEnabled(false)
-            Toast.makeText(
-                context,
-                translate(language, "Notification permission denied. Reminders are disabled."),
-                Toast.LENGTH_LONG
-            ).show()
+            showNotificationsBlocked(action)
         }
     }
 
     LaunchedEffect(state.notificationsEnabled) {
         if (
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             state.notificationsEnabled &&
-            !HabitReminderScheduler.hasNotificationPermission(context)
+            !HabitReminderScheduler.canDeliverNotifications(context)
         ) {
             vm.setNotificationsEnabled(false)
-            Toast.makeText(
-                context,
-                translate(language, "Notification permission denied. Reminders are disabled."),
-                Toast.LENGTH_LONG
-            ).show()
+        }
+    }
+
+    val ensureNotificationPermissionAndRun = { action: NotificationPermissionAction ->
+        when {
+            HabitReminderScheduler.canDeliverNotifications(context) -> runActionWithNotifications(action)
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                !HabitReminderScheduler.hasRuntimeNotificationPermission(context) -> {
+                pendingPermissionAction = action
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+            else -> {
+                showNotificationsBlocked(action)
+            }
+        }
+    }
+
+    DisposableEffect(lifecycleOwner, pendingSettingsAction) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (
+                event == Lifecycle.Event.ON_RESUME &&
+                pendingSettingsAction != null &&
+                HabitReminderScheduler.canDeliverNotifications(context)
+            ) {
+                val action = pendingSettingsAction
+                pendingSettingsAction = null
+                showNotificationsBlockedDialog = false
+                if (action != null) runActionWithNotifications(action)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 
@@ -362,12 +420,8 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                         onSetNotificationsEnabled = { enabled ->
                             if (!enabled) {
                                 vm.setNotificationsEnabled(false)
-                            } else if (HabitReminderScheduler.hasNotificationPermission(context)) {
-                                vm.setNotificationsEnabled(true)
-                            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                             } else {
-                                vm.setNotificationsEnabled(true)
+                                ensureNotificationPermissionAndRun(NotificationPermissionAction.ENABLE_REMINDERS)
                             }
                         },
                         onSetDefaultReminder = vm::setDefaultReminder,
@@ -384,7 +438,51 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
             }
 
             if (state.showEditor) {
-                TaskEditorDialog(state = state, onDismiss = vm::closeEditor, vm = vm)
+                TaskEditorDialog(
+                    state = state,
+                    onDismiss = vm::closeEditor,
+                    vm = vm,
+                    onSaveRequest = {
+                        ensureNotificationPermissionAndRun(NotificationPermissionAction.SAVE_EDITOR_REMINDER)
+                    }
+                )
+            }
+
+            if (showNotificationsBlockedDialog) {
+                AlertDialog(
+                    onDismissRequest = {
+                        showNotificationsBlockedDialog = false
+                        pendingSettingsAction = null
+                    },
+                    title = { Text(t("Notifications are disabled")) },
+                    text = { Text(t("Enable notifications in system settings to receive habit reminders.")) },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                showNotificationsBlockedDialog = false
+                                val opened = openNotificationOrAppSettings(context)
+                                if (!opened) {
+                                    pendingSettingsAction = null
+                                    Toast.makeText(
+                                        context,
+                                        translate(language, "Unable to open app settings."),
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            }
+                        ) {
+                            Text(t("Open Settings"))
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = {
+                            showNotificationsBlockedDialog = false
+                            pendingSettingsAction = null
+                        }) {
+                            Text(t("Cancel"))
+                        }
+                    }
+                )
             }
         }
     }
@@ -2168,7 +2266,12 @@ private fun SelectChip(title: String, selected: Boolean, onClick: () -> Unit) {
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
-private fun TaskEditorDialog(state: HabitUiState, onDismiss: () -> Unit, vm: MainViewModel) {
+private fun TaskEditorDialog(
+    state: HabitUiState,
+    onDismiss: () -> Unit,
+    vm: MainViewModel,
+    onSaveRequest: () -> Unit
+) {
     val spacing = AppTheme.spacing
     val colors = AppTheme.colors
     val stroke = AppTheme.stroke
@@ -2239,7 +2342,7 @@ private fun TaskEditorDialog(state: HabitUiState, onDismiss: () -> Unit, vm: Mai
                             )
                         }
                         Button(
-                            onClick = vm::saveEditor,
+                            onClick = onSaveRequest,
                             enabled = vm.canSaveEditor(),
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(AppTheme.radius.md)
@@ -2460,6 +2563,32 @@ private fun showThemedDatePicker(
         dialog.getButton(DatePickerDialog.BUTTON_NEGATIVE)?.setTextColor(actionColorArgb)
     }
     dialog.show()
+}
+
+private fun openNotificationOrAppSettings(context: Context): Boolean {
+    val packageName = context.packageName
+    val activity = context.findActivity()
+
+    val notificationSettingsIntent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+        putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+        putExtra("android.provider.extra.APP_PACKAGE", packageName)
+        if (activity == null) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    runCatching { context.startActivity(notificationSettingsIntent) }.onSuccess { return true }
+
+    val appDetailsIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+        data = Uri.fromParts("package", packageName, null)
+        if (activity == null) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    runCatching { context.startActivity(appDetailsIntent) }.onSuccess { return true }
+
+    return false
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
 
 private fun formatTime(hour: Int, minute: Int): String =

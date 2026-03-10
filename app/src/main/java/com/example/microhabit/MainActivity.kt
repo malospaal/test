@@ -481,7 +481,10 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                                     page = AppPage.PAYWALL
                                 }
                             )
-                            AppPage.ANALYTICS -> AnalyticsPage(state = state)
+                            AppPage.ANALYTICS -> AnalyticsPage(
+                                state = state,
+                                onSelectTask = vm::selectTask
+                            )
                             AppPage.CALENDAR -> CalendarScreen(state = state, vm = vm)
                             AppPage.PAYWALL -> PaywallPage(
                                 currentPlan = state.plan,
@@ -988,7 +991,10 @@ private fun HabitsPage(
 }
 
 @Composable
-private fun AnalyticsPage(state: HabitUiState) {
+private fun AnalyticsPage(
+    state: HabitUiState,
+    onSelectTask: (String) -> Unit
+) {
     val spacing = AppTheme.spacing
     val colors = AppTheme.colors
     val selectedTask = state.tasks.firstOrNull { it.id == state.selectedTaskId }
@@ -999,6 +1005,15 @@ private fun AnalyticsPage(state: HabitUiState) {
             contentPadding = PaddingValues(spacing.x2),
             verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
         ) {
+            if (state.tasks.isNotEmpty()) {
+                item {
+                    TaskSelector(
+                        tasks = state.tasks,
+                        selectedTaskId = state.selectedTaskId,
+                        onSelect = onSelectTask
+                    )
+                }
+            }
             item {
                 GlassCard {
                     Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
@@ -1035,21 +1050,11 @@ private fun AnalyticsPage(state: HabitUiState) {
         verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
     ) {
         item {
-            GlassCard {
-                Column(verticalArrangement = Arrangement.spacedBy(spacing.x0_5)) {
-                    Text(
-                        text = t("Analytics"),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = colors.textPrimary
-                    )
-                    Text(
-                        text = selectedTask.title,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.textSecondary
-                    )
-                }
-            }
+            TaskSelector(
+                tasks = state.tasks,
+                selectedTaskId = state.selectedTaskId,
+                onSelect = onSelectTask
+            )
         }
 
         item {
@@ -1199,21 +1204,11 @@ private fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
         verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
     ) {
         item {
-            GlassCard {
-                Column(verticalArrangement = Arrangement.spacedBy(spacing.x0_5)) {
-                    Text(
-                        text = t("Calendar"),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = colors.textPrimary
-                    )
-                    Text(
-                        text = selectedTask.title,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.textSecondary
-                    )
-                }
-            }
+            TaskSelector(
+                tasks = state.tasks,
+                selectedTaskId = state.selectedTaskId,
+                onSelect = vm::selectTask
+            )
         }
 
         item {
@@ -2712,9 +2707,50 @@ private fun HeroCard(
     val radius = AppTheme.radius
     val stroke = AppTheme.stroke
     val semantic = AppTheme.colors
+    val context = LocalContext.current
     val locale = appLocale()
     val canMarkForSelectedDate = scheduled
     val highlightActive = highlightMarkButton && !done && canMarkForSelectedDate
+    val completedButtonLottieResId = remember(context) {
+        context.resources.getIdentifier("completed_button_lottie", "raw", context.packageName)
+    }
+    val completedButtonComposition by if (completedButtonLottieResId != 0) {
+        rememberLottieComposition(LottieCompositionSpec.RawRes(completedButtonLottieResId))
+    } else {
+        remember { mutableStateOf(null) }
+    }
+    val completedTargetFrame = 22f
+    val completedTargetProgress = remember(completedButtonComposition) {
+        val durationFrames = completedButtonComposition?.durationFrames ?: 1f
+        (completedTargetFrame / durationFrames.coerceAtLeast(1f)).coerceIn(0f, 1f)
+    }
+    var completedAnimationPlaying by remember(task?.id, selectedDate) { mutableStateOf(false) }
+    var previousDoneState by remember(task?.id, selectedDate) { mutableStateOf(done) }
+    val completedAnimationProgress by animateLottieCompositionAsState(
+        composition = completedButtonComposition,
+        iterations = 1,
+        isPlaying = completedAnimationPlaying,
+        speed = 1f
+    )
+    val completedButtonLottieProgress = when {
+        done && completedAnimationPlaying -> completedAnimationProgress
+        done -> completedTargetProgress
+        else -> 0f
+    }
+    LaunchedEffect(done, task?.id, selectedDate) {
+        if (done && !previousDoneState) {
+            completedAnimationPlaying = true
+        }
+        if (!done) {
+            completedAnimationPlaying = false
+        }
+        previousDoneState = done
+    }
+    LaunchedEffect(completedAnimationPlaying, completedAnimationProgress, completedTargetProgress) {
+        if (completedAnimationPlaying && completedAnimationProgress >= completedTargetProgress) {
+            completedAnimationPlaying = false
+        }
+    }
     val highlightPulseTransition = rememberInfiniteTransition(label = "heroHighlightPulse")
     val highlightPulse by highlightPulseTransition.animateFloat(
         initialValue = 1f,
@@ -2771,10 +2807,34 @@ private fun HeroCard(
                         contentColor = MaterialTheme.colorScheme.onPrimary
                     )
                 ) {
-                    Text(
-                        text = t("Completed ✓"),
-                        style = MaterialTheme.typography.labelLarge
-                    )
+                    if (completedButtonComposition != null) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(1.5.dp)
+                        ) {
+                            Text(
+                                text = t("Completed"),
+                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.W600)
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size((spacing.x2 + spacing.x1) * 1.5f)
+                                    .clip(RoundedCornerShape(AppTheme.radius.sm)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                LottieAnimation(
+                                    composition = completedButtonComposition,
+                                    progress = { completedButtonLottieProgress },
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+                        }
+                    } else {
+                        Text(
+                            text = t("Completed"),
+                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.W600)
+                        )
+                    }
                 }
             } else {
                 val interactionSource = remember { MutableInteractionSource() }

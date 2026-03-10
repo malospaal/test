@@ -21,6 +21,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -37,15 +38,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -53,9 +58,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -65,6 +73,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.AddCircle
@@ -74,6 +83,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.WorkspacePremium
@@ -120,9 +130,15 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.text.font.FontWeight
@@ -688,6 +704,7 @@ private fun TrackerPage(
     var overlayVisible by remember { mutableStateOf(false) }
     var pendingMilestone by remember { mutableStateOf<StreakOverlayModel?>(null) }
     var milestoneCelebration by remember { mutableStateOf<StreakOverlayModel?>(null) }
+    var habitSwitchDirection by remember { mutableStateOf(0) }
 
     LaunchedEffect(state.selectedTaskId) {
         previousTotalCompletions = state.totalCompletions
@@ -729,6 +746,12 @@ private fun TrackerPage(
         }
     }
 
+    fun switchToTask(taskId: String, direction: Int = 0) {
+        if (taskId == state.selectedTaskId) return
+        habitSwitchDirection = direction
+        vm.selectTask(taskId)
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -747,44 +770,102 @@ private fun TrackerPage(
                         canEditDelete = selectedTask != null
                     )
                 }
-                item { TaskSelector(state.tasks, state.selectedTaskId, vm::selectTask) }
                 item {
-                    HeroCard(
-                        task = selectedTask,
-                        selectedDate = state.selectedDate,
-                        done = state.selectedDateDone,
-                        scheduled = state.selectedDateScheduled,
-                        onDone = vm::toggleSelectedDateDone,
-                        highlightMarkButton = highlightCompletionButton,
-                        onHighlightConsumed = onHighlightConsumed
+                    TaskSelector(
+                        tasks = state.tasks,
+                        selectedTaskId = state.selectedTaskId,
+                        onSelect = { taskId -> switchToTask(taskId, 0) },
+                        onAddHabit = { if (canAdd) vm.openCreateTask() else onUpgrade() }
                     )
                 }
                 item {
-                    StatsRow(
-                        streak = state.streak,
-                        bestStreak = state.bestStreak,
-                        progress = state.progressPercent,
-                        total = state.totalCompletions
-                    )
-                }
-                item {
-                    SevenDayChart(
-                        points = state.last7Days,
-                        scheduled = state.last7DaysScheduled,
-                        anchorDate = state.selectedDate
-                    )
-                }
-                item {
-                    CalendarCard(
-                        month = state.currentMonth,
-                        selectedDate = state.selectedDate,
-                        selectedTask = selectedTask,
-                        doneDates = state.doneDatesInCurrentMonth,
-                        scheduledDates = state.scheduledDatesInCurrentMonth,
-                        onMoveMonth = vm::moveMonth,
-                        onToday = vm::jumpToToday,
-                        onDateSelect = vm::selectDate
-                    )
+                    fun switchHabitBy(delta: Int) {
+                        if (state.tasks.size <= 1) return
+                        val currentIndex = state.tasks
+                            .indexOfFirst { it.id == state.selectedTaskId }
+                            .let { if (it < 0) 0 else it }
+                        val nextIndex = (currentIndex + delta + state.tasks.size) % state.tasks.size
+                        val nextId = state.tasks[nextIndex].id
+                        if (nextId != state.selectedTaskId) {
+                            switchToTask(nextId, if (delta > 0) 1 else -1)
+                        }
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(spacing.x1_5)) {
+                        AnimatedContent(
+                            targetState = state.selectedTaskId,
+                            transitionSpec = {
+                                if (habitSwitchDirection == 0) {
+                                    fadeIn(animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing)) togetherWith
+                                        fadeOut(animationSpec = tween(durationMillis = 120, easing = FastOutSlowInEasing))
+                                } else {
+                                    val direction = if (habitSwitchDirection > 0) 1 else -1
+                                    (slideInHorizontally(
+                                        initialOffsetX = { fullWidth -> (fullWidth / 7) * direction },
+                                        animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing)
+                                    ) + fadeIn(animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing))) togetherWith
+                                        (slideOutHorizontally(
+                                            targetOffsetX = { fullWidth -> (-fullWidth / 9) * direction },
+                                            animationSpec = tween(durationMillis = 130, easing = FastOutSlowInEasing)
+                                        ) + fadeOut(animationSpec = tween(durationMillis = 130, easing = FastOutSlowInEasing)))
+                                }
+                            },
+                            label = "trackerHeroSwitch"
+                        ) { taskId ->
+                            val animatedTask = state.tasks.firstOrNull { it.id == taskId }
+                            HeroCard(
+                                task = animatedTask,
+                                selectedDate = state.selectedDate,
+                                done = state.selectedDateDone,
+                                scheduled = state.selectedDateScheduled,
+                                onDone = vm::toggleSelectedDateDone,
+                                highlightMarkButton = highlightCompletionButton,
+                                onHighlightConsumed = onHighlightConsumed,
+                                swipeEnabled = state.tasks.size > 1,
+                                onSwipeNext = { switchHabitBy(1) },
+                                onSwipePrevious = { switchHabitBy(-1) }
+                            )
+                        }
+                        Crossfade(
+                            targetState = state.selectedTaskId,
+                            animationSpec = tween(durationMillis = 150),
+                            label = "trackerStatsCrossfade"
+                        ) {
+                            StatsRow(
+                                streak = state.streak,
+                                bestStreak = state.bestStreak,
+                                progress = state.progressPercent,
+                                total = state.totalCompletions
+                            )
+                        }
+                        Crossfade(
+                            targetState = state.selectedTaskId,
+                            animationSpec = tween(durationMillis = 150),
+                            label = "trackerWeekCrossfade"
+                        ) {
+                            SevenDayChart(
+                                points = state.last7Days,
+                                scheduled = state.last7DaysScheduled,
+                                anchorDate = state.selectedDate
+                            )
+                        }
+                        Crossfade(
+                            targetState = state.selectedTaskId,
+                            animationSpec = tween(durationMillis = 150),
+                            label = "trackerCalendarCrossfade"
+                        ) { taskId ->
+                            val animatedTask = state.tasks.firstOrNull { it.id == taskId }
+                            CalendarCard(
+                                month = state.currentMonth,
+                                selectedDate = state.selectedDate,
+                                selectedTask = animatedTask,
+                                doneDates = state.doneDatesInCurrentMonth,
+                                scheduledDates = state.scheduledDatesInCurrentMonth,
+                                onMoveMonth = vm::moveMonth,
+                                onToday = vm::jumpToToday,
+                                onDateSelect = vm::selectDate
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -2668,27 +2749,192 @@ private fun TaskControlButton(
 }
 
 @Composable
-private fun TaskSelector(tasks: List<HabitTask>, selectedTaskId: String?, onSelect: (String) -> Unit) {
+private fun TaskSelector(
+    tasks: List<HabitTask>,
+    selectedTaskId: String?,
+    onSelect: (String) -> Unit,
+    onAddHabit: (() -> Unit)? = null
+) {
     val spacing = AppTheme.spacing
     val radius = AppTheme.radius
     val semantic = AppTheme.colors
+    val density = LocalDensity.current
+    val selectedTask = tasks.firstOrNull { it.id == selectedTaskId } ?: tasks.firstOrNull()
+    var expanded by rememberSaveable(tasks.map { it.id }, selectedTaskId) { mutableStateOf(false) }
+    var triggerSize by remember { mutableStateOf(IntSize.Zero) }
+    val arrowRotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
+        label = "taskSelectorArrowRotation"
+    )
+    val dropdownTransitionState = remember { MutableTransitionState(false) }
+    val dropdownVisible = dropdownTransitionState.currentState || dropdownTransitionState.targetState
 
-    GlassCard(contentPadding = PaddingValues(spacing.x2)) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(spacing.x1),
-            modifier = Modifier.horizontalScroll(rememberScrollState())
-        ) {
-            tasks.forEach { task ->
-                val selected = task.id == selectedTaskId
-                Button(
-                    onClick = { onSelect(task.id) },
-                    shape = RoundedCornerShape(radius.md),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (selected) semantic.primary else semantic.backgroundSurfaceMuted,
-                        contentColor = if (selected) MaterialTheme.colorScheme.onPrimary else semantic.textPrimary
+    LaunchedEffect(expanded) {
+        dropdownTransitionState.targetState = expanded
+    }
+
+    GlassCard(contentPadding = PaddingValues(spacing.x1)) {
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(radius.md))
+                    .onGloballyPositioned { coordinates ->
+                        triggerSize = coordinates.size
+                    }
+                    .clickable(enabled = tasks.isNotEmpty()) { expanded = !expanded },
+                color = semantic.backgroundSurfaceMuted
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = spacing.x1_5, vertical = spacing.x1),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(spacing.x0_5)
+                    ) {
+                        Text(
+                            text = selectedTask?.emoji?.ifBlank { "✨" } ?: "✨",
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text(
+                            text = selectedTask?.title ?: t("No active habit"),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = semantic.textPrimary
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Rounded.KeyboardArrowDown,
+                        contentDescription = null,
+                        tint = semantic.textSecondary,
+                        modifier = Modifier.graphicsLayer { rotationZ = arrowRotation }
+                    )
+                }
+            }
+
+            if (dropdownVisible && tasks.isNotEmpty() && triggerSize.width > 0) {
+                val popupOffset = IntOffset(
+                    x = 0,
+                    y = triggerSize.height + with(density) { spacing.x0_5.roundToPx() }
+                )
+                Popup(
+                    alignment = Alignment.TopStart,
+                    offset = popupOffset,
+                    onDismissRequest = { expanded = false },
+                    properties = PopupProperties(
+                        focusable = true,
+                        dismissOnBackPress = true,
+                        dismissOnClickOutside = true,
+                        clippingEnabled = false
                     )
                 ) {
-                    Text(task.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    AnimatedVisibility(
+                        visibleState = dropdownTransitionState,
+                        enter = fadeIn(animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing)) +
+                            slideInVertically(
+                                initialOffsetY = { -it / 6 },
+                                animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing)
+                            ),
+                        exit = fadeOut(animationSpec = tween(durationMillis = 120, easing = FastOutSlowInEasing)) +
+                            slideOutVertically(
+                                targetOffsetY = { -it / 8 },
+                                animationSpec = tween(durationMillis = 120, easing = FastOutSlowInEasing)
+                            )
+                    ) {
+                        Surface(
+                            modifier = Modifier
+                                .width(with(density) { triggerSize.width.toDp() })
+                                .heightIn(max = 320.dp),
+                            shape = RoundedCornerShape(radius.md),
+                            color = semantic.backgroundSurface,
+                            tonalElevation = 6.dp,
+                            shadowElevation = 8.dp
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .verticalScroll(rememberScrollState())
+                                    .padding(vertical = spacing.x0_5)
+                            ) {
+                                tasks.forEach { task ->
+                                    val selected = task.id == selectedTaskId
+                                    val rowColor = if (selected) {
+                                        semantic.primary.copy(alpha = 0.12f)
+                                    } else {
+                                        Color.Transparent
+                                    }
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = spacing.x0_5, vertical = 1.dp)
+                                            .clip(RoundedCornerShape(radius.sm))
+                                            .background(rowColor)
+                                            .clickable {
+                                                expanded = false
+                                                onSelect(task.id)
+                                            }
+                                            .padding(horizontal = spacing.x1, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(spacing.x0_5)
+                                    ) {
+                                        Text(
+                                            text = task.emoji.ifBlank { "✨" },
+                                            style = MaterialTheme.typography.bodyLarge
+                                        )
+                                        Text(
+                                            text = task.title,
+                                            modifier = Modifier.weight(1f),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                            color = semantic.textPrimary
+                                        )
+                                        if (selected) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Check,
+                                                contentDescription = t("Selected"),
+                                                tint = semantic.primary
+                                            )
+                                        }
+                                    }
+                                }
+                                onAddHabit?.let { addHabit ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = spacing.x0_5, vertical = 1.dp)
+                                            .clip(RoundedCornerShape(radius.sm))
+                                            .clickable {
+                                                expanded = false
+                                                addHabit()
+                                            }
+                                            .padding(horizontal = spacing.x1, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(spacing.x0_5)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.AddCircle,
+                                            contentDescription = null,
+                                            tint = semantic.primary
+                                        )
+                                        Text(
+                                            text = t("Create habit"),
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = semantic.textPrimary
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -2703,7 +2949,10 @@ private fun HeroCard(
     scheduled: Boolean,
     onDone: () -> Unit,
     highlightMarkButton: Boolean,
-    onHighlightConsumed: () -> Unit
+    onHighlightConsumed: () -> Unit,
+    swipeEnabled: Boolean = false,
+    onSwipeNext: () -> Unit = {},
+    onSwipePrevious: () -> Unit = {}
 ) {
     val spacing = AppTheme.spacing
     val radius = AppTheme.radius
@@ -2713,6 +2962,9 @@ private fun HeroCard(
     val locale = appLocale()
     val canMarkForSelectedDate = scheduled
     val highlightActive = highlightMarkButton && !done && canMarkForSelectedDate
+    val density = LocalDensity.current
+    val swipeThresholdPx = with(density) { 56.dp.toPx() }
+    var horizontalDragDistance by remember(task?.id, selectedDate) { mutableStateOf(0f) }
     val completedButtonLottieResId = remember(context) {
         context.resources.getIdentifier("completed_button_lottie", "raw", context.packageName)
     }
@@ -2766,16 +3018,45 @@ private fun HeroCard(
 
     GlassCard(contentPadding = PaddingValues(spacing.x2)) {
         Column(
-            modifier = Modifier.animateContentSize(
-                animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing)
-            ),
+            modifier = Modifier
+                .animateContentSize(
+                    animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing)
+                )
+                .then(
+                    if (!swipeEnabled) {
+                        Modifier
+                    } else {
+                        Modifier.pointerInput(task?.id, selectedDate, swipeEnabled) {
+                            detectHorizontalDragGestures(
+                                onHorizontalDrag = { change, dragAmount ->
+                                    change.consume()
+                                    horizontalDragDistance += dragAmount
+                                },
+                                onDragEnd = {
+                                    when {
+                                        horizontalDragDistance <= -swipeThresholdPx -> onSwipeNext()
+                                        horizontalDragDistance >= swipeThresholdPx -> onSwipePrevious()
+                                    }
+                                    horizontalDragDistance = 0f
+                                },
+                                onDragCancel = { horizontalDragDistance = 0f }
+                            )
+                        }
+                    }
+                ),
             verticalArrangement = Arrangement.spacedBy(spacing.x1)
         ) {
-            Text(
-                text = task?.title.orEmpty(),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
+            Crossfade(
+                targetState = task?.title.orEmpty(),
+                animationSpec = tween(durationMillis = 140),
+                label = "heroTitleCrossfade"
+            ) { title ->
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            }
             Text(
                 text = selectedDate.format(DateTimeFormatter.ofPattern(t("dd MMM yyyy"), locale)),
                 style = MaterialTheme.typography.bodySmall,

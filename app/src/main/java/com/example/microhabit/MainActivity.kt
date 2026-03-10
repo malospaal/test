@@ -22,6 +22,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -43,6 +45,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -54,7 +57,13 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountCircle
@@ -105,7 +114,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -116,6 +129,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.airbnb.lottie.compose.LottieAnimation
+import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.compose.LottieConstants
+import com.airbnb.lottie.compose.animateLottieCompositionAsState
+import com.airbnb.lottie.compose.rememberLottieComposition
 import com.example.microhabit.data.AppLanguage
 import com.example.microhabit.data.AppThemeMode
 import com.example.microhabit.data.HabitRepository
@@ -587,25 +605,39 @@ private fun TrackerPage(
     var previousTotalCompletions by remember(state.selectedTaskId) { mutableStateOf(state.totalCompletions) }
     var streakOverlay by remember { mutableStateOf<StreakOverlayModel?>(null) }
     var overlayVisible by remember { mutableStateOf(false) }
+    var pendingMilestone by remember { mutableStateOf<StreakOverlayModel?>(null) }
+    var milestoneCelebration by remember { mutableStateOf<StreakOverlayModel?>(null) }
 
     LaunchedEffect(state.selectedTaskId) {
         previousTotalCompletions = state.totalCompletions
         streakOverlay = null
         overlayVisible = false
+        pendingMilestone = null
+        milestoneCelebration = null
     }
     LaunchedEffect(state.totalCompletions, state.selectedDateDone, state.streak) {
         if (state.selectedDateDone && state.totalCompletions > previousTotalCompletions) {
-            streakOverlay = StreakOverlayModel(
+            val model = StreakOverlayModel(
                 streak = state.streak,
                 milestone = isStreakMilestone(state.streak)
             )
+            streakOverlay = model
             overlayVisible = true
+            if (model.milestone) {
+                pendingMilestone = model
+            }
         }
         previousTotalCompletions = state.totalCompletions
     }
+    LaunchedEffect(pendingMilestone) {
+        val model = pendingMilestone ?: return@LaunchedEffect
+        delay(260)
+        milestoneCelebration = model
+        pendingMilestone = null
+    }
     LaunchedEffect(streakOverlay, overlayVisible) {
         if (overlayVisible && streakOverlay != null) {
-            delay(if (streakOverlay?.milestone == true) 2300 else 1700)
+            delay(1200)
             overlayVisible = false
         }
     }
@@ -683,6 +715,17 @@ private fun TrackerPage(
             streakOverlay?.let { model ->
                 StreakRewardOverlay(model = model)
             }
+        }
+
+        milestoneCelebration?.let { model ->
+            MilestoneCelebrationDialog(
+                model = model,
+                currentStreak = state.streak,
+                bestStreak = state.bestStreak,
+                completion30Day = state.progressPercent,
+                points = state.last7Days,
+                onDismiss = { milestoneCelebration = null }
+            )
         }
     }
 
@@ -1981,11 +2024,23 @@ private fun HeroCard(
                 style = MaterialTheme.typography.headlineSmall
             )
             if (done && canMarkForSelectedDate) {
+                val interactionSource = remember { MutableInteractionSource() }
+                val pressed by interactionSource.collectIsPressedAsState()
+                val pressScale by animateFloatAsState(
+                    targetValue = if (pressed) 0.975f else 1f,
+                    animationSpec = tween(durationMillis = 90),
+                    label = "completeButtonPressScale"
+                )
                 Button(
                     onClick = onDone,
+                    interactionSource = interactionSource,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(spacing.x5 + spacing.x1),
+                        .height(spacing.x5 + spacing.x1)
+                        .graphicsLayer {
+                            scaleX = pressScale
+                            scaleY = pressScale
+                        },
                     shape = RoundedCornerShape(radius.lg),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = semantic.primary,
@@ -1998,12 +2053,24 @@ private fun HeroCard(
                     )
                 }
             } else {
+                val interactionSource = remember { MutableInteractionSource() }
+                val pressed by interactionSource.collectIsPressedAsState()
+                val pressScale by animateFloatAsState(
+                    targetValue = if (pressed) 0.98f else 1f,
+                    animationSpec = tween(durationMillis = 90),
+                    label = "markButtonPressScale"
+                )
                 OutlinedButton(
                     onClick = onDone,
                     enabled = canMarkForSelectedDate,
+                    interactionSource = interactionSource,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(spacing.x5 + spacing.x1),
+                        .height(spacing.x5 + spacing.x1)
+                        .graphicsLayer {
+                            scaleX = pressScale
+                            scaleY = pressScale
+                        },
                     shape = RoundedCornerShape(radius.lg),
                     border = BorderStroke(
                         stroke.thin * 1.5f,
@@ -2063,18 +2130,13 @@ private fun HeroCard(
 private fun StreakRewardOverlay(model: StreakOverlayModel) {
     val spacing = AppTheme.spacing
     val radius = AppTheme.radius
-    val stroke = AppTheme.stroke
     val colors = AppTheme.colors
     val container by animateColorAsState(
-        targetValue = if (model.milestone) colors.primary else colors.backgroundSurface,
+        targetValue = colors.backgroundSurface,
         animationSpec = tween(durationMillis = 220),
         label = "streakOverlayContainer"
     )
-    val contentColor by animateColorAsState(
-        targetValue = if (model.milestone) MaterialTheme.colorScheme.onPrimary else colors.textPrimary,
-        animationSpec = tween(durationMillis = 220),
-        label = "streakOverlayContent"
-    )
+    val subtitle = if (model.streak <= 1) t("Great job") else t("Keep it going")
 
     Card(
         modifier = Modifier
@@ -2082,37 +2144,357 @@ private fun StreakRewardOverlay(model: StreakOverlayModel) {
             .padding(horizontal = spacing.x2),
         colors = CardDefaults.cardColors(containerColor = container),
         shape = RoundedCornerShape(radius.lg),
-        elevation = CardDefaults.cardElevation(defaultElevation = AppTheme.elevation.lg)
+        elevation = CardDefaults.cardElevation(defaultElevation = AppTheme.elevation.md)
     ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = spacing.x2, vertical = spacing.x1_5),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+        ) {
+            Text(
+                text = "🔥",
+                style = MaterialTheme.typography.titleLarge
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(spacing.x0_5)
+            ) {
+                Text(
+                    text = tf("%d day streak", model.streak),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.textPrimary
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.textSecondary
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MilestoneCelebrationDialog(
+    model: StreakOverlayModel,
+    currentStreak: Int,
+    bestStreak: Int,
+    completion30Day: Int,
+    points: List<Int>,
+    onDismiss: () -> Unit
+) {
+    val spacing = AppTheme.spacing
+    val radius = AppTheme.radius
+    val colors = AppTheme.colors
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            Button(onClick = onDismiss) {
+                Text(t("Continue"))
+            }
+        },
+        title = {
+            Text(
+                text = t("Streak milestone"),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(spacing.x1_5)) {
+                MilestoneFlameHero(streak = model.streak)
+
+                Text(
+                    text = t("Amazing consistency"),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.textPrimary
+                )
+                Text(
+                    text = t("You're building momentum"),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.textSecondary
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+                ) {
+                    MilestoneMetric(
+                        modifier = Modifier.weight(1f),
+                        label = t("Current streak"),
+                        value = "${currentStreak}d"
+                    )
+                    MilestoneMetric(
+                        modifier = Modifier.weight(1f),
+                        label = t("Best streak"),
+                        value = "${bestStreak}d"
+                    )
+                    MilestoneMetric(
+                        modifier = Modifier.weight(1f),
+                        label = t("30 day completion"),
+                        value = "${completion30Day}%"
+                    )
+                }
+
+                MilestonePreview(points = points)
+            }
+        },
+        shape = RoundedCornerShape(radius.lg),
+        containerColor = colors.backgroundSurface
+    )
+}
+
+@Composable
+private fun MilestoneFlameHero(streak: Int) {
+    val spacing = AppTheme.spacing
+    val radius = AppTheme.radius
+    val colors = AppTheme.colors
+    val flameSize = spacing.x6 * 2f
+    val lottieComposition by rememberLottieComposition(
+        LottieCompositionSpec.RawRes(R.raw.streak_milestone_lottie)
+    )
+    val lottieProgress by animateLottieCompositionAsState(
+        composition = lottieComposition,
+        iterations = LottieConstants.IterateForever,
+        isPlaying = lottieComposition != null,
+        speed = 1f
+    )
+    val infinite = rememberInfiniteTransition(label = "milestoneFlameMotion")
+    val flamePulse by infinite.animateFloat(
+        initialValue = 0.98f,
+        targetValue = 1.07f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 920, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "flamePulse"
+    )
+    val flameFlicker by infinite.animateFloat(
+        initialValue = 0.9f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 360, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "flameFlicker"
+    )
+    val flameDriftY by infinite.animateFloat(
+        initialValue = -2f,
+        targetValue = 2f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1100, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "flameDriftY"
+    )
+    val glowPulse by infinite.animateFloat(
+        initialValue = 0.88f,
+        targetValue = 1.08f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "flameGlowPulse"
+    )
+    val sweepProgress = remember(streak) { Animatable(-1.2f) }
+    val sweepAlpha = remember(streak) { Animatable(0f) }
+    LaunchedEffect(streak) {
+        sweepProgress.snapTo(-1.2f)
+        sweepAlpha.snapTo(0f)
+        sweepAlpha.animateTo(
+            targetValue = 0.78f,
+            animationSpec = tween(durationMillis = 120, easing = FastOutSlowInEasing)
+        )
+        sweepProgress.animateTo(
+            targetValue = 1.2f,
+            animationSpec = tween(durationMillis = 460, easing = FastOutSlowInEasing)
+        )
+        sweepAlpha.animateTo(targetValue = 0f, animationSpec = tween(durationMillis = 180))
+        delay(560)
+        sweepProgress.snapTo(-1.2f)
+        sweepAlpha.snapTo(0f)
+        sweepAlpha.animateTo(
+            targetValue = 0.52f,
+            animationSpec = tween(durationMillis = 100, easing = FastOutSlowInEasing)
+        )
+        sweepProgress.animateTo(
+            targetValue = 1.2f,
+            animationSpec = tween(durationMillis = 420, easing = FastOutSlowInEasing)
+        )
+        sweepAlpha.animateTo(targetValue = 0f, animationSpec = tween(durationMillis = 160))
+    }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(spacing.x0_5)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(spacing.x6 * 2.4f),
+            contentAlignment = Alignment.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(flameSize * 1.64f)
+                    .graphicsLayer {
+                        scaleX = glowPulse
+                        scaleY = glowPulse
+                        alpha = 0.12f
+                    }
+                    .clip(RoundedCornerShape(radius.full))
+                    .background(colors.success.copy(alpha = 0.24f))
+            )
+            Box(
+                modifier = Modifier
+                    .size(flameSize * 1.28f)
+                    .graphicsLayer {
+                        scaleX = glowPulse
+                        scaleY = glowPulse
+                        alpha = 0.2f
+                    }
+                    .clip(RoundedCornerShape(radius.full))
+                    .background(colors.primary.copy(alpha = 0.34f))
+            )
+            Box(
+                modifier = Modifier
+                    .size(flameSize)
+                    .graphicsLayer {
+                        translationY = flameDriftY
+                        scaleX = flamePulse
+                        scaleY = flamePulse
+                        alpha = flameFlicker
+                    }
+                    .clip(RoundedCornerShape(radius.full))
+                    .background(colors.backgroundSurface)
+                    .border(
+                        border = BorderStroke(2.dp, colors.primary.copy(alpha = 0.28f)),
+                        shape = RoundedCornerShape(radius.full)
+                    )
+                    .drawWithContent {
+                        drawContent()
+                        if (sweepAlpha.value > 0.01f) {
+                            val band = size.width * 0.34f
+                            val centerX = sweepProgress.value * size.width
+                            drawRect(
+                                brush = Brush.linearGradient(
+                                    colors = listOf(
+                                        Color.Transparent,
+                                        Color.White.copy(alpha = sweepAlpha.value),
+                                        Color.Transparent
+                                    ),
+                                    start = Offset(centerX - band, 0f),
+                                    end = Offset(centerX + band, size.height)
+                                ),
+                                alpha = 0.95f
+                            )
+                        }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                if (lottieComposition != null) {
+                    LottieAnimation(
+                        composition = lottieComposition,
+                        progress = { lottieProgress },
+                        modifier = Modifier
+                            .fillMaxSize(0.8f)
+                            .padding(spacing.x0_5)
+                    )
+                } else {
+                    Text(
+                        text = "🔥",
+                        style = MaterialTheme.typography.displaySmall
+                    )
+                }
+            }
+        }
+
+        Text(
+            text = tf("%d day streak", streak),
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.ExtraBold,
+            color = colors.textPrimary
+        )
+    }
+}
+
+@Composable
+private fun MilestoneMetric(
+    modifier: Modifier = Modifier,
+    label: String,
+    value: String
+) {
+    val spacing = AppTheme.spacing
+    val radius = AppTheme.radius
+    val colors = AppTheme.colors
+
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(radius.md))
+            .background(colors.backgroundSurfaceMuted)
+            .padding(horizontal = spacing.x1, vertical = spacing.x1),
+        verticalArrangement = Arrangement.spacedBy(spacing.x0_5),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = colors.textPrimary
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = colors.textSecondary,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun MilestonePreview(points: List<Int>) {
+    val spacing = AppTheme.spacing
+    val radius = AppTheme.radius
+    val colors = AppTheme.colors
+    val safe = if (points.size == 7) points else List(7) { 0 }
+
+    Column(verticalArrangement = Arrangement.spacedBy(spacing.x0_5)) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = spacing.x2, vertical = spacing.x1_5)
-                .border(
-                    width = stroke.thin,
-                    color = if (model.milestone) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.3f) else colors.borderSubtle,
-                    shape = RoundedCornerShape(radius.md)
-                )
-                .padding(horizontal = spacing.x1_5, vertical = spacing.x1),
-            verticalArrangement = Arrangement.spacedBy(spacing.x0_5)
+                .clip(RoundedCornerShape(radius.md))
+                .background(colors.backgroundSurfaceMuted)
+                .padding(horizontal = spacing.x1, vertical = spacing.x1),
+            verticalArrangement = Arrangement.spacedBy(spacing.x1)
         ) {
             Text(
-                text = "🔥 ${tf("%d day streak", model.streak)}",
-                style = MaterialTheme.typography.titleMedium,
+                text = t("7 day chart"),
+                style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,
-                color = contentColor
+                color = colors.textPrimary
             )
-            Text(
-                text = if (model.milestone) t("Milestone reached!") else t("Streak updated"),
-                style = MaterialTheme.typography.bodySmall,
-                color = if (model.milestone) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f) else colors.textSecondary
-            )
-            if (model.milestone) {
-                Text(
-                    text = "✦  ✦  ✦",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f)
-                )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                safe.forEach { point ->
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(spacing.x2)
+                            .clip(RoundedCornerShape(radius.full))
+                            .background(
+                                if (point > 0) colors.success.copy(alpha = 0.9f)
+                                else colors.borderSubtle.copy(alpha = 0.6f)
+                            )
+                    )
+                }
             }
         }
     }
@@ -2195,7 +2577,13 @@ private fun StatTile(modifier: Modifier = Modifier, label: String, value: String
                 .padding(horizontal = spacing.x2, vertical = spacing.x2),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            AnimatedContent(targetState = value, label = "statValue") { animatedValue ->
+                Text(
+                    text = animatedValue,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
             Text(
                 label,
                 style = MaterialTheme.typography.bodySmall,

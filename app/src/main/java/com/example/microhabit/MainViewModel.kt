@@ -9,30 +9,63 @@ import com.example.microhabit.data.HabitRepository
 import com.example.microhabit.data.HabitTask
 import com.example.microhabit.data.SubscriptionPlan
 import com.example.microhabit.data.TaskFrequency
+import com.example.microhabit.data.TrackingType
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.format.TextStyle
+import java.util.Locale
+
+data class HabitListItem(
+    val id: String,
+    val emoji: String,
+    val name: String,
+    val colorHex: String,
+    val trackingType: TrackingType,
+    val streak: Int,
+    val frequency: String,
+    val completionRate: Int,
+    val isArchived: Boolean
+)
 
 data class HabitUiState(
     val tasks: List<HabitTask> = emptyList(),
+    val allTasks: List<HabitTask> = emptyList(),
+    val habits: List<HabitListItem> = emptyList(),
     val selectedTaskId: String? = null,
     val selectedDate: LocalDate = LocalDate.now(),
     val currentMonth: YearMonth = YearMonth.now(),
     val selectedDateDone: Boolean = false,
     val selectedDateScheduled: Boolean = false,
     val streak: Int = 0,
+    val bestStreak: Int = 0,
+    val completionRate7Day: Int = 0,
+    val completionRate30Day: Int = 0,
+    val totalCompletions: Int = 0,
     val progressPercent: Int = 0,
     val last7Days: List<Int> = List(7) { 0 },
+    val monthlyProgress: List<Int> = emptyList(),
+    val weekdayConsistency: List<Int> = List(7) { 0 },
     val doneDatesInCurrentMonth: Set<LocalDate> = emptySet(),
+    val scheduledDatesInCurrentMonth: Set<LocalDate> = emptySet(),
     val showEditor: Boolean = false,
     val editingTaskId: String? = null,
     val editorTitle: String = "",
+    val editorEmoji: String = "✨",
+    val editorColorHex: String = "#1F6F64",
+    val editorTrackingType: TrackingType = TrackingType.YES_NO,
     val editorFrequency: TaskFrequency = TaskFrequency.DAILY,
+    val editorTimesPerWeek: Int = 3,
     val editorCustomDays: Set<Int> = setOf(1, 2, 3, 4, 5),
+    val editorReminderHour: Int = 8,
+    val editorReminderMinute: Int = 0,
+    val editorStartDate: LocalDate = LocalDate.now(),
+    val editorShowAdvanced: Boolean = false,
     val plan: SubscriptionPlan = SubscriptionPlan.FREE,
     val themeMode: AppThemeMode = AppThemeMode.SYSTEM,
     val language: AppLanguage = AppLanguage.RU
@@ -113,37 +146,70 @@ class MainViewModel(private val repository: HabitRepository) : ViewModel() {
                 showEditor = true,
                 editingTaskId = null,
                 editorTitle = "",
+                editorEmoji = "✨",
+                editorColorHex = "#1F6F64",
+                editorTrackingType = TrackingType.YES_NO,
                 editorFrequency = TaskFrequency.DAILY,
-                editorCustomDays = setOf(1, 2, 3, 4, 5)
+                editorTimesPerWeek = 3,
+                editorCustomDays = setOf(1, 2, 3, 4, 5),
+                editorReminderHour = 8,
+                editorReminderMinute = 0,
+                editorStartDate = LocalDate.now(),
+                editorShowAdvanced = false
             )
         }
     }
 
     fun openEditTask(taskId: String) {
-        val task = _state.value.tasks.firstOrNull { it.id == taskId } ?: return
+        val task = _state.value.allTasks.firstOrNull { it.id == taskId } ?: return
         _state.update {
             it.copy(
                 showEditor = true,
                 editingTaskId = task.id,
                 editorTitle = task.title,
+                editorEmoji = task.emoji,
+                editorColorHex = task.colorHex,
+                editorTrackingType = task.trackingType,
                 editorFrequency = task.frequency,
+                editorTimesPerWeek = task.timesPerWeek,
                 editorCustomDays = if (task.customDays.isEmpty()) setOf(1, 2, 3, 4, 5) else task.customDays
+                    .filter { it in 1..7 }
+                    .toSet(),
+                editorReminderHour = task.reminderHour,
+                editorReminderMinute = task.reminderMinute,
+                editorStartDate = task.startDate,
+                editorShowAdvanced = false
             )
         }
     }
 
     fun closeEditor() {
-        if (_state.value.tasks.isNotEmpty()) {
-            _state.update { it.copy(showEditor = false) }
-        }
+        _state.update { it.copy(showEditor = false) }
     }
 
     fun setEditorTitle(value: String) {
         _state.update { it.copy(editorTitle = value) }
     }
 
+    fun setEditorEmoji(value: String) {
+        val normalized = value.trim().ifEmpty { "✨" }.take(2)
+        _state.update { it.copy(editorEmoji = normalized) }
+    }
+
+    fun setEditorColorHex(value: String) {
+        _state.update { it.copy(editorColorHex = value) }
+    }
+
+    fun setEditorTrackingType(value: TrackingType) {
+        _state.update { it.copy(editorTrackingType = value) }
+    }
+
     fun setEditorFrequency(value: TaskFrequency) {
         _state.update { it.copy(editorFrequency = value) }
+    }
+
+    fun setEditorTimesPerWeek(value: Int) {
+        _state.update { it.copy(editorTimesPerWeek = value.coerceIn(1, 7)) }
     }
 
     fun toggleEditorCustomDay(day: Int) {
@@ -155,17 +221,34 @@ class MainViewModel(private val repository: HabitRepository) : ViewModel() {
         }
     }
 
+    fun setEditorReminder(hour: Int, minute: Int) {
+        _state.update {
+            it.copy(
+                editorReminderHour = hour.coerceIn(0, 23),
+                editorReminderMinute = minute.coerceIn(0, 59)
+            )
+        }
+    }
+
+    fun setEditorStartDate(value: LocalDate) {
+        _state.update { it.copy(editorStartDate = value) }
+    }
+
+    fun setEditorShowAdvanced(value: Boolean) {
+        _state.update { it.copy(editorShowAdvanced = value) }
+    }
+
     fun saveEditor() {
         val current = _state.value
         val title = current.editorTitle.trim()
-        if (title.isEmpty()) return
+        if (!canSaveEditor()) return
 
         if (current.editingTaskId == null && !canCreateTask(current.tasks.size, current.plan)) {
             return
         }
 
         val frequency = current.editorFrequency
-        val customDays = if (frequency == TaskFrequency.CUSTOM) {
+        val customDays = if (frequency == TaskFrequency.SELECTED_DAYS) {
             current.editorCustomDays.ifEmpty { setOf(1) }
         } else {
             emptySet()
@@ -173,10 +256,33 @@ class MainViewModel(private val repository: HabitRepository) : ViewModel() {
 
         viewModelScope.launch {
             if (current.editingTaskId == null) {
-                val task = repository.createTask(title, frequency, customDays)
+                val task = repository.createTask(
+                    title = title,
+                    emoji = current.editorEmoji,
+                    colorHex = current.editorColorHex,
+                    trackingType = current.editorTrackingType,
+                    frequency = frequency,
+                    customDays = customDays,
+                    timesPerWeek = current.editorTimesPerWeek,
+                    reminderHour = current.editorReminderHour,
+                    reminderMinute = current.editorReminderMinute,
+                    startDate = current.editorStartDate
+                )
                 repository.setSelectedTask(task.id)
             } else {
-                repository.updateTask(current.editingTaskId, title, frequency, customDays)
+                repository.updateTask(
+                    taskId = current.editingTaskId,
+                    title = title,
+                    emoji = current.editorEmoji,
+                    colorHex = current.editorColorHex,
+                    trackingType = current.editorTrackingType,
+                    frequency = frequency,
+                    customDays = customDays,
+                    timesPerWeek = current.editorTimesPerWeek,
+                    reminderHour = current.editorReminderHour,
+                    reminderMinute = current.editorReminderMinute,
+                    startDate = current.editorStartDate
+                )
             }
             repository.refreshWidget()
             refresh()
@@ -192,14 +298,33 @@ class MainViewModel(private val repository: HabitRepository) : ViewModel() {
         }
     }
 
+    fun archiveTask(taskId: String) {
+        viewModelScope.launch {
+            repository.archiveTask(taskId, archived = true)
+            repository.refreshWidget()
+            refresh()
+        }
+    }
+
     fun canCreateTask(): Boolean {
         val s = _state.value
         return canCreateTask(s.tasks.size, s.plan)
     }
 
+    fun canSaveEditor(): Boolean {
+        val s = _state.value
+        if (s.editorTitle.trim().isEmpty()) return false
+        if (s.editorEmoji.trim().isEmpty()) return false
+        if (s.editorColorHex.trim().isEmpty()) return false
+        if (s.editorFrequency == TaskFrequency.SELECTED_DAYS && s.editorCustomDays.isEmpty()) return false
+        if (s.editorFrequency == TaskFrequency.TIMES_PER_WEEK && s.editorTimesPerWeek !in 1..7) return false
+        return true
+    }
+
     private fun refresh() {
         viewModelScope.launch {
-            val tasks = repository.getTasks()
+            val allTasks = repository.getTasks()
+            val tasks = allTasks.filterNot { it.isArchived }
             val plan = repository.getPlan()
             val themeMode = repository.getThemeMode()
             val language = repository.getLanguage()
@@ -215,15 +340,40 @@ class MainViewModel(private val repository: HabitRepository) : ViewModel() {
             _state.update { state ->
                 state.copy(
                     tasks = tasks,
+                    allTasks = allTasks,
+                    habits = allTasks
+                        .map { task ->
+                            HabitListItem(
+                                id = task.id,
+                                emoji = task.emoji,
+                                name = task.title,
+                                colorHex = task.colorHex,
+                                trackingType = task.trackingType,
+                                streak = repository.calculateStreak(task),
+                                frequency = frequencyLabel(task),
+                                completionRate = repository.progressForLast30Days(task),
+                                isArchived = task.isArchived
+                            )
+                        }
+                        .sortedBy { it.isArchived },
                     selectedTaskId = selectedId,
-                    showEditor = if (tasks.isEmpty()) true else state.showEditor,
+                    showEditor = state.showEditor,
                     selectedDateScheduled = selectedTask?.let { repository.isScheduledOn(it, date) } ?: false,
                     selectedDateDone = selectedTask?.let { repository.isDone(it.id, date) } ?: false,
                     streak = selectedTask?.let { repository.calculateStreak(it) } ?: 0,
+                    bestStreak = selectedTask?.let { repository.bestStreak(it) } ?: 0,
+                    completionRate7Day = selectedTask?.let { repository.completionRate(it, 7, date) } ?: 0,
+                    completionRate30Day = selectedTask?.let { repository.completionRate(it, 30, date) } ?: 0,
+                    totalCompletions = selectedTask?.let { repository.totalCompletions(it) } ?: 0,
                     progressPercent = selectedTask?.let { repository.progressForLast30Days(it) } ?: 0,
                     last7Days = selectedTask?.let { repository.last7Days(it, date) } ?: List(7) { 0 },
+                    monthlyProgress = selectedTask?.let { repository.monthlyWeeklyProgress(it, state.currentMonth) } ?: emptyList(),
+                    weekdayConsistency = selectedTask?.let { repository.weekdayConsistency(it, 84, date) } ?: List(7) { 0 },
                     doneDatesInCurrentMonth = selectedTask?.let { task ->
                         doneDatesForMonth(task, state.currentMonth)
+                    } ?: emptySet(),
+                    scheduledDatesInCurrentMonth = selectedTask?.let { task ->
+                        scheduledDatesForMonth(task, state.currentMonth)
                     } ?: emptySet(),
                     plan = plan,
                     themeMode = themeMode,
@@ -237,15 +387,25 @@ class MainViewModel(private val repository: HabitRepository) : ViewModel() {
         val current = _state.value
         val selectedTask = current.tasks.firstOrNull { it.id == current.selectedTaskId }
         val date = current.selectedDate
+        val month = current.currentMonth
         _state.update {
             it.copy(
                 selectedDateScheduled = selectedTask?.let { task -> repository.isScheduledOn(task, date) } ?: false,
                 selectedDateDone = selectedTask?.let { task -> repository.isDone(task.id, date) } ?: false,
                 streak = selectedTask?.let { repository.calculateStreak(it) } ?: 0,
+                bestStreak = selectedTask?.let { repository.bestStreak(it) } ?: 0,
+                completionRate7Day = selectedTask?.let { repository.completionRate(it, 7, date) } ?: 0,
+                completionRate30Day = selectedTask?.let { repository.completionRate(it, 30, date) } ?: 0,
+                totalCompletions = selectedTask?.let { repository.totalCompletions(it) } ?: 0,
                 progressPercent = selectedTask?.let { repository.progressForLast30Days(it) } ?: 0,
                 last7Days = selectedTask?.let { repository.last7Days(it, date) } ?: List(7) { 0 },
+                monthlyProgress = selectedTask?.let { repository.monthlyWeeklyProgress(it, month) } ?: emptyList(),
+                weekdayConsistency = selectedTask?.let { repository.weekdayConsistency(it, 84, date) } ?: List(7) { 0 },
                 doneDatesInCurrentMonth = selectedTask?.let { task ->
                     doneDatesForMonth(task, it.currentMonth)
+                } ?: emptySet(),
+                scheduledDatesInCurrentMonth = selectedTask?.let { task ->
+                    scheduledDatesForMonth(task, it.currentMonth)
                 } ?: emptySet()
             )
         }
@@ -260,8 +420,33 @@ class MainViewModel(private val repository: HabitRepository) : ViewModel() {
         return done
     }
 
+    private fun scheduledDatesForMonth(task: HabitTask, month: YearMonth): Set<LocalDate> {
+        val scheduled = mutableSetOf<LocalDate>()
+        for (day in 1..month.lengthOfMonth()) {
+            val date = month.atDay(day)
+            if (repository.isScheduledOn(task, date)) scheduled += date
+        }
+        return scheduled
+    }
+
     private fun canCreateTask(taskCount: Int, plan: SubscriptionPlan): Boolean {
         return plan == SubscriptionPlan.PRO || taskCount < 1
+    }
+
+    private fun frequencyLabel(task: HabitTask): String {
+        return when (task.frequency) {
+            TaskFrequency.DAILY -> "Every day"
+            TaskFrequency.TIMES_PER_WEEK -> "${task.timesPerWeek}x / week"
+            TaskFrequency.SELECTED_DAYS -> {
+                if (task.customDays.isEmpty()) return "Custom"
+                task.customDays
+                    .toList()
+                    .sorted()
+                    .joinToString(", ") {
+                        DayOfWeek.of(it).getDisplayName(TextStyle.SHORT, Locale.ENGLISH)
+                    }
+            }
+        }
     }
 
     class Factory(private val repository: HabitRepository) : ViewModelProvider.Factory {

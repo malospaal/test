@@ -1,6 +1,7 @@
 package com.example.microhabit.ui.theme
 
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -83,22 +84,27 @@ internal val LocalAppSemanticColors = compositionLocalOf<AppSemanticColors> {
 
 object AppTheme {
     val spacing: AppSpacing
+        @Composable
         @ReadOnlyComposable
         get() = LocalAppSpacing.current
 
     val radius: AppRadius
+        @Composable
         @ReadOnlyComposable
         get() = LocalAppRadius.current
 
     val elevation: AppElevation
+        @Composable
         @ReadOnlyComposable
         get() = LocalAppElevation.current
 
     val colors: AppSemanticColors
+        @Composable
         @ReadOnlyComposable
         get() = LocalAppSemanticColors.current
 
     val stroke: AppStroke
+        @Composable
         @ReadOnlyComposable
         get() = LocalAppStroke.current
 }

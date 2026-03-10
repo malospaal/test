@@ -1,5 +1,7 @@
 package com.example.microhabit
 
+import android.app.DatePickerDialog
+import android.app.TimePickerDialog
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -62,7 +65,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -70,6 +72,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -80,9 +83,23 @@ import com.example.microhabit.data.HabitRepository
 import com.example.microhabit.data.HabitTask
 import com.example.microhabit.data.SubscriptionPlan
 import com.example.microhabit.data.TaskFrequency
+import com.example.microhabit.data.TrackingType
+import com.example.microhabit.ui.components.ChoiceOption
+import com.example.microhabit.ui.components.CalendarDay
+import com.example.microhabit.ui.components.CalendarDayState
+import com.example.microhabit.ui.components.ColorSwatchPicker
+import com.example.microhabit.ui.components.FormSection
+import com.example.microhabit.ui.components.HorizontalPercentBars
+import com.example.microhabit.ui.components.HabitCard
+import com.example.microhabit.ui.components.HabitCardModel
+import com.example.microhabit.ui.components.AnalyticsMetricTile
+import com.example.microhabit.ui.components.SingleSelectChips
+import com.example.microhabit.ui.components.Stepper
+import com.example.microhabit.ui.components.VerticalPercentBars
+import com.example.microhabit.ui.components.WeekdaySelector
+import com.example.microhabit.ui.components.parseColorHex
 import com.example.microhabit.ui.theme.AppTheme
 import com.example.microhabit.ui.theme.MicroHabitTheme
-import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -92,6 +109,9 @@ import kotlinx.coroutines.launch
 
 private enum class AppPage(val title: String) {
     TRACKER("Трекер"),
+    HABITS("Habits"),
+    ANALYTICS("Analytics"),
+    CALENDAR("Calendar"),
     ACCOUNT("Аккаунт"),
     SETTINGS("Настройки")
 }
@@ -144,6 +164,14 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                             Icon(Icons.Rounded.Menu, contentDescription = "Menu")
                         }
                     },
+                    actions = {
+                        if (page == AppPage.HABITS) {
+                            val canAdd = state.plan == SubscriptionPlan.PRO || state.tasks.size < 1
+                            TextButton(onClick = { if (canAdd) vm.openCreateTask() else page = AppPage.ACCOUNT }) {
+                                Text(if (canAdd) "Add" else "Upgrade")
+                            }
+                        }
+                    },
                     colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                         containerColor = semantic.backgroundSurface
                     )
@@ -163,13 +191,23 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                         onUpgrade = { page = AppPage.ACCOUNT },
                         onOpenSettings = { page = AppPage.SETTINGS }
                     )
+                    AppPage.HABITS -> HabitsPage(
+                        state = state,
+                        vm = vm,
+                        onOpenHabit = {
+                            page = AppPage.TRACKER
+                        },
+                        onUpgrade = { page = AppPage.ACCOUNT }
+                    )
+                    AppPage.ANALYTICS -> AnalyticsPage(state = state)
+                    AppPage.CALENDAR -> CalendarScreen(state = state, vm = vm)
                     AppPage.ACCOUNT -> AccountPage(state = state, onSetPlan = vm::setPlan)
                     AppPage.SETTINGS -> SettingsPage(state = state, onSetTheme = vm::setThemeMode, onSetLanguage = vm::setLanguage)
                 }
             }
         }
 
-        if (state.showEditor && state.tasks.isNotEmpty()) {
+        if (state.showEditor) {
             TaskEditorDialog(state = state, onDismiss = vm::closeEditor, vm = vm)
         }
     }
@@ -196,6 +234,27 @@ private fun DrawerContent(current: AppPage, plan: SubscriptionPlan, onNavigate: 
                 label = { Text("Трекер") },
                 selected = current == AppPage.TRACKER,
                 onClick = { onNavigate(AppPage.TRACKER) },
+                icon = { Icon(Icons.Rounded.Home, contentDescription = null) },
+                colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = colors.primary.copy(alpha = 0.15f))
+            )
+            NavigationDrawerItem(
+                label = { Text("Habits") },
+                selected = current == AppPage.HABITS,
+                onClick = { onNavigate(AppPage.HABITS) },
+                icon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
+                colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = colors.primary.copy(alpha = 0.15f))
+            )
+            NavigationDrawerItem(
+                label = { Text("Analytics") },
+                selected = current == AppPage.ANALYTICS,
+                onClick = { onNavigate(AppPage.ANALYTICS) },
+                icon = { Icon(Icons.Rounded.CheckCircle, contentDescription = null) },
+                colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = colors.primary.copy(alpha = 0.15f))
+            )
+            NavigationDrawerItem(
+                label = { Text("Calendar") },
+                selected = current == AppPage.CALENDAR,
+                onClick = { onNavigate(AppPage.CALENDAR) },
                 icon = { Icon(Icons.Rounded.Home, contentDescription = null) },
                 colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = colors.primary.copy(alpha = 0.15f))
             )
@@ -286,6 +345,423 @@ private fun TrackerPage(
 }
 
 @Composable
+private fun HabitsPage(
+    state: HabitUiState,
+    vm: MainViewModel,
+    onOpenHabit: () -> Unit,
+    onUpgrade: () -> Unit
+) {
+    val spacing = AppTheme.spacing
+    val colors = AppTheme.colors
+    val canAdd = state.plan == SubscriptionPlan.PRO || state.tasks.size < 1
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(spacing.x2),
+        verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
+    ) {
+        if (state.habits.isEmpty()) {
+            item {
+                GlassCard {
+                    Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+                        Text(
+                            text = "No habits yet",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = colors.textPrimary
+                        )
+                        Text(
+                            text = "Create your first habit to start building momentum.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.textSecondary
+                        )
+                        Button(
+                            onClick = { if (canAdd) vm.openCreateTask() else onUpgrade() },
+                            shape = RoundedCornerShape(AppTheme.radius.md)
+                        ) {
+                            Text(if (canAdd) "Create habit" else "Upgrade to PRO")
+                        }
+                    }
+                }
+            }
+        } else {
+            items(items = state.habits, key = { it.id }) { habit ->
+                HabitCard(
+                    habit = HabitCardModel(
+                        emoji = habit.emoji,
+                        name = habit.name,
+                        colorHex = habit.colorHex,
+                        trackingType = habit.trackingType,
+                        streak = habit.streak,
+                        frequency = habit.frequency,
+                        completionRate = habit.completionRate,
+                        isArchived = habit.isArchived
+                    ),
+                    onOpen = {
+                        if (habit.isArchived) {
+                            vm.openEditTask(habit.id)
+                        } else {
+                            vm.selectTask(habit.id)
+                            onOpenHabit()
+                        }
+                    },
+                    onEdit = { vm.openEditTask(habit.id) },
+                    onArchive = { vm.archiveTask(habit.id) },
+                    onDelete = { vm.deleteTask(habit.id) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AnalyticsPage(state: HabitUiState) {
+    val spacing = AppTheme.spacing
+    val colors = AppTheme.colors
+    val selectedTask = state.tasks.firstOrNull { it.id == state.selectedTaskId }
+
+    if (selectedTask == null) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(spacing.x2),
+            verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
+        ) {
+            item {
+                GlassCard {
+                    Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+                        Text(
+                            text = "Analytics",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = colors.textPrimary
+                        )
+                        Text(
+                            text = "Create and select a habit to view analytics.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.textSecondary
+                        )
+                    }
+                }
+            }
+        }
+        return
+    }
+
+    val weeklyValues = state.last7Days.map { if (it > 0) 100 else 0 }
+    val weeklyLabels = (6 downTo 0).map { offset ->
+        state.selectedDate.minusDays(offset.toLong()).dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.ENGLISH)
+    }
+    val monthlyValues = if (state.monthlyProgress.isEmpty()) listOf(0, 0, 0, 0) else state.monthlyProgress
+    val monthlyLabels = monthlyValues.indices.map { "W${it + 1}" }
+    val weekdayLabels = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(spacing.x2),
+        verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
+    ) {
+        item {
+            GlassCard {
+                Column(verticalArrangement = Arrangement.spacedBy(spacing.x0_5)) {
+                    Text(
+                        text = "Analytics",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.textPrimary
+                    )
+                    Text(
+                        text = selectedTask.title,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.textSecondary
+                    )
+                }
+            }
+        }
+
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+            ) {
+                AnalyticsMetricTile(
+                    label = "Current streak",
+                    value = "${state.streak}d",
+                    modifier = Modifier.weight(1f)
+                )
+                AnalyticsMetricTile(
+                    label = "Best streak",
+                    value = "${state.bestStreak}d",
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+            ) {
+                AnalyticsMetricTile(
+                    label = "7 day completion",
+                    value = "${state.completionRate7Day}%",
+                    modifier = Modifier.weight(1f)
+                )
+                AnalyticsMetricTile(
+                    label = "30 day completion",
+                    value = "${state.completionRate30Day}%",
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        item {
+            AnalyticsMetricTile(
+                label = "Total completions",
+                value = state.totalCompletions.toString(),
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+
+        item {
+            GlassCard {
+                Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+                    Text(
+                        text = "Weekly completion chart",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.textPrimary
+                    )
+                    VerticalPercentBars(
+                        values = weeklyValues,
+                        labels = weeklyLabels,
+                        highlightIndex = 6
+                    )
+                }
+            }
+        }
+
+        item {
+            GlassCard {
+                Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+                    Text(
+                        text = "Monthly progress chart",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.textPrimary
+                    )
+                    VerticalPercentBars(
+                        values = monthlyValues,
+                        labels = monthlyLabels
+                    )
+                }
+            }
+        }
+
+        item {
+            GlassCard {
+                Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+                    Text(
+                        text = "Weekday consistency",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.textPrimary
+                    )
+                    HorizontalPercentBars(
+                        values = state.weekdayConsistency,
+                        labels = weekdayLabels
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
+    val spacing = AppTheme.spacing
+    val colors = AppTheme.colors
+    val selectedTask = state.tasks.firstOrNull { it.id == state.selectedTaskId }
+    val today = LocalDate.now()
+
+    if (selectedTask == null) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(spacing.x2),
+            verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
+        ) {
+            item {
+                GlassCard {
+                    Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+                        Text(
+                            text = "Calendar",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = colors.textPrimary
+                        )
+                        Text(
+                            text = "Select or create a habit to view completion history.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.textSecondary
+                        )
+                    }
+                }
+            }
+        }
+        return
+    }
+
+    val selectedState = when {
+        state.selectedDate.isAfter(today) -> CalendarDayState.FUTURE
+        state.selectedDateDone -> CalendarDayState.COMPLETED
+        state.selectedDate == today -> CalendarDayState.TODAY
+        state.selectedDateScheduled -> CalendarDayState.MISSED
+        else -> CalendarDayState.FUTURE
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(spacing.x2),
+        verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
+    ) {
+        item {
+            GlassCard {
+                Column(verticalArrangement = Arrangement.spacedBy(spacing.x0_5)) {
+                    Text(
+                        text = "Calendar",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.textPrimary
+                    )
+                    Text(
+                        text = selectedTask.title,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.textSecondary
+                    )
+                }
+            }
+        }
+
+        item {
+            GlassCard {
+                Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TextButton(onClick = { vm.moveMonth(-1) }) { Text("<") }
+                        Text(
+                            text = state.currentMonth.format(DateTimeFormatter.ofPattern("LLLL yyyy", Locale.ENGLISH)),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = colors.textPrimary
+                        )
+                        TextButton(onClick = { vm.moveMonth(1) }) { Text(">") }
+                    }
+
+                    Button(
+                        onClick = vm::jumpToToday,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(AppTheme.radius.md)
+                    ) {
+                        Text("Today")
+                    }
+
+                    val weekdayLabels = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+                    ) {
+                        weekdayLabels.forEach { label ->
+                            Text(
+                                text = label,
+                                modifier = Modifier.weight(1f),
+                                textAlign = TextAlign.Center,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = colors.textSecondary
+                            )
+                        }
+                    }
+
+                    monthGrid(state.currentMonth).forEach { week ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+                        ) {
+                            week.forEach { day ->
+                                CalendarDay(
+                                    modifier = Modifier.weight(1f),
+                                    date = day,
+                                    state = dayStateFor(
+                                        date = day,
+                                        doneDates = state.doneDatesInCurrentMonth,
+                                        scheduledDates = state.scheduledDatesInCurrentMonth,
+                                        today = today
+                                    ),
+                                    selected = day == state.selectedDate,
+                                    enabled = day != null,
+                                    onClick = { day?.let(vm::selectDate) }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        item {
+            GlassCard {
+                Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+                    Text(
+                        text = "Completion details",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.textPrimary
+                    )
+                    Text(
+                        text = state.selectedDate.format(DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ENGLISH)),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.textSecondary
+                    )
+                    Text(
+                        text = statusLabel(selectedState),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = when (selectedState) {
+                            CalendarDayState.COMPLETED -> colors.success
+                            CalendarDayState.MISSED -> colors.danger
+                            CalendarDayState.TODAY -> colors.primary
+                            CalendarDayState.FUTURE -> colors.textSecondary
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun dayStateFor(
+    date: LocalDate?,
+    doneDates: Set<LocalDate>,
+    scheduledDates: Set<LocalDate>,
+    today: LocalDate
+): CalendarDayState {
+    if (date == null) return CalendarDayState.FUTURE
+    if (date.isAfter(today)) return CalendarDayState.FUTURE
+    if (date in doneDates) return CalendarDayState.COMPLETED
+    if (date == today) return CalendarDayState.TODAY
+    return if (date in scheduledDates) CalendarDayState.MISSED else CalendarDayState.FUTURE
+}
+
+private fun statusLabel(state: CalendarDayState): String {
+    return when (state) {
+        CalendarDayState.COMPLETED -> "Completed"
+        CalendarDayState.MISSED -> "Missed"
+        CalendarDayState.TODAY -> "Today"
+        CalendarDayState.FUTURE -> "Future"
+    }
+}
+
+@Composable
 private fun AccountPage(state: HabitUiState, onSetPlan: (SubscriptionPlan) -> Unit) {
     val spacing = AppTheme.spacing
     val semantic = AppTheme.colors
@@ -369,23 +845,22 @@ private fun SettingsPage(
 @Composable
 private fun OnboardingCard(vm: MainViewModel, state: HabitUiState) {
     val spacing = AppTheme.spacing
+    val colors = AppTheme.colors
+    val canAdd = state.plan == SubscriptionPlan.PRO || state.tasks.size < 1
     GlassCard {
         Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
             Text("Создай первую задачу", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            OutlinedTextField(
-                value = state.editorTitle,
-                onValueChange = vm::setEditorTitle,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Название") }
+            Text(
+                text = "Заполни базовые параметры и при желании открой дополнительные настройки.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.textSecondary
             )
-            FrequencySelector(
-                selected = state.editorFrequency,
-                selectedCustomDays = state.editorCustomDays,
-                onFrequencySelect = vm::setEditorFrequency,
-                onToggleCustomDay = vm::toggleEditorCustomDay
-            )
-            Button(onClick = vm::saveEditor, enabled = state.editorTitle.isNotBlank(), modifier = Modifier.fillMaxWidth()) {
-                Text("Создать")
+            Button(
+                onClick = vm::openCreateTask,
+                enabled = canAdd,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (canAdd) "Создать привычку" else "Upgrade to PRO")
             }
         }
     }
@@ -910,75 +1385,199 @@ private fun SelectChip(title: String, selected: Boolean, onClick: () -> Unit) {
 @Composable
 private fun TaskEditorDialog(state: HabitUiState, onDismiss: () -> Unit, vm: MainViewModel) {
     val spacing = AppTheme.spacing
+    val colors = AppTheme.colors
+    val context = LocalContext.current
+    val selectedColor = parseColorHex(state.editorColorHex)
+
+    val trackingOptions = listOf(
+        ChoiceOption(TrackingType.YES_NO, "Yes / No"),
+        ChoiceOption(TrackingType.COUNT, "Count"),
+        ChoiceOption(TrackingType.DURATION, "Duration")
+    )
+    val frequencyOptions = listOf(
+        ChoiceOption(TaskFrequency.DAILY, "Every day"),
+        ChoiceOption(TaskFrequency.SELECTED_DAYS, "Selected weekdays"),
+        ChoiceOption(TaskFrequency.TIMES_PER_WEEK, "X / week")
+    )
+    val palette = listOf("#1F6F64", "#3B7EA1", "#7B6BC9", "#3E8E5F", "#B36A3C", "#C65C74", "#5D6D7E")
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (state.editingTaskId == null) "Новая задача" else "Редактировать задачу") },
+        title = {
+            Text(
+                if (state.editingTaskId == null) "Create Habit" else "Edit Habit",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+        },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(spacing.x1)
             ) {
-                OutlinedTextField(
-                    value = state.editorTitle,
-                    onValueChange = vm::setEditorTitle,
-                    label = { Text("Название") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                FrequencySelector(
-                    selected = state.editorFrequency,
-                    selectedCustomDays = state.editorCustomDays,
-                    onFrequencySelect = vm::setEditorFrequency,
-                    onToggleCustomDay = vm::toggleEditorCustomDay
-                )
+                FormSection(title = "Basic setup") {
+                    Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+                        OutlinedTextField(
+                            value = state.editorTitle,
+                            onValueChange = vm::setEditorTitle,
+                            label = { Text("Habit name") },
+                            placeholder = { Text("Morning meditation") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(spacing.x1),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedTextField(
+                                value = state.editorEmoji,
+                                onValueChange = vm::setEditorEmoji,
+                                label = { Text("Icon / emoji") },
+                                modifier = Modifier.weight(1f),
+                                singleLine = true
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(spacing.x5)
+                                    .clip(RoundedCornerShape(AppTheme.radius.md))
+                                    .background(selectedColor),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = state.editorEmoji.ifBlank { "✨" },
+                                    style = MaterialTheme.typography.titleLarge
+                                )
+                            }
+                        }
+                    }
+                }
+
+                FormSection(title = "Color") {
+                    ColorSwatchPicker(
+                        colorsHex = palette,
+                        selectedHex = state.editorColorHex,
+                        onSelect = vm::setEditorColorHex
+                    )
+                }
+
+                FormSection(title = "Tracking type") {
+                    SingleSelectChips(
+                        options = trackingOptions,
+                        selected = state.editorTrackingType,
+                        onSelect = vm::setEditorTrackingType
+                    )
+                }
+
+                FormSection(title = "Frequency") {
+                    Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+                        SingleSelectChips(
+                            options = frequencyOptions,
+                            selected = state.editorFrequency,
+                            onSelect = vm::setEditorFrequency
+                        )
+
+                        if (state.editorFrequency == TaskFrequency.SELECTED_DAYS) {
+                            WeekdaySelector(
+                                selectedDays = state.editorCustomDays,
+                                onToggle = vm::toggleEditorCustomDay
+                            )
+                            if (state.editorCustomDays.isEmpty()) {
+                                Text(
+                                    text = "Select at least one weekday.",
+                                    color = colors.danger,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+
+                        if (state.editorFrequency == TaskFrequency.TIMES_PER_WEEK) {
+                            Stepper(
+                                label = "Times per week",
+                                value = state.editorTimesPerWeek,
+                                min = 1,
+                                max = 7,
+                                onValueChange = vm::setEditorTimesPerWeek
+                            )
+                        }
+                    }
+                }
+
+                TextButton(onClick = { vm.setEditorShowAdvanced(!state.editorShowAdvanced) }) {
+                    Text(if (state.editorShowAdvanced) "Hide advanced settings" else "Show advanced settings")
+                }
+
+                AnimatedVisibility(visible = state.editorShowAdvanced) {
+                    Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+                        FormSection(title = "Advanced settings") {
+                            Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+                                Button(
+                                    onClick = {
+                                        TimePickerDialog(
+                                            context,
+                                            { _, hour, minute -> vm.setEditorReminder(hour, minute) },
+                                            state.editorReminderHour,
+                                            state.editorReminderMinute,
+                                            true
+                                        ).show()
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(AppTheme.radius.md)
+                                ) {
+                                    Text("Reminder: ${formatTime(state.editorReminderHour, state.editorReminderMinute)}")
+                                }
+
+                                Button(
+                                    onClick = {
+                                        DatePickerDialog(
+                                            context,
+                                            { _, year, month, day ->
+                                                vm.setEditorStartDate(LocalDate.of(year, month + 1, day))
+                                            },
+                                            state.editorStartDate.year,
+                                            state.editorStartDate.monthValue - 1,
+                                            state.editorStartDate.dayOfMonth
+                                        ).show()
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(AppTheme.radius.md)
+                                ) {
+                                    Text(
+                                        "Start date: ${
+                                            state.editorStartDate.format(
+                                                DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ENGLISH)
+                                            )
+                                        }"
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (!vm.canSaveEditor()) {
+                    Text(
+                        text = "Fill required fields to continue.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.textSecondary
+                    )
+                }
             }
         },
         confirmButton = {
-            Button(onClick = vm::saveEditor, enabled = state.editorTitle.isNotBlank()) { Text("Сохранить") }
+            Button(onClick = vm::saveEditor, enabled = vm.canSaveEditor()) {
+                Text(if (state.editingTaskId == null) "Save habit" else "Save changes")
+            }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Отмена") }
+            TextButton(onClick = onDismiss) { Text("Cancel") }
         }
     )
 }
 
-@Composable
-private fun FrequencySelector(
-    selected: TaskFrequency,
-    selectedCustomDays: Set<Int>,
-    onFrequencySelect: (TaskFrequency) -> Unit,
-    onToggleCustomDay: (Int) -> Unit
-) {
-    val spacing = AppTheme.spacing
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(spacing.x1),
-        modifier = Modifier.horizontalScroll(rememberScrollState())
-    ) {
-        FrequencyChip("Каждый день", selected == TaskFrequency.DAILY) { onFrequencySelect(TaskFrequency.DAILY) }
-        FrequencyChip("Будни", selected == TaskFrequency.WEEKDAYS) { onFrequencySelect(TaskFrequency.WEEKDAYS) }
-        FrequencyChip("Кастом", selected == TaskFrequency.CUSTOM) { onFrequencySelect(TaskFrequency.CUSTOM) }
-
-        if (selected == TaskFrequency.CUSTOM) {
-            (1..7).forEach { day ->
-                val label = DayOfWeek.of(day).getDisplayName(TextStyle.SHORT, Locale("ru")).replaceFirstChar { it.uppercaseChar() }
-                FrequencyChip(label, day in selectedCustomDays) { onToggleCustomDay(day) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun FrequencyChip(title: String, active: Boolean, onClick: () -> Unit) {
-    val semantic = AppTheme.colors
-    Button(
-        onClick = onClick,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = if (active) semantic.primary else semantic.backgroundSurfaceMuted,
-            contentColor = if (active) MaterialTheme.colorScheme.onPrimary else semantic.textPrimary
-        )
-    ) {
-        Text(title)
-    }
-}
+private fun formatTime(hour: Int, minute: Int): String =
+    String.format(Locale.ENGLISH, "%02d:%02d", hour, minute)
 
 @Composable
 private fun GlassCard(

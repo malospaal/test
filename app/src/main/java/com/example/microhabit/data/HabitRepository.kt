@@ -4,15 +4,22 @@ import android.content.Context
 import com.example.microhabit.widget.HabitWidgetProvider
 import org.json.JSONArray
 import org.json.JSONObject
-import java.time.DayOfWeek
+import kotlin.math.ceil
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.UUID
+import java.time.YearMonth
 
 enum class TaskFrequency {
     DAILY,
-    WEEKDAYS,
-    CUSTOM
+    SELECTED_DAYS,
+    TIMES_PER_WEEK
+}
+
+enum class TrackingType {
+    YES_NO,
+    COUNT,
+    DURATION
 }
 
 enum class SubscriptionPlan {
@@ -38,8 +45,16 @@ enum class AppLanguage(val label: String) {
 data class HabitTask(
     val id: String,
     val title: String,
+    val emoji: String = "✨",
+    val colorHex: String = "#1F6F64",
+    val trackingType: TrackingType = TrackingType.YES_NO,
     val frequency: TaskFrequency,
-    val customDays: Set<Int> = emptySet()
+    val timesPerWeek: Int = 3,
+    val reminderHour: Int = 8,
+    val reminderMinute: Int = 0,
+    val startDate: LocalDate = LocalDate.now(),
+    val customDays: Set<Int> = emptySet(),
+    val isArchived: Boolean = false
 )
 
 class HabitRepository(private val context: Context) {
@@ -56,28 +71,75 @@ class HabitRepository(private val context: Context) {
                 val title = obj.optString("title")
                 if (id.isBlank() || title.isBlank()) return@mapNotNull null
 
+                val rawFrequency = obj.optString("frequency", TaskFrequency.DAILY.name)
                 val frequency = runCatching {
-                    TaskFrequency.valueOf(obj.optString("frequency", TaskFrequency.DAILY.name))
+                    when (rawFrequency) {
+                        "WEEKDAYS", "CUSTOM" -> TaskFrequency.SELECTED_DAYS
+                        else -> TaskFrequency.valueOf(rawFrequency)
+                    }
                 }.getOrDefault(TaskFrequency.DAILY)
 
+                val trackingType = runCatching {
+                    TrackingType.valueOf(obj.optString("trackingType", TrackingType.YES_NO.name))
+                }.getOrDefault(TrackingType.YES_NO)
+
                 val custom = mutableSetOf<Int>()
+                if (rawFrequency == "WEEKDAYS") {
+                    custom += setOf(1, 2, 3, 4, 5)
+                }
                 val customJson = obj.optJSONArray("customDays") ?: JSONArray()
                 for (j in 0 until customJson.length()) {
                     val day = customJson.optInt(j, -1)
                     if (day in 1..7) custom += day
                 }
 
-                HabitTask(id = id, title = title, frequency = frequency, customDays = custom)
+                val startDate = runCatching {
+                    LocalDate.parse(obj.optString("startDate", LocalDate.now().format(formatter)), formatter)
+                }.getOrDefault(LocalDate.now())
+
+                HabitTask(
+                    id = id,
+                    title = title,
+                    emoji = obj.optString("emoji", "✨").ifBlank { "✨" },
+                    colorHex = obj.optString("colorHex", "#1F6F64").ifBlank { "#1F6F64" },
+                    trackingType = trackingType,
+                    frequency = frequency,
+                    timesPerWeek = obj.optInt("timesPerWeek", 3).coerceIn(1, 7),
+                    reminderHour = obj.optInt("reminderHour", 8).coerceIn(0, 23),
+                    reminderMinute = obj.optInt("reminderMinute", 0).coerceIn(0, 59),
+                    startDate = startDate,
+                    customDays = custom,
+                    isArchived = obj.optBoolean("isArchived", false)
+                )
             }
         }.getOrDefault(emptyList())
     }
 
-    fun createTask(title: String, frequency: TaskFrequency, customDays: Set<Int>): HabitTask {
+    fun createTask(
+        title: String,
+        emoji: String,
+        colorHex: String,
+        trackingType: TrackingType,
+        frequency: TaskFrequency,
+        customDays: Set<Int>,
+        timesPerWeek: Int,
+        reminderHour: Int,
+        reminderMinute: Int,
+        startDate: LocalDate
+    ): HabitTask {
         val task = HabitTask(
             id = UUID.randomUUID().toString(),
             title = title.trim(),
+            emoji = emoji.ifBlank { "✨" },
+            colorHex = colorHex.ifBlank { "#1F6F64" },
+            trackingType = trackingType,
             frequency = frequency,
-            customDays = sanitizeCustomDays(customDays)
+            timesPerWeek = timesPerWeek.coerceIn(1, 7),
+            reminderHour = reminderHour.coerceIn(0, 23),
+            reminderMinute = reminderMinute.coerceIn(0, 59),
+            startDate = startDate,
+            customDays = sanitizeCustomDays(customDays),
+            isArchived = false
         )
         val tasks = getTasks().toMutableList().apply { add(task) }
         saveTasks(tasks)
@@ -85,12 +147,31 @@ class HabitRepository(private val context: Context) {
         return task
     }
 
-    fun updateTask(taskId: String, title: String, frequency: TaskFrequency, customDays: Set<Int>) {
+    fun updateTask(
+        taskId: String,
+        title: String,
+        emoji: String,
+        colorHex: String,
+        trackingType: TrackingType,
+        frequency: TaskFrequency,
+        customDays: Set<Int>,
+        timesPerWeek: Int,
+        reminderHour: Int,
+        reminderMinute: Int,
+        startDate: LocalDate
+    ) {
         val updated = getTasks().map { task ->
             if (task.id == taskId) {
                 task.copy(
                     title = title.trim(),
+                    emoji = emoji.ifBlank { "✨" },
+                    colorHex = colorHex.ifBlank { "#1F6F64" },
+                    trackingType = trackingType,
                     frequency = frequency,
+                    timesPerWeek = timesPerWeek.coerceIn(1, 7),
+                    reminderHour = reminderHour.coerceIn(0, 23),
+                    reminderMinute = reminderMinute.coerceIn(0, 59),
+                    startDate = startDate,
                     customDays = sanitizeCustomDays(customDays)
                 )
             } else {
@@ -110,6 +191,19 @@ class HabitRepository(private val context: Context) {
 
         if (getSelectedTaskId() == taskId) {
             prefs.edit().putString(KEY_SELECTED_TASK, updated.firstOrNull()?.id).apply()
+        }
+    }
+
+    fun archiveTask(taskId: String, archived: Boolean = true) {
+        val updated = getTasks().map { task ->
+            if (task.id == taskId) task.copy(isArchived = archived) else task
+        }
+        saveTasks(updated)
+
+        val selectedId = getSelectedTaskId()
+        if (selectedId == taskId && archived) {
+            val nextActive = updated.firstOrNull { !it.isArchived }?.id
+            setSelectedTask(nextActive)
         }
     }
 
@@ -147,10 +241,11 @@ class HabitRepository(private val context: Context) {
     }
 
     fun isScheduledOn(task: HabitTask, date: LocalDate): Boolean {
+        if (date.isBefore(task.startDate)) return false
         return when (task.frequency) {
             TaskFrequency.DAILY -> true
-            TaskFrequency.WEEKDAYS -> date.dayOfWeek != DayOfWeek.SATURDAY && date.dayOfWeek != DayOfWeek.SUNDAY
-            TaskFrequency.CUSTOM -> date.dayOfWeek.value in task.customDays
+            TaskFrequency.SELECTED_DAYS -> date.dayOfWeek.value in task.customDays
+            TaskFrequency.TIMES_PER_WEEK -> true
         }
     }
 
@@ -168,6 +263,14 @@ class HabitRepository(private val context: Context) {
     }
 
     fun calculateStreak(task: HabitTask, fromDate: LocalDate = LocalDate.now()): Int {
+        if (task.frequency == TaskFrequency.TIMES_PER_WEEK) {
+            // For times-per-week habits we keep a simple day streak over completed days.
+            return calculateDailyLikeStreak(task, fromDate)
+        }
+        return calculateDailyLikeStreak(task, fromDate)
+    }
+
+    private fun calculateDailyLikeStreak(task: HabitTask, fromDate: LocalDate): Int {
         var streak = 0
         var cursor = fromDate
 
@@ -195,6 +298,16 @@ class HabitRepository(private val context: Context) {
     }
 
     fun progressForLast30Days(task: HabitTask, anchorDate: LocalDate = LocalDate.now()): Int {
+        if (task.frequency == TaskFrequency.TIMES_PER_WEEK) {
+            var completed = 0
+            for (offset in 0L until 30L) {
+                val day = anchorDate.minusDays(offset)
+                if (!day.isBefore(task.startDate) && isDone(task.id, day)) completed += 1
+            }
+            val target = ((task.timesPerWeek / 7f) * 30f).toInt().coerceAtLeast(1)
+            return (completed * 100 / target).coerceIn(0, 100)
+        }
+
         var scheduled = 0
         var completed = 0
         for (offset in 0L until 30L) {
@@ -208,8 +321,102 @@ class HabitRepository(private val context: Context) {
         return (completed * 100 / scheduled)
     }
 
+    fun completionRate(task: HabitTask, days: Int, anchorDate: LocalDate = LocalDate.now()): Int {
+        if (days <= 0) return 0
+        if (task.frequency == TaskFrequency.TIMES_PER_WEEK) {
+            var completed = 0
+            for (offset in 0L until days.toLong()) {
+                val day = anchorDate.minusDays(offset)
+                if (!day.isBefore(task.startDate) && isDone(task.id, day)) completed += 1
+            }
+            val target = ceil((task.timesPerWeek / 7f) * days).toInt().coerceAtLeast(1)
+            return (completed * 100 / target).coerceIn(0, 100)
+        }
+
+        var scheduled = 0
+        var completed = 0
+        for (offset in 0L until days.toLong()) {
+            val day = anchorDate.minusDays(offset)
+            if (isScheduledOn(task, day)) {
+                scheduled += 1
+                if (isDone(task.id, day)) completed += 1
+            }
+        }
+        if (scheduled == 0) return 0
+        return (completed * 100 / scheduled)
+    }
+
+    fun bestStreak(task: HabitTask, upToDate: LocalDate = LocalDate.now()): Int {
+        var best = 0
+        var current = 0
+        var cursor = upToDate
+        val earliest = task.startDate.minusDays(1)
+
+        while (cursor.isAfter(earliest)) {
+            if (!isScheduledOn(task, cursor)) {
+                cursor = cursor.minusDays(1)
+                continue
+            }
+
+            if (isDone(task.id, cursor)) {
+                current += 1
+                if (current > best) best = current
+            } else {
+                current = 0
+            }
+            cursor = cursor.minusDays(1)
+        }
+        return best
+    }
+
+    fun totalCompletions(task: HabitTask): Int {
+        val prefix = "done_${task.id}_"
+        return prefs.all.keys.count { it.startsWith(prefix) }
+    }
+
+    fun monthlyWeeklyProgress(task: HabitTask, month: YearMonth): List<Int> {
+        val firstWeekday = month.atDay(1).dayOfWeek.value - 1
+        val totalDays = month.lengthOfMonth()
+        val weeks = ((firstWeekday + totalDays + 6) / 7).coerceAtLeast(4)
+        val scheduled = IntArray(weeks)
+        val done = IntArray(weeks)
+
+        for (day in 1..totalDays) {
+            val date = month.atDay(day)
+            val weekIndex = (firstWeekday + day - 1) / 7
+            if (isScheduledOn(task, date)) {
+                scheduled[weekIndex] += 1
+                if (isDone(task.id, date)) done[weekIndex] += 1
+            }
+        }
+
+        return (0 until weeks).map { idx ->
+            val sched = scheduled[idx]
+            if (sched == 0) 0 else (done[idx] * 100 / sched).coerceIn(0, 100)
+        }
+    }
+
+    fun weekdayConsistency(task: HabitTask, days: Int = 84, anchorDate: LocalDate = LocalDate.now()): List<Int> {
+        val scheduled = IntArray(7)
+        val done = IntArray(7)
+
+        for (offset in 0L until days.toLong()) {
+            val date = anchorDate.minusDays(offset)
+            if (isScheduledOn(task, date)) {
+                val index = date.dayOfWeek.value - 1
+                scheduled[index] += 1
+                if (isDone(task.id, date)) done[index] += 1
+            }
+        }
+
+        return (0..6).map { idx ->
+            val sched = scheduled[idx]
+            if (sched == 0) 0 else (done[idx] * 100 / sched).coerceIn(0, 100)
+        }
+    }
+
     fun selectedTaskWidgetSummary(): Triple<String, Int, Int> {
-        val tasks = getTasks()
+        val tasks = getTasks().filterNot { it.isArchived }
         val selected = tasks.firstOrNull { it.id == getSelectedTaskId() } ?: tasks.firstOrNull()
         if (selected == null) return Triple("Создай задачу", 0, 0)
 
@@ -228,7 +435,15 @@ class HabitRepository(private val context: Context) {
             val obj = JSONObject()
                 .put("id", task.id)
                 .put("title", task.title)
+                .put("emoji", task.emoji)
+                .put("colorHex", task.colorHex)
+                .put("trackingType", task.trackingType.name)
                 .put("frequency", task.frequency.name)
+                .put("timesPerWeek", task.timesPerWeek)
+                .put("reminderHour", task.reminderHour)
+                .put("reminderMinute", task.reminderMinute)
+                .put("startDate", task.startDate.format(formatter))
+                .put("isArchived", task.isArchived)
             val custom = JSONArray()
             task.customDays.sorted().forEach { custom.put(it) }
             obj.put("customDays", custom)

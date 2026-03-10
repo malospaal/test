@@ -23,6 +23,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import com.example.microhabit.data.AppLanguage
+import com.example.microhabit.i18n.LocalAppLanguage
+import com.example.microhabit.i18n.t
+import com.example.microhabit.i18n.translate
 import com.example.microhabit.data.TrackingType
 import com.example.microhabit.ui.theme.AppTheme
 
@@ -43,6 +47,7 @@ fun HabitCard(
     onOpen: () -> Unit,
     onEdit: () -> Unit,
     onArchive: () -> Unit,
+    onUnarchive: () -> Unit,
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -51,6 +56,7 @@ fun HabitCard(
     val elevation = AppTheme.elevation
     val stroke = AppTheme.stroke
     val colors = AppTheme.colors
+    val language = LocalAppLanguage.current
 
     Card(
         modifier = modifier
@@ -104,7 +110,7 @@ fun HabitCard(
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = trackingLabel(habit.trackingType),
+                        text = trackingLabel(habit.trackingType, language),
                         style = MaterialTheme.typography.bodySmall,
                         color = colors.textTertiary,
                         maxLines = 1,
@@ -119,7 +125,7 @@ fun HabitCard(
                         .padding(horizontal = spacing.x1, vertical = spacing.x0_5)
                 ) {
                     Text(
-                        text = if (habit.isArchived) "Archived" else "Active",
+                        text = if (habit.isArchived) t("Archived") else t("Active"),
                         style = MaterialTheme.typography.labelMedium,
                         color = if (habit.isArchived) colors.textSecondary else colors.success
                     )
@@ -132,12 +138,12 @@ fun HabitCard(
             ) {
                 HabitMetricTile(
                     modifier = Modifier.weight(1f),
-                    label = "Streak",
+                    label = t("Streak"),
                     value = "${habit.streak}d"
                 )
                 HabitMetricTile(
                     modifier = Modifier.weight(1f),
-                    label = "Completion",
+                    label = t("Completion"),
                     value = "${habit.completionRate}%"
                 )
             }
@@ -162,24 +168,30 @@ fun HabitCard(
                 horizontalArrangement = Arrangement.End
             ) {
                 TextButton(onClick = onEdit) {
-                    Text("Edit")
+                    Text(t("Edit"))
                 }
-                TextButton(onClick = onArchive, enabled = !habit.isArchived) {
-                    Text("Archive")
+                if (habit.isArchived) {
+                    TextButton(onClick = onUnarchive) {
+                        Text(t("Unarchive"))
+                    }
+                } else {
+                    TextButton(onClick = onArchive) {
+                        Text(t("Archive"))
+                    }
                 }
                 TextButton(onClick = onDelete) {
-                    Text("Delete", color = colors.danger)
+                    Text(t("Delete"), color = colors.danger)
                 }
             }
         }
     }
 }
 
-private fun trackingLabel(type: TrackingType): String {
+private fun trackingLabel(type: TrackingType, language: AppLanguage): String {
     return when (type) {
-        TrackingType.YES_NO -> "Yes / No"
-        TrackingType.COUNT -> "Count"
-        TrackingType.DURATION -> "Duration"
+        TrackingType.YES_NO -> translate(language, "Yes / No")
+        TrackingType.COUNT -> translate(language, "Count")
+        TrackingType.DURATION -> translate(language, "Duration")
     }
 }
 

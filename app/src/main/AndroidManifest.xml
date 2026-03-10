@@ -3,7 +3,9 @@
 
     <application
         android:allowBackup="true"
+        android:icon="@drawable/app_icon"
         android:label="Micro Habit"
+        android:roundIcon="@drawable/app_icon"
         android:supportsRtl="true"
         android:theme="@style/Theme.MicroHabit">
         <activity

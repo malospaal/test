@@ -10,6 +10,8 @@ import com.example.microhabit.data.HabitTask
 import com.example.microhabit.data.SubscriptionPlan
 import com.example.microhabit.data.TaskFrequency
 import com.example.microhabit.data.TrackingType
+import com.example.microhabit.i18n.localeForLanguage
+import com.example.microhabit.i18n.translate
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,7 +21,6 @@ import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.TextStyle
-import java.util.Locale
 
 data class HabitListItem(
     val id: String,
@@ -42,6 +43,7 @@ data class HabitUiState(
     val currentMonth: YearMonth = YearMonth.now(),
     val selectedDateDone: Boolean = false,
     val selectedDateScheduled: Boolean = false,
+    val selectedDateInFuture: Boolean = false,
     val streak: Int = 0,
     val bestStreak: Int = 0,
     val completionRate7Day: Int = 0,
@@ -126,7 +128,7 @@ class MainViewModel(private val repository: HabitRepository) : ViewModel() {
     fun setLanguage(language: AppLanguage) {
         viewModelScope.launch {
             repository.setLanguage(language)
-            _state.update { it.copy(language = language) }
+            refresh()
         }
     }
 
@@ -170,11 +172,17 @@ class MainViewModel(private val repository: HabitRepository) : ViewModel() {
     fun toggleSelectedDateDone() {
         val current = _state.value
         val task = current.tasks.firstOrNull { it.id == current.selectedTaskId } ?: return
-        if (!repository.isScheduledOn(task, current.selectedDate)) return
+        val selectedDate = current.selectedDate
+        val shouldShiftStartDate =
+            selectedDate.isBefore(task.startDate) && repository.isScheduledByFrequency(task, selectedDate)
+        if (!repository.isScheduledOn(task, selectedDate) && !shouldShiftStartDate) return
 
         viewModelScope.launch {
-            val alreadyDone = repository.isDone(task.id, current.selectedDate)
-            repository.setDone(task.id, current.selectedDate, !alreadyDone)
+            if (shouldShiftStartDate) {
+                repository.updateTaskStartDate(task.id, selectedDate)
+            }
+            val alreadyDone = repository.isDone(task.id, selectedDate)
+            repository.setDone(task.id, selectedDate, !alreadyDone)
             repository.refreshWidget()
             refresh()
         }
@@ -348,6 +356,14 @@ class MainViewModel(private val repository: HabitRepository) : ViewModel() {
         }
     }
 
+    fun unarchiveTask(taskId: String) {
+        viewModelScope.launch {
+            repository.archiveTask(taskId, archived = false)
+            repository.refreshWidget()
+            refresh()
+        }
+    }
+
     fun canCreateTask(): Boolean {
         val s = _state.value
         return canCreateTask(s.tasks.size, s.plan)
@@ -382,6 +398,7 @@ class MainViewModel(private val repository: HabitRepository) : ViewModel() {
 
             val selectedTask = tasks.firstOrNull { it.id == selectedId }
             val date = _state.value.selectedDate
+            val isFutureDate = date.isAfter(LocalDate.now())
             _state.update { state ->
                 state.copy(
                     tasks = tasks,
@@ -395,7 +412,7 @@ class MainViewModel(private val repository: HabitRepository) : ViewModel() {
                                 colorHex = task.colorHex,
                                 trackingType = task.trackingType,
                                 streak = repository.calculateStreak(task),
-                                frequency = frequencyLabel(task),
+                                frequency = frequencyLabel(task, language),
                                 completionRate = repository.progressForLast30Days(task),
                                 isArchived = task.isArchived
                             )
@@ -403,14 +420,18 @@ class MainViewModel(private val repository: HabitRepository) : ViewModel() {
                         .sortedBy { it.isArchived },
                     selectedTaskId = selectedId,
                     showEditor = state.showEditor,
-                    selectedDateScheduled = selectedTask?.let { repository.isScheduledOn(it, date) } ?: false,
+                    selectedDateInFuture = isFutureDate,
+                    selectedDateScheduled = selectedTask?.let { task ->
+                        repository.isScheduledOn(task, date) ||
+                            (date.isBefore(task.startDate) && repository.isScheduledByFrequency(task, date))
+                    } ?: false,
                     selectedDateDone = selectedTask?.let { repository.isDone(it.id, date) } ?: false,
                     streak = selectedTask?.let { repository.calculateStreak(it) } ?: 0,
                     bestStreak = selectedTask?.let { repository.bestStreak(it) } ?: 0,
                     completionRate7Day = selectedTask?.let { repository.completionRate(it, 7, date) } ?: 0,
                     completionRate30Day = selectedTask?.let { repository.completionRate(it, 30, date) } ?: 0,
                     totalCompletions = selectedTask?.let { repository.totalCompletions(it) } ?: 0,
-                    progressPercent = selectedTask?.let { repository.progressForLast30Days(it) } ?: 0,
+                    progressPercent = selectedTask?.let { repository.progressForLast30Days(it, date) } ?: 0,
                     last7Days = selectedTask?.let { repository.last7Days(it, date) } ?: List(7) { 0 },
                     monthlyProgress = selectedTask?.let { repository.monthlyWeeklyProgress(it, state.currentMonth) } ?: emptyList(),
                     weekdayConsistency = selectedTask?.let { repository.weekdayConsistency(it, 84, date) } ?: List(7) { 0 },
@@ -436,16 +457,21 @@ class MainViewModel(private val repository: HabitRepository) : ViewModel() {
         val selectedTask = current.tasks.firstOrNull { it.id == current.selectedTaskId }
         val date = current.selectedDate
         val month = current.currentMonth
+        val isFutureDate = date.isAfter(LocalDate.now())
         _state.update {
             it.copy(
-                selectedDateScheduled = selectedTask?.let { task -> repository.isScheduledOn(task, date) } ?: false,
+                selectedDateInFuture = isFutureDate,
+                selectedDateScheduled = selectedTask?.let { task ->
+                    repository.isScheduledOn(task, date) ||
+                        (date.isBefore(task.startDate) && repository.isScheduledByFrequency(task, date))
+                } ?: false,
                 selectedDateDone = selectedTask?.let { task -> repository.isDone(task.id, date) } ?: false,
                 streak = selectedTask?.let { repository.calculateStreak(it) } ?: 0,
                 bestStreak = selectedTask?.let { repository.bestStreak(it) } ?: 0,
                 completionRate7Day = selectedTask?.let { repository.completionRate(it, 7, date) } ?: 0,
                 completionRate30Day = selectedTask?.let { repository.completionRate(it, 30, date) } ?: 0,
                 totalCompletions = selectedTask?.let { repository.totalCompletions(it) } ?: 0,
-                progressPercent = selectedTask?.let { repository.progressForLast30Days(it) } ?: 0,
+                progressPercent = selectedTask?.let { repository.progressForLast30Days(it, date) } ?: 0,
                 last7Days = selectedTask?.let { repository.last7Days(it, date) } ?: List(7) { 0 },
                 monthlyProgress = selectedTask?.let { repository.monthlyWeeklyProgress(it, month) } ?: emptyList(),
                 weekdayConsistency = selectedTask?.let { repository.weekdayConsistency(it, 84, date) } ?: List(7) { 0 },
@@ -481,17 +507,18 @@ class MainViewModel(private val repository: HabitRepository) : ViewModel() {
         return plan == SubscriptionPlan.PRO || taskCount < 1
     }
 
-    private fun frequencyLabel(task: HabitTask): String {
+    private fun frequencyLabel(task: HabitTask, language: AppLanguage): String {
+        val locale = localeForLanguage(language)
         return when (task.frequency) {
-            TaskFrequency.DAILY -> "Every day"
-            TaskFrequency.TIMES_PER_WEEK -> "${task.timesPerWeek}x / week"
+            TaskFrequency.DAILY -> translate(language, "Every day")
+            TaskFrequency.TIMES_PER_WEEK -> translate(language, "X / week").replace("X", task.timesPerWeek.toString())
             TaskFrequency.SELECTED_DAYS -> {
-                if (task.customDays.isEmpty()) return "Custom"
+                if (task.customDays.isEmpty()) return translate(language, "Selected weekdays")
                 task.customDays
                     .toList()
                     .sorted()
                     .joinToString(", ") {
-                        DayOfWeek.of(it).getDisplayName(TextStyle.SHORT, Locale.ENGLISH)
+                        DayOfWeek.of(it).getDisplayName(TextStyle.SHORT, locale)
                     }
             }
         }

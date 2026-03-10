@@ -6,10 +6,12 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +19,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -28,11 +31,17 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.AddCircle
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
@@ -57,6 +66,7 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -64,6 +74,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -78,6 +89,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.microhabit.data.AppLanguage
 import com.example.microhabit.data.AppThemeMode
@@ -86,6 +99,14 @@ import com.example.microhabit.data.HabitTask
 import com.example.microhabit.data.SubscriptionPlan
 import com.example.microhabit.data.TaskFrequency
 import com.example.microhabit.data.TrackingType
+import com.example.microhabit.i18n.LocalAppLanguage
+import com.example.microhabit.i18n.appLocale
+import com.example.microhabit.i18n.formatTranslate
+import com.example.microhabit.i18n.languageNativeLabel
+import com.example.microhabit.i18n.t
+import com.example.microhabit.i18n.tf
+import com.example.microhabit.i18n.translate
+import com.example.microhabit.i18n.weekdayLabels
 import com.example.microhabit.ui.components.ChoiceOption
 import com.example.microhabit.ui.components.CalendarDay
 import com.example.microhabit.ui.components.CalendarDayState
@@ -117,14 +138,14 @@ import java.time.format.TextStyle
 import java.util.Locale
 import kotlinx.coroutines.launch
 
-private enum class AppPage(val title: String) {
-    TRACKER("Tracker"),
-    HABITS("Habits"),
-    ANALYTICS("Analytics"),
-    CALENDAR("Calendar"),
-    PAYWALL("Premium"),
-    ACCOUNT("Account"),
-    SETTINGS("Settings")
+private enum class AppPage {
+    TRACKER,
+    HABITS,
+    ANALYTICS,
+    CALENDAR,
+    PAYWALL,
+    ACCOUNT,
+    SETTINGS
 }
 
 private enum class BillingCycle {
@@ -150,6 +171,19 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@Composable
+private fun pageTitle(page: AppPage): String {
+    return when (page) {
+        AppPage.TRACKER -> t("Tracker")
+        AppPage.HABITS -> t("Habits")
+        AppPage.ANALYTICS -> t("Analytics")
+        AppPage.CALENDAR -> t("Calendar")
+        AppPage.PAYWALL -> t("Premium")
+        AppPage.ACCOUNT -> t("Account")
+        AppPage.SETTINGS -> t("Settings")
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
@@ -160,53 +194,62 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
     var selectedBilling by rememberSaveable { mutableStateOf(BillingCycle.YEARLY) }
     val semantic = AppTheme.colors
     val context = LocalContext.current
+    val language = state.language
 
-    ModalNavigationDrawer(
-        drawerState = drawerState,
-        drawerContent = {
-            DrawerContent(
-                current = page,
-                plan = state.plan,
-                onNavigate = {
-                    if (it != AppPage.PAYWALL) previousPage = it
-                    page = it
-                    scope.launch { drawerState.close() }
-                }
-            )
-        }
-    ) {
-        Scaffold(
-            topBar = {
-                CenterAlignedTopAppBar(
-                    title = { Text(page.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) },
-                    navigationIcon = {
-                        if (page != AppPage.PAYWALL) {
-                            IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                                Icon(Icons.Rounded.Menu, contentDescription = "Menu")
-                            }
-                        }
-                    },
-                    actions = {
-                        if (page == AppPage.HABITS) {
-                            val canAdd = state.plan == SubscriptionPlan.PRO || state.tasks.size < 1
-                            TextButton(onClick = {
-                                if (canAdd) {
-                                    vm.openCreateTask()
-                                } else {
-                                    previousPage = page
-                                    page = AppPage.PAYWALL
-                                }
-                            }) {
-                                Text(if (canAdd) "Add" else "Upgrade")
-                            }
-                        }
-                    },
-                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                        containerColor = semantic.backgroundSurface
-                    )
+    CompositionLocalProvider(LocalAppLanguage provides state.language) {
+        ModalNavigationDrawer(
+            drawerState = drawerState,
+            drawerContent = {
+                DrawerContent(
+                    current = page,
+                    plan = state.plan,
+                    onNavigate = {
+                        if (it != AppPage.PAYWALL) previousPage = it
+                        page = it
+                        scope.launch { drawerState.close() }
+                    }
                 )
             }
-        ) { padding ->
+        ) {
+            Scaffold(
+                topBar = {
+                    CenterAlignedTopAppBar(
+                        title = {
+                            Text(
+                                pageTitle(page),
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                        },
+                        navigationIcon = {
+                            IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                                Icon(Icons.Rounded.Menu, contentDescription = t("Menu"))
+                            }
+                        },
+                        actions = {
+                            when (page) {
+                                AppPage.HABITS -> {
+                                    val canAdd = state.plan == SubscriptionPlan.PRO || state.tasks.size < 1
+                                    TextButton(onClick = {
+                                        if (canAdd) {
+                                            vm.openCreateTask()
+                                        } else {
+                                            previousPage = page
+                                            page = AppPage.PAYWALL
+                                        }
+                                    }) {
+                                        Text(if (canAdd) t("Add") else t("Upgrade"))
+                                    }
+                                }
+                                else -> Unit
+                            }
+                        },
+                        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                            containerColor = semantic.backgroundSurface
+                        )
+                    )
+                }
+            ) { padding ->
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -220,8 +263,7 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                         onUpgrade = {
                             previousPage = AppPage.TRACKER
                             page = AppPage.PAYWALL
-                        },
-                        onOpenSettings = { page = AppPage.SETTINGS }
+                        }
                     )
                     AppPage.HABITS -> HabitsPage(
                         state = state,
@@ -245,16 +287,20 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                             Toast.makeText(
                                 context,
                                 if (selectedBilling == BillingCycle.YEARLY) {
-                                    "PRO yearly activated (debug)"
+                                    translate(language, "PRO yearly activated (debug)")
                                 } else {
-                                    "PRO monthly activated (debug)"
+                                    translate(language, "PRO monthly activated (debug)")
                                 },
                                 Toast.LENGTH_SHORT
                             ).show()
                         },
                         onRestorePurchase = {
                             vm.setPlan(SubscriptionPlan.PRO)
-                            Toast.makeText(context, "Purchases restored (debug)", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(
+                                context,
+                                translate(language, "Purchases restored (debug)"),
+                                Toast.LENGTH_SHORT
+                            ).show()
                         },
                         onClose = { page = previousPage }
                     )
@@ -282,10 +328,11 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                     )
                 }
             }
-        }
+            }
 
-        if (state.showEditor) {
-            TaskEditorDialog(state = state, onDismiss = vm::closeEditor, vm = vm)
+            if (state.showEditor) {
+                TaskEditorDialog(state = state, onDismiss = vm::closeEditor, vm = vm)
+            }
         }
     }
 }
@@ -300,57 +347,57 @@ private fun DrawerContent(current: AppPage, plan: SubscriptionPlan, onNavigate: 
             modifier = Modifier.padding(spacing.x2),
             verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
         ) {
-            Text("Micro-habit", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
+            Text(t("Micro-habit"), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
             Text(
-                if (plan == SubscriptionPlan.PRO) "Plan: PRO" else "Plan: Free",
+                if (plan == SubscriptionPlan.PRO) t("Plan: PRO") else t("Plan: Free"),
                 color = semantic.textSecondary,
                 style = MaterialTheme.typography.bodyMedium
             )
 
             NavigationDrawerItem(
-                label = { Text("Tracker") },
+                label = { Text(t("Tracker")) },
                 selected = current == AppPage.TRACKER,
                 onClick = { onNavigate(AppPage.TRACKER) },
                 icon = { Icon(Icons.Rounded.Home, contentDescription = null) },
                 colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = colors.primary.copy(alpha = 0.15f))
             )
             NavigationDrawerItem(
-                label = { Text("Habits") },
+                label = { Text(t("Habits")) },
                 selected = current == AppPage.HABITS,
                 onClick = { onNavigate(AppPage.HABITS) },
                 icon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
                 colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = colors.primary.copy(alpha = 0.15f))
             )
             NavigationDrawerItem(
-                label = { Text("Analytics") },
+                label = { Text(t("Analytics")) },
                 selected = current == AppPage.ANALYTICS,
                 onClick = { onNavigate(AppPage.ANALYTICS) },
                 icon = { Icon(Icons.Rounded.CheckCircle, contentDescription = null) },
                 colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = colors.primary.copy(alpha = 0.15f))
             )
             NavigationDrawerItem(
-                label = { Text("Calendar") },
+                label = { Text(t("Calendar")) },
                 selected = current == AppPage.CALENDAR,
                 onClick = { onNavigate(AppPage.CALENDAR) },
                 icon = { Icon(Icons.Rounded.Home, contentDescription = null) },
                 colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = colors.primary.copy(alpha = 0.15f))
             )
             NavigationDrawerItem(
-                label = { Text("Premium") },
+                label = { Text(t("Premium")) },
                 selected = current == AppPage.PAYWALL,
                 onClick = { onNavigate(AppPage.PAYWALL) },
                 icon = { Icon(Icons.Rounded.WorkspacePremium, contentDescription = null) },
                 colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = colors.primary.copy(alpha = 0.15f))
             )
             NavigationDrawerItem(
-                label = { Text("Account") },
+                label = { Text(t("Account")) },
                 selected = current == AppPage.ACCOUNT,
                 onClick = { onNavigate(AppPage.ACCOUNT) },
                 icon = { Icon(Icons.Rounded.AccountCircle, contentDescription = null) },
                 colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = colors.primary.copy(alpha = 0.15f))
             )
             NavigationDrawerItem(
-                label = { Text("Settings") },
+                label = { Text(t("Settings")) },
                 selected = current == AppPage.SETTINGS,
                 onClick = { onNavigate(AppPage.SETTINGS) },
                 icon = { Icon(Icons.Rounded.Settings, contentDescription = null) },
@@ -364,34 +411,27 @@ private fun DrawerContent(current: AppPage, plan: SubscriptionPlan, onNavigate: 
 private fun TrackerPage(
     state: HabitUiState,
     vm: MainViewModel,
-    onUpgrade: () -> Unit,
-    onOpenSettings: () -> Unit
+    onUpgrade: () -> Unit
 ) {
     val selectedTask = state.tasks.firstOrNull { it.id == state.selectedTaskId }
     val canAdd = state.plan == SubscriptionPlan.PRO || state.tasks.size < 1
     val spacing = AppTheme.spacing
+    var pendingDeleteTaskId by rememberSaveable { mutableStateOf<String?>(null) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(spacing.x2),
-        verticalArrangement = Arrangement.spacedBy(spacing.x2)
+        contentPadding = PaddingValues(start = spacing.x2, top = spacing.x1, end = spacing.x2, bottom = spacing.x2),
+        verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
     ) {
         if (state.tasks.isEmpty()) {
             item { OnboardingCard(vm, state) }
         } else {
             item {
-                TrackerHeader(
-                    habitTitle = selectedTask?.title.orEmpty(),
-                    plan = state.plan,
-                    onOpenSettings = onOpenSettings
-                )
-            }
-            item {
                 TaskControlsRow(
                     canAddTask = canAdd,
                     onCreate = { if (canAdd) vm.openCreateTask() else onUpgrade() },
                     onEdit = { selectedTask?.id?.let(vm::openEditTask) },
-                    onDelete = { selectedTask?.id?.let(vm::deleteTask) },
+                    onDelete = { selectedTask?.id?.let { pendingDeleteTaskId = it } },
                     canEditDelete = selectedTask != null
                 )
             }
@@ -409,7 +449,7 @@ private fun TrackerPage(
                 StatsRow(
                     streak = state.streak,
                     progress = state.progressPercent,
-                    total = state.doneDatesInCurrentMonth.size
+                    total = state.totalCompletions
                 )
             }
             item { SevenDayChart(points = state.last7Days, anchorDate = state.selectedDate) }
@@ -426,6 +466,30 @@ private fun TrackerPage(
             }
         }
     }
+
+    pendingDeleteTaskId?.let { taskId ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteTaskId = null },
+            title = { Text(t("Delete habit?")) },
+            text = { Text(t("This will permanently delete this habit and its completion history.")) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        pendingDeleteTaskId = null
+                        vm.deleteTask(taskId)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text(t("Delete"))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteTaskId = null }) {
+                    Text(t("Cancel"))
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -438,6 +502,7 @@ private fun HabitsPage(
     val spacing = AppTheme.spacing
     val colors = AppTheme.colors
     val canAdd = state.plan == SubscriptionPlan.PRO || state.tasks.size < 1
+    var pendingDeleteTaskId by rememberSaveable { mutableStateOf<String?>(null) }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -449,13 +514,13 @@ private fun HabitsPage(
                 GlassCard {
                     Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
                         Text(
-                            text = "No habits yet",
+                            text = t("No habits yet"),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.SemiBold,
                             color = colors.textPrimary
                         )
                         Text(
-                            text = "Create your first habit to start building momentum.",
+                            text = t("Create your first habit to start building momentum."),
                             style = MaterialTheme.typography.bodyMedium,
                             color = colors.textSecondary
                         )
@@ -463,38 +528,102 @@ private fun HabitsPage(
                             onClick = { if (canAdd) vm.openCreateTask() else onUpgrade() },
                             shape = RoundedCornerShape(AppTheme.radius.md)
                         ) {
-                            Text(if (canAdd) "Create habit" else "Upgrade to PRO")
+                            Text(if (canAdd) t("Create habit") else t("Upgrade to PRO"))
                         }
                     }
                 }
             }
         } else {
-            items(items = state.habits, key = { it.id }) { habit ->
-                HabitCard(
-                    habit = HabitCardModel(
-                        emoji = habit.emoji,
-                        name = habit.name,
-                        colorHex = habit.colorHex,
-                        trackingType = habit.trackingType,
-                        streak = habit.streak,
-                        frequency = habit.frequency,
-                        completionRate = habit.completionRate,
-                        isArchived = habit.isArchived
-                    ),
-                    onOpen = {
-                        if (habit.isArchived) {
-                            vm.openEditTask(habit.id)
-                        } else {
+            val activeHabits = state.habits.filterNot { it.isArchived }
+            val archivedHabits = state.habits.filter { it.isArchived }
+
+            if (activeHabits.isNotEmpty()) {
+                item {
+                    Text(
+                        text = t("Active habits"),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.textPrimary
+                    )
+                }
+                items(items = activeHabits, key = { it.id }) { habit ->
+                    HabitCard(
+                        habit = HabitCardModel(
+                            emoji = habit.emoji,
+                            name = habit.name,
+                            colorHex = habit.colorHex,
+                            trackingType = habit.trackingType,
+                            streak = habit.streak,
+                            frequency = habit.frequency,
+                            completionRate = habit.completionRate,
+                            isArchived = habit.isArchived
+                        ),
+                        onOpen = {
                             vm.selectTask(habit.id)
                             onOpenHabit()
-                        }
-                    },
-                    onEdit = { vm.openEditTask(habit.id) },
-                    onArchive = { vm.archiveTask(habit.id) },
-                    onDelete = { vm.deleteTask(habit.id) }
-                )
+                        },
+                        onEdit = { vm.openEditTask(habit.id) },
+                        onArchive = { vm.archiveTask(habit.id) },
+                        onUnarchive = { vm.unarchiveTask(habit.id) },
+                        onDelete = { pendingDeleteTaskId = habit.id }
+                    )
+                }
+            }
+
+            if (archivedHabits.isNotEmpty()) {
+                item {
+                    Text(
+                        text = t("Archived habits"),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.textPrimary
+                    )
+                }
+                items(items = archivedHabits, key = { it.id }) { habit ->
+                    HabitCard(
+                        habit = HabitCardModel(
+                            emoji = habit.emoji,
+                            name = habit.name,
+                            colorHex = habit.colorHex,
+                            trackingType = habit.trackingType,
+                            streak = habit.streak,
+                            frequency = habit.frequency,
+                            completionRate = habit.completionRate,
+                            isArchived = habit.isArchived
+                        ),
+                        onOpen = { vm.openEditTask(habit.id) },
+                        onEdit = { vm.openEditTask(habit.id) },
+                        onArchive = { vm.archiveTask(habit.id) },
+                        onUnarchive = { vm.unarchiveTask(habit.id) },
+                        onDelete = { pendingDeleteTaskId = habit.id }
+                    )
+                }
             }
         }
+    }
+
+    pendingDeleteTaskId?.let { taskId ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteTaskId = null },
+            title = { Text(t("Delete habit?")) },
+            text = { Text(t("This will permanently delete this habit and its completion history.")) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        pendingDeleteTaskId = null
+                        vm.deleteTask(taskId)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text(t("Delete"))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDeleteTaskId = null }) {
+                    Text(t("Cancel"))
+                }
+            }
+        )
     }
 }
 
@@ -514,13 +643,13 @@ private fun AnalyticsPage(state: HabitUiState) {
                 GlassCard {
                     Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
                         Text(
-                            text = "Analytics",
+                            text = t("Analytics"),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.SemiBold,
                             color = colors.textPrimary
                         )
                         Text(
-                            text = "Create and select a habit to view analytics.",
+                            text = t("Create and select a habit to view analytics."),
                             style = MaterialTheme.typography.bodyMedium,
                             color = colors.textSecondary
                         )
@@ -531,13 +660,14 @@ private fun AnalyticsPage(state: HabitUiState) {
         return
     }
 
+    val locale = appLocale()
     val weeklyValues = state.last7Days.map { if (it > 0) 100 else 0 }
     val weeklyLabels = (6 downTo 0).map { offset ->
-        state.selectedDate.minusDays(offset.toLong()).dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.ENGLISH)
+        state.selectedDate.minusDays(offset.toLong()).dayOfWeek.getDisplayName(TextStyle.SHORT, locale)
     }
     val monthlyValues = if (state.monthlyProgress.isEmpty()) listOf(0, 0, 0, 0) else state.monthlyProgress
-    val monthlyLabels = monthlyValues.indices.map { "W${it + 1}" }
-    val weekdayLabels = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+    val monthlyLabels = monthlyValues.indices.map { "${t("W")}${it + 1}" }
+    val weekdayLabels = weekdayLabels(LocalAppLanguage.current)
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -548,7 +678,7 @@ private fun AnalyticsPage(state: HabitUiState) {
             GlassCard {
                 Column(verticalArrangement = Arrangement.spacedBy(spacing.x0_5)) {
                     Text(
-                        text = "Analytics",
+                        text = t("Analytics"),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold,
                         color = colors.textPrimary
@@ -568,12 +698,12 @@ private fun AnalyticsPage(state: HabitUiState) {
                 horizontalArrangement = Arrangement.spacedBy(spacing.x1)
             ) {
                 AnalyticsMetricTile(
-                    label = "Current streak",
+                    label = t("Current streak"),
                     value = "${state.streak}d",
                     modifier = Modifier.weight(1f)
                 )
                 AnalyticsMetricTile(
-                    label = "Best streak",
+                    label = t("Best streak"),
                     value = "${state.bestStreak}d",
                     modifier = Modifier.weight(1f)
                 )
@@ -586,12 +716,12 @@ private fun AnalyticsPage(state: HabitUiState) {
                 horizontalArrangement = Arrangement.spacedBy(spacing.x1)
             ) {
                 AnalyticsMetricTile(
-                    label = "7 day completion",
+                    label = t("7 day completion"),
                     value = "${state.completionRate7Day}%",
                     modifier = Modifier.weight(1f)
                 )
                 AnalyticsMetricTile(
-                    label = "30 day completion",
+                    label = t("30 day completion"),
                     value = "${state.completionRate30Day}%",
                     modifier = Modifier.weight(1f)
                 )
@@ -600,7 +730,7 @@ private fun AnalyticsPage(state: HabitUiState) {
 
         item {
             AnalyticsMetricTile(
-                label = "Total completions",
+                label = t("Total completions"),
                 value = state.totalCompletions.toString(),
                 modifier = Modifier.fillMaxWidth()
             )
@@ -610,7 +740,7 @@ private fun AnalyticsPage(state: HabitUiState) {
             GlassCard {
                 Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
                     Text(
-                        text = "Weekly completion chart",
+                        text = t("Weekly completion chart"),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = colors.textPrimary
@@ -628,7 +758,7 @@ private fun AnalyticsPage(state: HabitUiState) {
             GlassCard {
                 Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
                     Text(
-                        text = "Monthly progress chart",
+                        text = t("Monthly progress chart"),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = colors.textPrimary
@@ -645,7 +775,7 @@ private fun AnalyticsPage(state: HabitUiState) {
             GlassCard {
                 Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
                     Text(
-                        text = "Weekday consistency",
+                        text = t("Weekday consistency"),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = colors.textPrimary
@@ -664,6 +794,7 @@ private fun AnalyticsPage(state: HabitUiState) {
 private fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
     val spacing = AppTheme.spacing
     val colors = AppTheme.colors
+    val locale = appLocale()
     val selectedTask = state.tasks.firstOrNull { it.id == state.selectedTaskId }
     val today = LocalDate.now()
 
@@ -677,13 +808,13 @@ private fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
                 GlassCard {
                     Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
                         Text(
-                            text = "Calendar",
+                            text = t("Calendar"),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.SemiBold,
                             color = colors.textPrimary
                         )
                         Text(
-                            text = "Select or create a habit to view completion history.",
+                            text = t("Select or create a habit to view completion history."),
                             style = MaterialTheme.typography.bodyMedium,
                             color = colors.textSecondary
                         )
@@ -711,7 +842,7 @@ private fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
             GlassCard {
                 Column(verticalArrangement = Arrangement.spacedBy(spacing.x0_5)) {
                     Text(
-                        text = "Calendar",
+                        text = t("Calendar"),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold,
                         color = colors.textPrimary
@@ -735,7 +866,7 @@ private fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
                     ) {
                         TextButton(onClick = { vm.moveMonth(-1) }) { Text("<") }
                         Text(
-                            text = state.currentMonth.format(DateTimeFormatter.ofPattern("LLLL yyyy", Locale.ENGLISH)),
+                            text = localizedMonthYear(state.currentMonth, state.language, locale),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = colors.textPrimary
@@ -748,10 +879,10 @@ private fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(AppTheme.radius.md)
                     ) {
-                        Text("Today")
+                        Text(t("Today"))
                     }
 
-                    val weekdayLabels = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+                    val weekdayLabels = weekdayLabels(LocalAppLanguage.current)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(spacing.x1)
@@ -797,18 +928,18 @@ private fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
             GlassCard {
                 Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
                     Text(
-                        text = "Completion details",
+                        text = t("Completion details"),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = colors.textPrimary
                     )
                     Text(
-                        text = state.selectedDate.format(DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ENGLISH)),
+                        text = state.selectedDate.format(DateTimeFormatter.ofPattern(t("dd MMM yyyy"), locale)),
                         style = MaterialTheme.typography.bodyMedium,
                         color = colors.textSecondary
                     )
                     Text(
-                        text = statusLabel(selectedState),
+                        text = statusLabel(selectedState, state.language),
                         style = MaterialTheme.typography.titleMedium,
                         color = when (selectedState) {
                             CalendarDayState.COMPLETED -> colors.success
@@ -836,12 +967,12 @@ private fun dayStateFor(
     return if (date in scheduledDates) CalendarDayState.MISSED else CalendarDayState.FUTURE
 }
 
-private fun statusLabel(state: CalendarDayState): String {
+private fun statusLabel(state: CalendarDayState, language: AppLanguage): String {
     return when (state) {
-        CalendarDayState.COMPLETED -> "Completed"
-        CalendarDayState.MISSED -> "Missed"
-        CalendarDayState.TODAY -> "Today"
-        CalendarDayState.FUTURE -> "Future"
+        CalendarDayState.COMPLETED -> translate(language, "Completed")
+        CalendarDayState.MISSED -> translate(language, "Missed")
+        CalendarDayState.TODAY -> translate(language, "Today")
+        CalendarDayState.FUTURE -> translate(language, "Future")
     }
 }
 
@@ -860,37 +991,37 @@ private fun AccountPage(
     ) {
         item {
             GlassCard {
-                Text("Account", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text(t("Account"), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(spacing.x1))
                 Text(
                     text = if (state.plan == SubscriptionPlan.PRO) {
-                        "You are on PRO. Manage options in Premium."
+                        t("You are on PRO. Manage options in Premium.")
                     } else {
-                        "You are on Free. Upgrade to unlock unlimited habits."
+                        t("You are on Free. Upgrade to unlock unlimited habits.")
                     },
                     color = semantic.textSecondary
                 )
                 Spacer(Modifier.height(spacing.x1))
                 Button(onClick = onOpenPaywall, modifier = Modifier.fillMaxWidth()) {
-                    Text(if (state.plan == SubscriptionPlan.PRO) "Open Premium" else "Upgrade to Premium")
+                    Text(if (state.plan == SubscriptionPlan.PRO) t("Open Premium") else t("Upgrade to Premium"))
                 }
             }
         }
         item {
             PlanCard(
-                title = "Free",
-                subtitle = "1 habit",
+                title = t("Free"),
+                subtitle = t("1 habit"),
                 selected = state.plan == SubscriptionPlan.FREE,
-                actionLabel = if (state.plan == SubscriptionPlan.FREE) "Current" else "Choose",
+                actionLabel = if (state.plan == SubscriptionPlan.FREE) t("Current") else t("Choose"),
                 onAction = { onSetPlan(SubscriptionPlan.FREE) }
             )
         }
         item {
             PlanCard(
                 title = "PRO",
-                subtitle = "Unlimited habits",
+                subtitle = t("Unlimited habits"),
                 selected = state.plan == SubscriptionPlan.PRO,
-                actionLabel = if (state.plan == SubscriptionPlan.PRO) "Current" else "Choose PRO",
+                actionLabel = if (state.plan == SubscriptionPlan.PRO) t("Current") else t("Choose PRO"),
                 onAction = { onSetPlan(SubscriptionPlan.PRO) }
             )
         }
@@ -911,11 +1042,19 @@ private fun SettingsPage(
 ) {
     val spacing = AppTheme.spacing
     val context = LocalContext.current
+    val language = LocalAppLanguage.current
     var showThemeDialog by rememberSaveable { mutableStateOf(false) }
     var showLanguageDialog by rememberSaveable { mutableStateOf(false) }
     var showResetConfirm by rememberSaveable { mutableStateOf(false) }
     var showDeleteConfirm by rememberSaveable { mutableStateOf(false) }
     val selectedHabit = state.tasks.firstOrNull { it.id == state.selectedTaskId }
+    val supportedLanguages = listOf(
+        AppLanguage.EN,
+        AppLanguage.RU,
+        AppLanguage.UK,
+        AppLanguage.DE,
+        AppLanguage.CS
+    )
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -924,39 +1063,32 @@ private fun SettingsPage(
     ) {
         item {
             SettingsGroup(
-                title = "Account",
-                subtitle = "Profile and app usage overview."
+                title = t("Account"),
+                subtitle = t("Profile and app usage overview.")
             ) {
                 SettingsRow(
-                    title = "Current plan",
-                    subtitle = if (state.plan == SubscriptionPlan.PRO) "Unlimited habits" else "One active habit",
-                    value = if (state.plan == SubscriptionPlan.PRO) "PRO" else "FREE",
-                    onClick = onOpenPaywall
-                )
-                SettingsDivider()
-                SettingsRow(
-                    title = "Active habits",
-                    subtitle = "Non-archived habits",
+                    title = t("Active habits"),
+                    subtitle = t("Non-archived habits"),
                     value = state.tasks.size.toString()
                 )
                 SettingsDivider()
                 SettingsRow(
-                    title = "Current habit",
-                    subtitle = "Selected for tracking today",
-                    value = selectedHabit?.title ?: "Not selected"
+                    title = t("Current habit"),
+                    subtitle = t("Selected for tracking today"),
+                    value = selectedHabit?.title ?: t("Not selected")
                 )
             }
         }
 
         item {
             SettingsGroup(
-                title = "Appearance",
-                subtitle = "Visual style of the app."
+                title = t("Appearance"),
+                subtitle = t("Visual style of the app.")
             ) {
                 SettingsRow(
-                    title = "Theme",
-                    subtitle = "System, light or dark mode",
-                    value = themeLabel(state.themeMode),
+                    title = t("Theme"),
+                    subtitle = t("System, light or dark mode"),
+                    value = themeLabel(state.themeMode, language),
                     onClick = { showThemeDialog = true }
                 )
             }
@@ -964,13 +1096,13 @@ private fun SettingsPage(
 
         item {
             SettingsGroup(
-                title = "Language",
-                subtitle = "App interface language."
+                title = t("Language"),
+                subtitle = t("App interface language.")
             ) {
                 SettingsRow(
-                    title = "Language",
-                    subtitle = "Choose your preferred locale",
-                    value = state.language.label,
+                    title = t("Language"),
+                    subtitle = t("Choose your preferred locale"),
+                    value = languageNativeLabel(state.language),
                     onClick = { showLanguageDialog = true }
                 )
             }
@@ -978,19 +1110,19 @@ private fun SettingsPage(
 
         item {
             SettingsGroup(
-                title = "Notifications",
-                subtitle = "Daily reminders and nudges."
+                title = t("Notifications"),
+                subtitle = t("Daily reminders and nudges.")
             ) {
                 SettingsSwitchRow(
-                    title = "Reminders",
-                    subtitle = "Enable habit reminder notifications",
+                    title = t("Reminders"),
+                    subtitle = t("Enable habit reminder notifications"),
                     checked = state.notificationsEnabled,
                     onCheckedChange = onSetNotificationsEnabled
                 )
                 SettingsDivider()
                 SettingsRow(
-                    title = "Reminder time",
-                    subtitle = "Daily notification time",
+                    title = t("Reminder time"),
+                    subtitle = t("Daily notification time"),
                     value = formatTime(state.defaultReminderHour, state.defaultReminderMinute),
                     enabled = state.notificationsEnabled,
                     onClick = {
@@ -1008,17 +1140,17 @@ private fun SettingsPage(
 
         item {
             SettingsGroup(
-                title = "Subscription",
-                subtitle = "Manage Free and PRO plans."
+                title = t("Subscription"),
+                subtitle = t("Manage Free and PRO plans.")
             ) {
                 SettingsRow(
-                    title = "Manage subscription",
+                    title = t("Manage subscription"),
                     subtitle = if (state.plan == SubscriptionPlan.PRO) {
-                        "PRO active: unlimited habits"
+                        t("PRO active: unlimited habits")
                     } else {
-                        "Free plan: one active habit"
+                        t("Free plan: one active habit")
                     },
-                    value = if (state.plan == SubscriptionPlan.PRO) "PRO" else "FREE",
+                    value = if (state.plan == SubscriptionPlan.PRO) "PRO" else t("FREE"),
                     onClick = onOpenPaywall
                 )
             }
@@ -1026,31 +1158,37 @@ private fun SettingsPage(
 
         item {
             SettingsGroup(
-                title = "Data & Privacy",
-                subtitle = "Control your data and account lifecycle."
+                title = t("Data & Privacy"),
+                subtitle = t("Control your data and account lifecycle.")
             ) {
                 SettingsRow(
-                    title = "Export data",
-                    subtitle = "Save tasks and progress as JSON",
+                    title = t("Export data"),
+                    subtitle = t("Save tasks and progress as JSON"),
                     onClick = {
                         val result = onExportData()
                         val message = result.fold(
-                            onSuccess = { "Data exported: $it" },
-                            onFailure = { "Export failed: ${it.message ?: "Unknown error"}" }
+                            onSuccess = { formatTranslate(language, "Data exported: %s", it) },
+                            onFailure = {
+                                formatTranslate(
+                                    language,
+                                    "Export failed: %s",
+                                    it.message ?: translate(language, "Unknown error")
+                                )
+                            }
                         )
                         Toast.makeText(context, message, Toast.LENGTH_LONG).show()
                     }
                 )
                 SettingsDivider()
                 SettingsRow(
-                    title = "Reset progress",
-                    subtitle = "Clear completion history, keep habits",
+                    title = t("Reset progress"),
+                    subtitle = t("Clear completion history, keep habits"),
                     onClick = { showResetConfirm = true }
                 )
                 SettingsDivider()
                 SettingsRow(
-                    title = "Delete account",
-                    subtitle = "Remove all habits and settings",
+                    title = t("Delete account"),
+                    subtitle = t("Remove all habits and settings"),
                     destructive = true,
                     onClick = { showDeleteConfirm = true }
                 )
@@ -1059,22 +1197,30 @@ private fun SettingsPage(
 
         item {
             SettingsGroup(
-                title = "Support",
-                subtitle = "Get help and send feedback."
+                title = t("Support"),
+                subtitle = t("Get help and send feedback.")
             ) {
                 SettingsRow(
-                    title = "Help center",
-                    subtitle = "Quick guidance for app features",
+                    title = t("Help center"),
+                    subtitle = t("Quick guidance for app features"),
                     onClick = {
-                        Toast.makeText(context, "Help center is not available in debug build.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            context,
+                            translate(language, "Help center is not available in debug build."),
+                            Toast.LENGTH_SHORT
+                        ).show()
                     }
                 )
                 SettingsDivider()
                 SettingsRow(
-                    title = "Contact support",
-                    subtitle = "Send us your feedback",
+                    title = t("Contact support"),
+                    subtitle = t("Send us your feedback"),
                     onClick = {
-                        Toast.makeText(context, "Support contact will be connected in the next build.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            context,
+                            translate(language, "Support contact will be connected in the next build."),
+                            Toast.LENGTH_SHORT
+                        ).show()
                     }
                 )
             }
@@ -1083,11 +1229,11 @@ private fun SettingsPage(
 
     if (showThemeDialog) {
         SelectionDialog(
-            title = "Select theme",
+            title = t("Select theme"),
             options = listOf(
-                AppThemeMode.SYSTEM to "System",
-                AppThemeMode.LIGHT to "Light",
-                AppThemeMode.DARK to "Dark"
+                AppThemeMode.SYSTEM to t("System"),
+                AppThemeMode.LIGHT to t("Light"),
+                AppThemeMode.DARK to t("Dark")
             ),
             selected = state.themeMode,
             onDismiss = { showThemeDialog = false },
@@ -1097,8 +1243,8 @@ private fun SettingsPage(
 
     if (showLanguageDialog) {
         SelectionDialog(
-            title = "Select language",
-            options = AppLanguage.entries.map { it to it.label },
+            title = t("Select language"),
+            options = supportedLanguages.map { it to languageNativeLabel(it) },
             selected = state.language,
             onDismiss = { showLanguageDialog = false },
             onSelect = onSetLanguage
@@ -1108,22 +1254,26 @@ private fun SettingsPage(
     if (showResetConfirm) {
         AlertDialog(
             onDismissRequest = { showResetConfirm = false },
-            title = { Text("Reset progress?") },
-            text = { Text("This will remove all completion history and keep your habits.") },
+            title = { Text(t("Reset progress?")) },
+            text = { Text(t("This will remove all completion history and keep your habits.")) },
             confirmButton = {
                 Button(
                     onClick = {
                         showResetConfirm = false
                         onResetProgress()
-                        Toast.makeText(context, "Progress reset.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            context,
+                            translate(language, "Progress reset."),
+                            Toast.LENGTH_SHORT
+                        ).show()
                     }
                 ) {
-                    Text("Reset")
+                    Text(t("Reset"))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showResetConfirm = false }) {
-                    Text("Cancel")
+                    Text(t("Cancel"))
                 }
             }
         )
@@ -1132,23 +1282,27 @@ private fun SettingsPage(
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Delete account?") },
-            text = { Text("This action removes all habits, progress and settings.") },
+            title = { Text(t("Delete account?")) },
+            text = { Text(t("This action removes all habits, progress and settings.")) },
             confirmButton = {
                 Button(
                     onClick = {
                         showDeleteConfirm = false
                         onDeleteAccount()
-                        Toast.makeText(context, "Account data deleted.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            context,
+                            translate(language, "Account data deleted."),
+                            Toast.LENGTH_SHORT
+                        ).show()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                 ) {
-                    Text("Delete")
+                    Text(t("Delete"))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirm = false }) {
-                    Text("Cancel")
+                    Text(t("Cancel"))
                 }
             }
         )
@@ -1182,19 +1336,19 @@ private fun PaywallPage(
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(spacing.x0_5)) {
                             Text(
-                                text = "Premium",
+                                text = t("Premium"),
                                 style = MaterialTheme.typography.headlineSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = colors.textPrimary
                             )
                             Text(
-                                text = "Calm focus for consistent habit building.",
+                                text = t("Calm focus for consistent habit building."),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = colors.textSecondary
                             )
                         }
                         IconButton(onClick = onClose) {
-                            Icon(Icons.Rounded.Close, contentDescription = "Close paywall")
+                            Icon(Icons.Rounded.Close, contentDescription = t("Close"))
                         }
                     }
 
@@ -1204,9 +1358,9 @@ private fun PaywallPage(
                     ) {
                         Text(
                             text = if (currentPlan == SubscriptionPlan.PRO) {
-                                "You already have Premium access."
+                                t("You already have Premium access.")
                             } else {
-                                "Unlock unlimited habits and deeper insights."
+                                t("Unlock unlimited habits and deeper insights.")
                             },
                             modifier = Modifier.padding(horizontal = spacing.x1_5, vertical = spacing.x1),
                             style = MaterialTheme.typography.bodyMedium,
@@ -1221,14 +1375,14 @@ private fun PaywallPage(
             GlassCard {
                 Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
                     Text(
-                        text = "Included with Premium",
+                        text = t("Included with Premium"),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
-                    FeatureBulletRow("Unlimited active habits")
-                    FeatureBulletRow("Advanced analytics and consistency views")
-                    FeatureBulletRow("Priority support and early access updates")
-                    FeatureBulletRow("Future cross-device sync support")
+                    FeatureBulletRow(t("Unlimited active habits"))
+                    FeatureBulletRow(t("Advanced analytics and consistency views"))
+                    FeatureBulletRow(t("Priority support and early access updates"))
+                    FeatureBulletRow(t("Future cross-device sync support"))
                 }
             }
         }
@@ -1237,7 +1391,7 @@ private fun PaywallPage(
             GlassCard {
                 Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
                     Text(
-                        text = "Plan comparison",
+                        text = t("Plan comparison"),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -1246,39 +1400,39 @@ private fun PaywallPage(
                         horizontalArrangement = Arrangement.spacedBy(spacing.x1)
                     ) {
                         Text(
-                            text = "Feature",
+                            text = t("Feature"),
                             modifier = Modifier.weight(1f),
                             style = MaterialTheme.typography.labelLarge,
                             color = colors.textSecondary
                         )
                         Text(
-                            text = "Free",
+                            text = t("Free"),
                             style = MaterialTheme.typography.labelLarge,
                             color = colors.textSecondary
                         )
                         Text(
-                            text = "Premium",
+                            text = t("Premium"),
                             style = MaterialTheme.typography.labelLarge,
                             color = colors.textSecondary
                         )
                     }
                     PlanComparisonRow(
-                        feature = "Active habits",
+                        feature = t("Active habits"),
                         freeIncluded = true,
                         premiumIncluded = true
                     )
                     PlanComparisonRow(
-                        feature = "More than one habit",
+                        feature = t("More than one habit"),
                         freeIncluded = false,
                         premiumIncluded = true
                     )
                     PlanComparisonRow(
-                        feature = "Advanced analytics",
+                        feature = t("Advanced analytics"),
                         freeIncluded = false,
                         premiumIncluded = true
                     )
                     PlanComparisonRow(
-                        feature = "Priority support",
+                        feature = t("Priority support"),
                         freeIncluded = false,
                         premiumIncluded = true
                     )
@@ -1290,19 +1444,19 @@ private fun PaywallPage(
             Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
                 PricingPlanCard(
                     model = PricingCardModel(
-                        title = "Monthly",
+                        title = t("Monthly"),
                         priceLabel = "\$4.99 / month",
-                        subtitle = "Flexible monthly billing"
+                        subtitle = t("Flexible monthly billing")
                     ),
                     selected = selectedBilling == BillingCycle.MONTHLY,
                     onClick = { onSelectBilling(BillingCycle.MONTHLY) }
                 )
                 PricingPlanCard(
                     model = PricingCardModel(
-                        title = "Yearly",
+                        title = t("Yearly"),
                         priceLabel = "\$39.99 / year",
-                        subtitle = "Equivalent to \$3.33 / month",
-                        badge = "Recommended"
+                        subtitle = t("Equivalent to \$3.33 / month"),
+                        badge = t("Recommended")
                     ),
                     selected = selectedBilling == BillingCycle.YEARLY,
                     onClick = { onSelectBilling(BillingCycle.YEARLY) }
@@ -1320,9 +1474,12 @@ private fun PaywallPage(
                     ) {
                         Text(
                             if (currentPlan == SubscriptionPlan.PRO) {
-                                "Premium active"
+                                t("Premium active")
                             } else {
-                                "Continue with ${if (selectedBilling == BillingCycle.YEARLY) "Yearly" else "Monthly"}"
+                                tf(
+                                    "Continue with %s",
+                                    if (selectedBilling == BillingCycle.YEARLY) t("Yearly") else t("Monthly")
+                                )
                             }
                         )
                     }
@@ -1330,10 +1487,10 @@ private fun PaywallPage(
                         onClick = onRestorePurchase,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Restore purchase")
+                        Text(t("Restore purchase"))
                     }
                     Text(
-                        text = "Billing integration is shown in debug mode for now.",
+                        text = t("Billing integration is shown in debug mode for now."),
                         style = MaterialTheme.typography.bodySmall,
                         color = colors.textTertiary
                     )
@@ -1343,11 +1500,11 @@ private fun PaywallPage(
     }
 }
 
-private fun themeLabel(mode: AppThemeMode): String {
+private fun themeLabel(mode: AppThemeMode, language: AppLanguage): String {
     return when (mode) {
-        AppThemeMode.SYSTEM -> "System"
-        AppThemeMode.LIGHT -> "Light"
-        AppThemeMode.DARK -> "Dark"
+        AppThemeMode.SYSTEM -> translate(language, "System")
+        AppThemeMode.LIGHT -> translate(language, "Light")
+        AppThemeMode.DARK -> translate(language, "Dark")
     }
 }
 
@@ -1391,11 +1548,13 @@ private fun <T> SelectionDialog(
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = colors.textPrimary
                             )
-                            Text(
-                                text = if (isSelected) "Selected" else "",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = colors.primary
-                            )
+                            if (isSelected) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Check,
+                                    contentDescription = t("Selected"),
+                                    tint = colors.primary
+                                )
+                            }
                         }
                     }
                 }
@@ -1403,7 +1562,7 @@ private fun <T> SelectionDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Close")
+                Text(t("Close"))
             }
         }
     )
@@ -1416,9 +1575,9 @@ private fun OnboardingCard(vm: MainViewModel, state: HabitUiState) {
     val canAdd = state.plan == SubscriptionPlan.PRO || state.tasks.size < 1
     GlassCard {
         Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
-            Text("Create your first habit", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text(t("Create your first habit"), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Text(
-                text = "Set up the basics first and add advanced options if needed.",
+                text = t("Set up the basics first and add advanced options if needed."),
                 style = MaterialTheme.typography.bodyMedium,
                 color = colors.textSecondary
             )
@@ -1427,67 +1586,7 @@ private fun OnboardingCard(vm: MainViewModel, state: HabitUiState) {
                 enabled = canAdd,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(if (canAdd) "Create habit" else "Upgrade to PRO")
-            }
-        }
-    }
-}
-
-@Composable
-private fun TrackerHeader(
-    habitTitle: String,
-    plan: SubscriptionPlan,
-    onOpenSettings: () -> Unit
-) {
-    val spacing = AppTheme.spacing
-    val radius = AppTheme.radius
-    val semantic = AppTheme.colors
-    val title = if (habitTitle.isBlank()) "No active habit" else habitTitle
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(spacing.x1)
-    ) {
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(spacing.x1),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "TODAY",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = semantic.textSecondary
-                )
-                Surface(
-                    color = semantic.primaryMuted,
-                    shape = RoundedCornerShape(radius.full)
-                ) {
-                    Text(
-                        text = if (plan == SubscriptionPlan.PRO) "PRO" else "FREE",
-                        modifier = Modifier.padding(horizontal = spacing.x1, vertical = spacing.x0_5),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = semantic.primary
-                    )
-                }
-            }
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-
-        Surface(
-            shape = CircleShape,
-            color = semantic.backgroundSurface,
-            tonalElevation = AppTheme.elevation.md,
-            shadowElevation = AppTheme.elevation.md
-        ) {
-            IconButton(onClick = onOpenSettings, modifier = Modifier.size(spacing.x5)) {
-                Icon(Icons.Rounded.Settings, contentDescription = "Settings")
+                Text(if (canAdd) t("Create habit") else t("Upgrade to PRO"))
             }
         }
     }
@@ -1508,20 +1607,20 @@ private fun TaskControlsRow(
     ) {
         TaskControlButton(
             modifier = Modifier.weight(1f),
-            label = if (canAddTask) "New" else "PRO",
+            label = if (canAddTask) t("New") else "PRO",
             icon = if (canAddTask) Icons.Rounded.AddCircle else Icons.Rounded.WorkspacePremium,
             onClick = onCreate
         )
         TaskControlButton(
             modifier = Modifier.weight(1f),
-            label = "Edit",
+            label = t("Edit"),
             icon = Icons.Rounded.Edit,
             onClick = onEdit,
             enabled = canEditDelete
         )
         TaskControlButton(
             modifier = Modifier.weight(1f),
-            label = "Delete",
+            label = t("Delete"),
             icon = Icons.Rounded.Delete,
             onClick = onDelete,
             enabled = canEditDelete,
@@ -1613,51 +1712,90 @@ private fun HeroCard(
 ) {
     val spacing = AppTheme.spacing
     val radius = AppTheme.radius
+    val stroke = AppTheme.stroke
     val semantic = AppTheme.colors
-
-    val ctaColor by animateColorAsState(
-        targetValue = if (done) semantic.success else semantic.primary,
-        animationSpec = tween(durationMillis = 220),
-        label = "heroCtaColor"
-    )
+    val locale = appLocale()
+    val canMarkForSelectedDate = scheduled
 
     GlassCard(contentPadding = PaddingValues(spacing.x2)) {
-        Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+        Column(
+            modifier = Modifier.animateContentSize(
+                animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing)
+            ),
+            verticalArrangement = Arrangement.spacedBy(spacing.x1)
+        ) {
             Text(
                 text = task?.title.orEmpty(),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = selectedDate.format(DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ENGLISH)),
+                text = selectedDate.format(DateTimeFormatter.ofPattern(t("dd MMM yyyy"), locale)),
                 style = MaterialTheme.typography.bodySmall,
                 color = semantic.textSecondary
             )
             Text(
-                text = "Did you complete it today?",
+                text = t("Did you complete it on this date?"),
                 style = MaterialTheme.typography.headlineSmall
             )
-            Button(
-                onClick = onDone,
-                enabled = scheduled,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(spacing.x5 + spacing.x1),
-                shape = RoundedCornerShape(radius.lg),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = ctaColor,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    disabledContainerColor = semantic.backgroundSurfaceMuted,
-                    disabledContentColor = semantic.textSecondary
-                )
-            ) {
-                Text(
-                    text = if (!scheduled) "Not scheduled today" else if (done) "Completed today" else "Mark as done",
-                    style = MaterialTheme.typography.labelLarge
-                )
+            if (done && canMarkForSelectedDate) {
+                Button(
+                    onClick = onDone,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(spacing.x5 + spacing.x1),
+                    shape = RoundedCornerShape(radius.lg),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = semantic.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                ) {
+                    Text(
+                        text = t("Completed ✓"),
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
+            } else {
+                OutlinedButton(
+                    onClick = onDone,
+                    enabled = canMarkForSelectedDate,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(spacing.x5 + spacing.x1),
+                    shape = RoundedCornerShape(radius.lg),
+                    border = BorderStroke(
+                        stroke.thin * 1.5f,
+                        if (canMarkForSelectedDate) semantic.primary else semantic.borderSubtle
+                    ),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color.Transparent,
+                        contentColor = semantic.primary,
+                        disabledContentColor = semantic.textSecondary
+                    )
+                ) {
+                    Text(
+                        text = when {
+                            !canMarkForSelectedDate -> t("Not scheduled for this date")
+                            else -> t("Mark as done")
+                        },
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                }
             }
 
-            AnimatedVisibility(visible = done && scheduled) {
+            AnimatedVisibility(
+                visible = done && canMarkForSelectedDate,
+                enter = fadeIn(animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing)) +
+                    expandVertically(
+                        animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing),
+                        expandFrom = Alignment.Top
+                    ),
+                exit = fadeOut(animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing)) +
+                    shrinkVertically(
+                        animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
+                        shrinkTowards = Alignment.Top
+                    )
+            ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(spacing.x1)
@@ -1669,7 +1807,7 @@ private fun HeroCard(
                         modifier = Modifier.size(spacing.x2 + spacing.x0_5)
                     )
                     Text(
-                        "Great job, your streak is safe.",
+                        t("Great job, your streak is safe."),
                         style = MaterialTheme.typography.bodySmall,
                         color = semantic.textSecondary
                     )
@@ -1684,11 +1822,31 @@ private fun StatsRow(streak: Int, progress: Int, total: Int) {
     val spacing = AppTheme.spacing
     Row(
         horizontalArrangement = Arrangement.spacedBy(spacing.x1),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min)
     ) {
-        StatTile(modifier = Modifier.weight(1f), label = "Current streak", value = "${streak}d")
-        StatTile(modifier = Modifier.weight(1f), label = "30 day completion", value = "${progress}%")
-        StatTile(modifier = Modifier.weight(1f), label = "Total completions", value = "$total")
+        StatTile(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+            label = t("Current streak"),
+            value = "${streak}d"
+        )
+        StatTile(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+            label = t("30 day completion"),
+            value = "${progress}%"
+        )
+        StatTile(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+            label = t("Total completions"),
+            value = "$total"
+        )
     }
 }
 
@@ -1699,22 +1857,25 @@ private fun StatTile(modifier: Modifier = Modifier, label: String, value: String
     val semantic = AppTheme.colors
 
     Card(
-        modifier = modifier,
+        modifier = modifier.fillMaxHeight(),
         colors = CardDefaults.cardColors(containerColor = semantic.backgroundSurface),
         shape = RoundedCornerShape(radius.md),
         elevation = CardDefaults.cardElevation(defaultElevation = AppTheme.elevation.sm)
     ) {
         Column(
             modifier = Modifier
+                .fillMaxHeight()
                 .fillMaxWidth()
                 .padding(horizontal = spacing.x2, vertical = spacing.x2),
-            verticalArrangement = Arrangement.spacedBy(spacing.x1)
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
             Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text(
                 label,
                 style = MaterialTheme.typography.bodySmall,
-                color = semantic.textSecondary
+                color = semantic.textSecondary,
+                minLines = 2,
+                maxLines = 2
             )
         }
     }
@@ -1723,12 +1884,13 @@ private fun StatTile(modifier: Modifier = Modifier, label: String, value: String
 @Composable
 private fun SevenDayChart(points: List<Int>, anchorDate: LocalDate) {
     val spacing = AppTheme.spacing
+    val locale = appLocale()
     val safe = if (points.size == 7) points else List(7) { 0 }
     val today = LocalDate.now()
 
     GlassCard(contentPadding = PaddingValues(spacing.x2)) {
         Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
-            Text("7 day chart", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(t("7 day chart"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(spacing.x1)
@@ -1740,7 +1902,7 @@ private fun SevenDayChart(points: List<Int>, anchorDate: LocalDate) {
                         modifier = Modifier.weight(1f),
                         done = value == 1,
                         isToday = isToday,
-                        label = date.dayOfWeek.getDisplayName(TextStyle.SHORT, Locale.ENGLISH)
+                        label = date.dayOfWeek.getDisplayName(TextStyle.SHORT, locale)
                     )
                 }
             }
@@ -1797,6 +1959,8 @@ private fun CalendarCard(
     val spacing = AppTheme.spacing
     val radius = AppTheme.radius
     val semantic = AppTheme.colors
+    val language = LocalAppLanguage.current
+    val locale = appLocale()
 
     GlassCard(contentPadding = PaddingValues(spacing.x2)) {
         Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
@@ -1806,7 +1970,7 @@ private fun CalendarCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    month.format(DateTimeFormatter.ofPattern("LLLL yyyy", Locale.ENGLISH)),
+                    localizedMonthYear(month, language, locale),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = semantic.textPrimary
@@ -1825,10 +1989,10 @@ private fun CalendarCard(
                 modifier = Modifier.fillMaxWidth().height(spacing.x5),
                 shape = RoundedCornerShape(radius.md)
             ) {
-                Text("Today")
+                Text(t("Today"))
             }
 
-            val days = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+            val days = weekdayLabels(LocalAppLanguage.current)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(spacing.x1)
@@ -1950,45 +2114,97 @@ private fun SelectChip(title: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 private fun TaskEditorDialog(state: HabitUiState, onDismiss: () -> Unit, vm: MainViewModel) {
     val spacing = AppTheme.spacing
     val colors = AppTheme.colors
+    val stroke = AppTheme.stroke
     val context = LocalContext.current
+    val locale = appLocale()
     val selectedColor = parseColorHex(state.editorColorHex)
+    val pickerTheme = R.style.ThemeOverlay_MicroHabit_Picker
 
     val trackingOptions = listOf(
-        ChoiceOption(TrackingType.YES_NO, "Yes / No"),
-        ChoiceOption(TrackingType.COUNT, "Count"),
-        ChoiceOption(TrackingType.DURATION, "Duration")
+        ChoiceOption(TrackingType.YES_NO, t("Yes / No")),
+        ChoiceOption(TrackingType.COUNT, t("Count")),
+        ChoiceOption(TrackingType.DURATION, t("Duration"))
     )
     val frequencyOptions = listOf(
-        ChoiceOption(TaskFrequency.DAILY, "Every day"),
-        ChoiceOption(TaskFrequency.SELECTED_DAYS, "Selected weekdays"),
-        ChoiceOption(TaskFrequency.TIMES_PER_WEEK, "X / week")
+        ChoiceOption(TaskFrequency.DAILY, t("Every day")),
+        ChoiceOption(TaskFrequency.SELECTED_DAYS, t("Selected weekdays")),
+        ChoiceOption(TaskFrequency.TIMES_PER_WEEK, t("X / week"))
     )
     val palette = listOf("#1F6F64", "#3B7EA1", "#7B6BC9", "#3E8E5F", "#B36A3C", "#C65C74", "#5D6D7E")
 
-    AlertDialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        title = {
-            Text(
-                if (state.editingTaskId == null) "Create Habit" else "Edit Habit",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold
-            )
-        },
-        text = {
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
+    ) {
+        Scaffold(
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = {
+                        Text(
+                            if (state.editingTaskId == null) t("Create Habit") else t("Edit Habit"),
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onDismiss) {
+                            Icon(Icons.Rounded.Close, contentDescription = t("Close"))
+                        }
+                    },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = colors.backgroundSurface
+                    )
+                )
+            },
+            bottomBar = {
+                Surface(
+                    color = colors.backgroundSurface,
+                    tonalElevation = AppTheme.elevation.sm
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = spacing.x2, vertical = spacing.x1_5),
+                        verticalArrangement = Arrangement.spacedBy(spacing.x0_5)
+                    ) {
+                        if (!vm.canSaveEditor()) {
+                            Text(
+                                text = t("Fill required fields to continue."),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = colors.textSecondary
+                            )
+                        }
+                        Button(
+                            onClick = vm::saveEditor,
+                            enabled = vm.canSaveEditor(),
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(AppTheme.radius.md)
+                        ) {
+                            Text(if (state.editingTaskId == null) t("Save habit") else t("Save changes"))
+                        }
+                    }
+                }
+            }
+        ) { innerPadding ->
             Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(spacing.x1)
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(horizontal = spacing.x2, vertical = spacing.x1_5)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
             ) {
-                FormSection(title = "Basic setup") {
+                FormSection(title = t("Basic setup")) {
                     Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
                         OutlinedTextField(
                             value = state.editorTitle,
                             onValueChange = vm::setEditorTitle,
-                            label = { Text("Habit name") },
-                            placeholder = { Text("Morning meditation") },
+                            label = { Text(t("Habit name")) },
+                            placeholder = { Text(t("Morning meditation")) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true
                         )
@@ -2001,7 +2217,7 @@ private fun TaskEditorDialog(state: HabitUiState, onDismiss: () -> Unit, vm: Mai
                             OutlinedTextField(
                                 value = state.editorEmoji,
                                 onValueChange = vm::setEditorEmoji,
-                                label = { Text("Icon / emoji") },
+                                label = { Text(t("Icon / emoji")) },
                                 modifier = Modifier.weight(1f),
                                 singleLine = true
                             )
@@ -2021,7 +2237,7 @@ private fun TaskEditorDialog(state: HabitUiState, onDismiss: () -> Unit, vm: Mai
                     }
                 }
 
-                FormSection(title = "Color") {
+                FormSection(title = t("Color")) {
                     ColorSwatchPicker(
                         colorsHex = palette,
                         selectedHex = state.editorColorHex,
@@ -2029,7 +2245,7 @@ private fun TaskEditorDialog(state: HabitUiState, onDismiss: () -> Unit, vm: Mai
                     )
                 }
 
-                FormSection(title = "Tracking type") {
+                FormSection(title = t("Tracking type")) {
                     SingleSelectChips(
                         options = trackingOptions,
                         selected = state.editorTrackingType,
@@ -2037,7 +2253,7 @@ private fun TaskEditorDialog(state: HabitUiState, onDismiss: () -> Unit, vm: Mai
                     )
                 }
 
-                FormSection(title = "Frequency") {
+                FormSection(title = t("Frequency")) {
                     Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
                         SingleSelectChips(
                             options = frequencyOptions,
@@ -2052,7 +2268,7 @@ private fun TaskEditorDialog(state: HabitUiState, onDismiss: () -> Unit, vm: Mai
                             )
                             if (state.editorCustomDays.isEmpty()) {
                                 Text(
-                                    text = "Select at least one weekday.",
+                                    text = t("Select at least one weekday."),
                                     color = colors.danger,
                                     style = MaterialTheme.typography.bodySmall
                                 )
@@ -2061,7 +2277,7 @@ private fun TaskEditorDialog(state: HabitUiState, onDismiss: () -> Unit, vm: Mai
 
                         if (state.editorFrequency == TaskFrequency.TIMES_PER_WEEK) {
                             Stepper(
-                                label = "Times per week",
+                                label = t("Times per week"),
                                 value = state.editorTimesPerWeek,
                                 min = 1,
                                 max = 7,
@@ -2072,17 +2288,18 @@ private fun TaskEditorDialog(state: HabitUiState, onDismiss: () -> Unit, vm: Mai
                 }
 
                 TextButton(onClick = { vm.setEditorShowAdvanced(!state.editorShowAdvanced) }) {
-                    Text(if (state.editorShowAdvanced) "Hide advanced settings" else "Show advanced settings")
+                    Text(if (state.editorShowAdvanced) t("Hide advanced settings") else t("Show advanced settings"))
                 }
 
                 AnimatedVisibility(visible = state.editorShowAdvanced) {
                     Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
-                        FormSection(title = "Advanced settings") {
+                        FormSection(title = t("Advanced settings")) {
                             Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
-                                Button(
+                                OutlinedButton(
                                     onClick = {
                                         TimePickerDialog(
                                             context,
+                                            pickerTheme,
                                             { _, hour, minute -> vm.setEditorReminder(hour, minute) },
                                             state.editorReminderHour,
                                             state.editorReminderMinute,
@@ -2090,15 +2307,21 @@ private fun TaskEditorDialog(state: HabitUiState, onDismiss: () -> Unit, vm: Mai
                                         ).show()
                                     },
                                     modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(AppTheme.radius.md)
+                                    shape = RoundedCornerShape(AppTheme.radius.md),
+                                    border = BorderStroke(stroke.thin, colors.primary),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        containerColor = Color.Transparent,
+                                        contentColor = colors.primary
+                                    )
                                 ) {
-                                    Text("Reminder: ${formatTime(state.editorReminderHour, state.editorReminderMinute)}")
+                                    Text(tf("Reminder: %s", formatTime(state.editorReminderHour, state.editorReminderMinute)))
                                 }
 
-                                Button(
+                                OutlinedButton(
                                     onClick = {
                                         DatePickerDialog(
                                             context,
+                                            pickerTheme,
                                             { _, year, month, day ->
                                                 vm.setEditorStartDate(LocalDate.of(year, month + 1, day))
                                             },
@@ -2108,43 +2331,40 @@ private fun TaskEditorDialog(state: HabitUiState, onDismiss: () -> Unit, vm: Mai
                                         ).show()
                                     },
                                     modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(AppTheme.radius.md)
+                                    shape = RoundedCornerShape(AppTheme.radius.md),
+                                    border = BorderStroke(stroke.thin, colors.primary),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        containerColor = Color.Transparent,
+                                        contentColor = colors.primary
+                                    )
                                 ) {
                                     Text(
-                                        "Start date: ${
-                                            state.editorStartDate.format(
-                                                DateTimeFormatter.ofPattern("dd MMM yyyy", Locale.ENGLISH)
-                                            )
-                                        }"
+                                        tf(
+                                            "Start date: %s",
+                                            state.editorStartDate.format(DateTimeFormatter.ofPattern(t("dd MMM yyyy"), locale))
+                                        )
                                     )
                                 }
                             }
                         }
                     }
                 }
-
-                if (!vm.canSaveEditor()) {
-                    Text(
-                        text = "Fill required fields to continue.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = colors.textSecondary
-                    )
-                }
             }
-        },
-        confirmButton = {
-            Button(onClick = vm::saveEditor, enabled = vm.canSaveEditor()) {
-                Text(if (state.editingTaskId == null) "Save habit" else "Save changes")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
         }
-    )
+    }
 }
 
 private fun formatTime(hour: Int, minute: Int): String =
     String.format(Locale.ENGLISH, "%02d:%02d", hour, minute)
+
+private fun localizedMonthYear(month: YearMonth, language: AppLanguage, locale: Locale): String {
+    val raw = month.format(DateTimeFormatter.ofPattern(translate(language, "LLLL yyyy"), locale))
+    val shouldCapitalize = language == AppLanguage.RU || language == AppLanguage.UK || language == AppLanguage.CS
+    if (!shouldCapitalize || raw.isEmpty()) return raw
+    return raw.replaceFirstChar { first ->
+        if (first.isLowerCase()) first.titlecase(locale) else first.toString()
+    }
+}
 
 @Composable
 private fun GlassCard(

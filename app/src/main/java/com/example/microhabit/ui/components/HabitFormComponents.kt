@@ -3,15 +3,14 @@ package com.example.microhabit.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
@@ -27,6 +26,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
+import com.example.microhabit.i18n.LocalAppLanguage
+import com.example.microhabit.i18n.weekdayLabels
 import com.example.microhabit.ui.theme.AppTheme
 
 data class ChoiceOption<T>(
@@ -73,21 +74,32 @@ fun <T> SingleSelectChips(
     val colors = AppTheme.colors
     val radius = AppTheme.radius
 
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(spacing.x1),
-        modifier = Modifier.horizontalScroll(rememberScrollState())
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(spacing.x1)
     ) {
-        options.forEach { option ->
-            val isSelected = option.value == selected
-            Button(
-                onClick = { onSelect(option.value) },
-                shape = RoundedCornerShape(radius.md),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isSelected) colors.primary else colors.backgroundSurfaceMuted,
-                    contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else colors.textPrimary
-                )
+        options.chunked(2).forEach { rowOptions ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(spacing.x1)
             ) {
-                Text(option.label)
+                rowOptions.forEach { option ->
+                    val isSelected = option.value == selected
+                    Button(
+                        onClick = { onSelect(option.value) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(radius.md),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isSelected) colors.primary else colors.backgroundSurfaceMuted,
+                            contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else colors.textPrimary
+                        )
+                    ) {
+                        Text(option.label)
+                    }
+                }
+                if (rowOptions.size == 1) {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
             }
         }
     }
@@ -104,33 +116,44 @@ fun ColorSwatchPicker(
     val radius = AppTheme.radius
     val semantic = AppTheme.colors
 
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(spacing.x1),
-        modifier = Modifier.horizontalScroll(rememberScrollState())
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(spacing.x1)
     ) {
-        colorsHex.forEach { hex ->
-            val parsed = parseColorHex(hex)
-            val selected = hex.equals(selectedHex, ignoreCase = true)
-            Box(
-                modifier = Modifier
-                    .size(spacing.x4)
-                    .clip(RoundedCornerShape(radius.md))
-                    .background(parsed)
-                    .clickable { onSelect(hex) }
-                    .border(
-                        width = if (selected) stroke.medium else stroke.thin,
-                        color = if (selected) semantic.textPrimary else semantic.borderSubtle,
-                        shape = RoundedCornerShape(radius.md)
-                    ),
-                contentAlignment = Alignment.Center
+        colorsHex.chunked(6).forEach { rowColors ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(spacing.x1)
             ) {
-                if (selected) {
-                    Icon(
-                        imageVector = Icons.Rounded.Check,
-                        contentDescription = null,
-                        tint = if (parsed.luminance() > 0.5f) Color.Black else Color.White,
-                        modifier = Modifier.size(spacing.x2)
-                    )
+                rowColors.forEach { hex ->
+                    val parsed = parseColorHex(hex)
+                    val selected = hex.equals(selectedHex, ignoreCase = true)
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .size(spacing.x4)
+                            .clip(RoundedCornerShape(radius.md))
+                            .background(parsed)
+                            .clickable { onSelect(hex) }
+                            .border(
+                                width = if (selected) stroke.medium else stroke.thin,
+                                color = if (selected) semantic.textPrimary else semantic.borderSubtle,
+                                shape = RoundedCornerShape(radius.md)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (selected) {
+                            Icon(
+                                imageVector = Icons.Rounded.Check,
+                                contentDescription = null,
+                                tint = if (parsed.luminance() > 0.5f) Color.Black else Color.White,
+                                modifier = Modifier.size(spacing.x2)
+                            )
+                        }
+                    }
+                }
+                repeat(6 - rowColors.size) {
+                    Spacer(modifier = Modifier.weight(1f))
                 }
             }
         }
@@ -142,27 +165,38 @@ fun WeekdaySelector(
     selectedDays: Set<Int>,
     onToggle: (Int) -> Unit
 ) {
-    val labels = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+    val labels = weekdayLabels(LocalAppLanguage.current)
     val spacing = AppTheme.spacing
     val colors = AppTheme.colors
     val radius = AppTheme.radius
 
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(spacing.x1),
-        modifier = Modifier.horizontalScroll(rememberScrollState())
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(spacing.x1)
     ) {
-        labels.forEachIndexed { index, label ->
-            val day = index + 1
-            val selected = day in selectedDays
-            Button(
-                onClick = { onToggle(day) },
-                shape = RoundedCornerShape(radius.md),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (selected) colors.primary else colors.backgroundSurfaceMuted,
-                    contentColor = if (selected) MaterialTheme.colorScheme.onPrimary else colors.textPrimary
-                )
+        labels.withIndex().toList().chunked(4).forEach { rowEntries ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(spacing.x1)
             ) {
-                Text(label)
+                rowEntries.forEach { entry ->
+                    val day = entry.index + 1
+                    val selected = day in selectedDays
+                    Button(
+                        onClick = { onToggle(day) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(radius.md),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (selected) colors.primary else colors.backgroundSurfaceMuted,
+                            contentColor = if (selected) MaterialTheme.colorScheme.onPrimary else colors.textPrimary
+                        )
+                    ) {
+                        Text(entry.value)
+                    }
+                }
+                repeat(4 - rowEntries.size) {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
             }
         }
     }

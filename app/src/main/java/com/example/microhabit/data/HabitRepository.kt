@@ -8,6 +8,7 @@ import kotlin.math.ceil
 import java.io.File
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 import java.time.YearMonth
@@ -38,11 +39,13 @@ enum class AppThemeMode {
 
 enum class AppLanguage(val label: String) {
     EN("English"),
+    CS("Čeština"),
     DE("Deutsch"),
     FR("Français"),
     ES("Español"),
     IT("Italiano"),
-    RU("Russian")
+    RU("Russian"),
+    UK("Українська")
 }
 
 data class HabitTask(
@@ -96,9 +99,10 @@ class HabitRepository(private val context: Context) {
                     if (day in 1..7) custom += day
                 }
 
-                val startDate = runCatching {
-                    LocalDate.parse(obj.optString("startDate", LocalDate.now().format(formatter)), formatter)
-                }.getOrDefault(LocalDate.now())
+                val startDate = parseTaskStartDate(
+                    taskId = id,
+                    rawValue = obj.optString("startDate", "")
+                )
 
                 HabitTask(
                     id = id,
@@ -207,6 +211,11 @@ class HabitRepository(private val context: Context) {
         if (selectedId == taskId && archived) {
             val nextActive = updated.firstOrNull { !it.isArchived }?.id
             setSelectedTask(nextActive)
+        } else if (!archived) {
+            val hasSelectedActive = updated.any { it.id == selectedId && !it.isArchived }
+            if (!hasSelectedActive) {
+                setSelectedTask(taskId)
+            }
         }
     }
 
@@ -308,6 +317,10 @@ class HabitRepository(private val context: Context) {
 
     fun isScheduledOn(task: HabitTask, date: LocalDate): Boolean {
         if (date.isBefore(task.startDate)) return false
+        return isScheduledByFrequency(task, date)
+    }
+
+    fun isScheduledByFrequency(task: HabitTask, date: LocalDate): Boolean {
         return when (task.frequency) {
             TaskFrequency.DAILY -> true
             TaskFrequency.SELECTED_DAYS -> date.dayOfWeek.value in task.customDays
@@ -326,6 +339,13 @@ class HabitRepository(private val context: Context) {
         } else {
             prefs.edit().remove(key).apply()
         }
+    }
+
+    fun updateTaskStartDate(taskId: String, startDate: LocalDate) {
+        val updated = getTasks().map { task ->
+            if (task.id == taskId) task.copy(startDate = startDate) else task
+        }
+        saveTasks(updated)
     }
 
     fun calculateStreak(task: HabitTask, fromDate: LocalDate = LocalDate.now()): Int {
@@ -417,15 +437,6 @@ class HabitRepository(private val context: Context) {
         return (completed * 100 / scheduled)
     }
 
-    // Uses the habit pattern only; does not clamp by start date.
-    private fun isScheduledByFrequency(task: HabitTask, date: LocalDate): Boolean {
-        return when (task.frequency) {
-            TaskFrequency.DAILY -> true
-            TaskFrequency.SELECTED_DAYS -> date.dayOfWeek.value in task.customDays
-            TaskFrequency.TIMES_PER_WEEK -> true
-        }
-    }
-
     fun bestStreak(task: HabitTask, upToDate: LocalDate = LocalDate.now()): Int {
         if (task.frequency == TaskFrequency.TIMES_PER_WEEK) {
              // Simplified for times per week: just return current if we don't have historical best logic yet
@@ -511,6 +522,31 @@ class HabitRepository(private val context: Context) {
 
     fun refreshWidget() {
         HabitWidgetProvider.refreshAll(context)
+    }
+
+    private fun parseTaskStartDate(taskId: String, rawValue: String): LocalDate {
+        val normalized = rawValue.trim()
+        if (normalized.isNotEmpty()) {
+            parseLocalDateLenient(normalized)?.let { return it }
+        }
+        return earliestCompletionDate(taskId) ?: LocalDate.now().minusYears(5)
+    }
+
+    private fun parseLocalDateLenient(rawValue: String): LocalDate? {
+        return runCatching { LocalDate.parse(rawValue, formatter) }.getOrNull()
+            ?: runCatching { LocalDate.parse(rawValue) }.getOrNull()
+            ?: runCatching { LocalDateTime.parse(rawValue).toLocalDate() }.getOrNull()
+            ?: runCatching { OffsetDateTime.parse(rawValue).toLocalDate() }.getOrNull()
+    }
+
+    private fun earliestCompletionDate(taskId: String): LocalDate? {
+        val prefix = "done_${taskId}_"
+        return prefs.all.keys.asSequence()
+            .filter { key -> key.startsWith(prefix) }
+            .mapNotNull { key ->
+                runCatching { LocalDate.parse(key.removePrefix(prefix), formatter) }.getOrNull()
+            }
+            .minOrNull()
     }
 
     private fun saveTasks(tasks: List<HabitTask>) {

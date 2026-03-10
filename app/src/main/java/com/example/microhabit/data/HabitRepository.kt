@@ -5,7 +5,9 @@ import com.example.microhabit.widget.HabitWidgetProvider
 import org.json.JSONArray
 import org.json.JSONObject
 import kotlin.math.ceil
+import java.io.File
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 import java.time.YearMonth
@@ -240,6 +242,69 @@ class HabitRepository(private val context: Context) {
         prefs.edit().putString(KEY_LANGUAGE, language.name).apply()
     }
 
+    fun getNotificationsEnabled(): Boolean {
+        return prefs.getBoolean(KEY_NOTIFICATIONS_ENABLED, true)
+    }
+
+    fun setNotificationsEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_NOTIFICATIONS_ENABLED, enabled).apply()
+    }
+
+    fun getDefaultReminderHour(): Int {
+        return prefs.getInt(KEY_DEFAULT_REMINDER_HOUR, 8).coerceIn(0, 23)
+    }
+
+    fun getDefaultReminderMinute(): Int {
+        return prefs.getInt(KEY_DEFAULT_REMINDER_MINUTE, 0).coerceIn(0, 59)
+    }
+
+    fun setDefaultReminder(hour: Int, minute: Int) {
+        prefs.edit()
+            .putInt(KEY_DEFAULT_REMINDER_HOUR, hour.coerceIn(0, 23))
+            .putInt(KEY_DEFAULT_REMINDER_MINUTE, minute.coerceIn(0, 59))
+            .apply()
+    }
+
+    fun exportData(): Result<String> = runCatching {
+        val tasksArray = runCatching {
+            JSONArray(prefs.getString(KEY_TASKS_JSON, "[]") ?: "[]")
+        }.getOrDefault(JSONArray())
+
+        val progress = JSONObject()
+        prefs.all
+            .filterKeys { it.startsWith("done_") }
+            .forEach { (key, value) ->
+                progress.put(key, value as? Boolean ?: false)
+            }
+
+        val payload = JSONObject()
+            .put("exportedAt", LocalDateTime.now().toString())
+            .put("plan", getPlan().name)
+            .put("themeMode", getThemeMode().name)
+            .put("language", getLanguage().name)
+            .put("notificationsEnabled", getNotificationsEnabled())
+            .put("defaultReminderHour", getDefaultReminderHour())
+            .put("defaultReminderMinute", getDefaultReminderMinute())
+            .put("selectedTaskId", getSelectedTaskId())
+            .put("tasks", tasksArray)
+            .put("progress", progress)
+
+        val file = File(context.filesDir, "micro_habit_export_${System.currentTimeMillis()}.json")
+        file.writeText(payload.toString(2))
+        file.absolutePath
+    }
+
+    fun resetProgress() {
+        val doneKeys = prefs.all.keys.filter { it.startsWith("done_") }
+        val editor = prefs.edit()
+        doneKeys.forEach { editor.remove(it) }
+        editor.apply()
+    }
+
+    fun deleteAccount() {
+        prefs.edit().clear().apply()
+    }
+
     fun isScheduledOn(task: HabitTask, date: LocalDate): Boolean {
         if (date.isBefore(task.startDate)) return false
         return when (task.frequency) {
@@ -466,5 +531,8 @@ class HabitRepository(private val context: Context) {
         private const val KEY_PLAN = "user_plan"
         private const val KEY_THEME_MODE = "theme_mode"
         private const val KEY_LANGUAGE = "app_language"
+        private const val KEY_NOTIFICATIONS_ENABLED = "notifications_enabled"
+        private const val KEY_DEFAULT_REMINDER_HOUR = "default_reminder_hour"
+        private const val KEY_DEFAULT_REMINDER_MINUTE = "default_reminder_minute"
     }
 }

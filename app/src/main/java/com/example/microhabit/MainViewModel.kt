@@ -68,7 +68,10 @@ data class HabitUiState(
     val editorShowAdvanced: Boolean = false,
     val plan: SubscriptionPlan = SubscriptionPlan.FREE,
     val themeMode: AppThemeMode = AppThemeMode.SYSTEM,
-    val language: AppLanguage = AppLanguage.RU
+    val language: AppLanguage = AppLanguage.RU,
+    val notificationsEnabled: Boolean = true,
+    val defaultReminderHour: Int = 8,
+    val defaultReminderMinute: Int = 0
 )
 
 class MainViewModel(private val repository: HabitRepository) : ViewModel() {
@@ -127,6 +130,43 @@ class MainViewModel(private val repository: HabitRepository) : ViewModel() {
         }
     }
 
+    fun setNotificationsEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            repository.setNotificationsEnabled(enabled)
+            _state.update { it.copy(notificationsEnabled = enabled) }
+        }
+    }
+
+    fun setDefaultReminder(hour: Int, minute: Int) {
+        viewModelScope.launch {
+            repository.setDefaultReminder(hour, minute)
+            _state.update {
+                it.copy(
+                    defaultReminderHour = hour.coerceIn(0, 23),
+                    defaultReminderMinute = minute.coerceIn(0, 59)
+                )
+            }
+        }
+    }
+
+    fun exportData(): Result<String> = repository.exportData()
+
+    fun resetProgress() {
+        viewModelScope.launch {
+            repository.resetProgress()
+            repository.refreshWidget()
+            refresh()
+        }
+    }
+
+    fun deleteAccount() {
+        viewModelScope.launch {
+            repository.deleteAccount()
+            repository.refreshWidget()
+            refresh()
+        }
+    }
+
     fun toggleSelectedDateDone() {
         val current = _state.value
         val task = current.tasks.firstOrNull { it.id == current.selectedTaskId } ?: return
@@ -141,6 +181,8 @@ class MainViewModel(private val repository: HabitRepository) : ViewModel() {
     }
 
     fun openCreateTask() {
+        val reminderHour = _state.value.defaultReminderHour
+        val reminderMinute = _state.value.defaultReminderMinute
         _state.update {
             it.copy(
                 showEditor = true,
@@ -152,8 +194,8 @@ class MainViewModel(private val repository: HabitRepository) : ViewModel() {
                 editorFrequency = TaskFrequency.DAILY,
                 editorTimesPerWeek = 3,
                 editorCustomDays = setOf(1, 2, 3, 4, 5),
-                editorReminderHour = 8,
-                editorReminderMinute = 0,
+                editorReminderHour = reminderHour,
+                editorReminderMinute = reminderMinute,
                 editorStartDate = LocalDate.now(),
                 editorShowAdvanced = false
             )
@@ -328,6 +370,9 @@ class MainViewModel(private val repository: HabitRepository) : ViewModel() {
             val plan = repository.getPlan()
             val themeMode = repository.getThemeMode()
             val language = repository.getLanguage()
+            val notificationsEnabled = repository.getNotificationsEnabled()
+            val defaultReminderHour = repository.getDefaultReminderHour()
+            val defaultReminderMinute = repository.getDefaultReminderMinute()
 
             var selectedId = repository.getSelectedTaskId()
             if (selectedId == null || tasks.none { it.id == selectedId }) {
@@ -377,7 +422,10 @@ class MainViewModel(private val repository: HabitRepository) : ViewModel() {
                     } ?: emptySet(),
                     plan = plan,
                     themeMode = themeMode,
-                    language = language
+                    language = language,
+                    notificationsEnabled = notificationsEnabled,
+                    defaultReminderHour = defaultReminderHour,
+                    defaultReminderMinute = defaultReminderMinute
                 )
             }
         }

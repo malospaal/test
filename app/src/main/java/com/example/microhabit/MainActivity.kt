@@ -3,6 +3,7 @@ package com.example.microhabit
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -33,6 +34,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.AddCircle
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Home
@@ -88,15 +90,23 @@ import com.example.microhabit.ui.components.ChoiceOption
 import com.example.microhabit.ui.components.CalendarDay
 import com.example.microhabit.ui.components.CalendarDayState
 import com.example.microhabit.ui.components.ColorSwatchPicker
+import com.example.microhabit.ui.components.FeatureBulletRow
 import com.example.microhabit.ui.components.FormSection
 import com.example.microhabit.ui.components.HorizontalPercentBars
 import com.example.microhabit.ui.components.HabitCard
 import com.example.microhabit.ui.components.HabitCardModel
 import com.example.microhabit.ui.components.AnalyticsMetricTile
+import com.example.microhabit.ui.components.PlanComparisonRow
+import com.example.microhabit.ui.components.PricingCardModel
+import com.example.microhabit.ui.components.PricingPlanCard
 import com.example.microhabit.ui.components.SingleSelectChips
 import com.example.microhabit.ui.components.Stepper
 import com.example.microhabit.ui.components.VerticalPercentBars
 import com.example.microhabit.ui.components.WeekdaySelector
+import com.example.microhabit.ui.components.SettingsDivider
+import com.example.microhabit.ui.components.SettingsGroup
+import com.example.microhabit.ui.components.SettingsRow
+import com.example.microhabit.ui.components.SettingsSwitchRow
 import com.example.microhabit.ui.components.parseColorHex
 import com.example.microhabit.ui.theme.AppTheme
 import com.example.microhabit.ui.theme.MicroHabitTheme
@@ -112,8 +122,14 @@ private enum class AppPage(val title: String) {
     HABITS("Habits"),
     ANALYTICS("Analytics"),
     CALENDAR("Calendar"),
+    PAYWALL("Premium"),
     ACCOUNT("Аккаунт"),
     SETTINGS("Настройки")
+}
+
+private enum class BillingCycle {
+    MONTHLY,
+    YEARLY
 }
 
 class MainActivity : ComponentActivity() {
@@ -140,7 +156,10 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
     var page by rememberSaveable { mutableStateOf(AppPage.TRACKER) }
+    var previousPage by rememberSaveable { mutableStateOf(AppPage.TRACKER) }
+    var selectedBilling by rememberSaveable { mutableStateOf(BillingCycle.YEARLY) }
     val semantic = AppTheme.colors
+    val context = LocalContext.current
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -149,6 +168,7 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                 current = page,
                 plan = state.plan,
                 onNavigate = {
+                    if (it != AppPage.PAYWALL) previousPage = it
                     page = it
                     scope.launch { drawerState.close() }
                 }
@@ -160,14 +180,23 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                 CenterAlignedTopAppBar(
                     title = { Text(page.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) },
                     navigationIcon = {
-                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                            Icon(Icons.Rounded.Menu, contentDescription = "Menu")
+                        if (page != AppPage.PAYWALL) {
+                            IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                                Icon(Icons.Rounded.Menu, contentDescription = "Menu")
+                            }
                         }
                     },
                     actions = {
                         if (page == AppPage.HABITS) {
                             val canAdd = state.plan == SubscriptionPlan.PRO || state.tasks.size < 1
-                            TextButton(onClick = { if (canAdd) vm.openCreateTask() else page = AppPage.ACCOUNT }) {
+                            TextButton(onClick = {
+                                if (canAdd) {
+                                    vm.openCreateTask()
+                                } else {
+                                    previousPage = page
+                                    page = AppPage.PAYWALL
+                                }
+                            }) {
                                 Text(if (canAdd) "Add" else "Upgrade")
                             }
                         }
@@ -188,7 +217,10 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                     AppPage.TRACKER -> TrackerPage(
                         state = state,
                         vm = vm,
-                        onUpgrade = { page = AppPage.ACCOUNT },
+                        onUpgrade = {
+                            previousPage = AppPage.TRACKER
+                            page = AppPage.PAYWALL
+                        },
                         onOpenSettings = { page = AppPage.SETTINGS }
                     )
                     AppPage.HABITS -> HabitsPage(
@@ -197,12 +229,57 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                         onOpenHabit = {
                             page = AppPage.TRACKER
                         },
-                        onUpgrade = { page = AppPage.ACCOUNT }
+                        onUpgrade = {
+                            previousPage = AppPage.HABITS
+                            page = AppPage.PAYWALL
+                        }
                     )
                     AppPage.ANALYTICS -> AnalyticsPage(state = state)
                     AppPage.CALENDAR -> CalendarScreen(state = state, vm = vm)
-                    AppPage.ACCOUNT -> AccountPage(state = state, onSetPlan = vm::setPlan)
-                    AppPage.SETTINGS -> SettingsPage(state = state, onSetTheme = vm::setThemeMode, onSetLanguage = vm::setLanguage)
+                    AppPage.PAYWALL -> PaywallPage(
+                        currentPlan = state.plan,
+                        selectedBilling = selectedBilling,
+                        onSelectBilling = { selectedBilling = it },
+                        onSubscribe = {
+                            vm.setPlan(SubscriptionPlan.PRO)
+                            Toast.makeText(
+                                context,
+                                if (selectedBilling == BillingCycle.YEARLY) {
+                                    "PRO yearly activated (debug)"
+                                } else {
+                                    "PRO monthly activated (debug)"
+                                },
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        },
+                        onRestorePurchase = {
+                            vm.setPlan(SubscriptionPlan.PRO)
+                            Toast.makeText(context, "Purchases restored (debug)", Toast.LENGTH_SHORT).show()
+                        },
+                        onClose = { page = previousPage }
+                    )
+                    AppPage.ACCOUNT -> AccountPage(
+                        state = state,
+                        onSetPlan = vm::setPlan,
+                        onOpenPaywall = {
+                            previousPage = AppPage.ACCOUNT
+                            page = AppPage.PAYWALL
+                        }
+                    )
+                    AppPage.SETTINGS -> SettingsPage(
+                        state = state,
+                        onSetTheme = vm::setThemeMode,
+                        onSetLanguage = vm::setLanguage,
+                        onSetNotificationsEnabled = vm::setNotificationsEnabled,
+                        onSetDefaultReminder = vm::setDefaultReminder,
+                        onOpenPaywall = {
+                            previousPage = AppPage.SETTINGS
+                            page = AppPage.PAYWALL
+                        },
+                        onExportData = vm::exportData,
+                        onResetProgress = vm::resetProgress,
+                        onDeleteAccount = vm::deleteAccount
+                    )
                 }
             }
         }
@@ -256,6 +333,13 @@ private fun DrawerContent(current: AppPage, plan: SubscriptionPlan, onNavigate: 
                 selected = current == AppPage.CALENDAR,
                 onClick = { onNavigate(AppPage.CALENDAR) },
                 icon = { Icon(Icons.Rounded.Home, contentDescription = null) },
+                colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = colors.primary.copy(alpha = 0.15f))
+            )
+            NavigationDrawerItem(
+                label = { Text("Premium") },
+                selected = current == AppPage.PAYWALL,
+                onClick = { onNavigate(AppPage.PAYWALL) },
+                icon = { Icon(Icons.Rounded.WorkspacePremium, contentDescription = null) },
                 colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = colors.primary.copy(alpha = 0.15f))
             )
             NavigationDrawerItem(
@@ -762,7 +846,11 @@ private fun statusLabel(state: CalendarDayState): String {
 }
 
 @Composable
-private fun AccountPage(state: HabitUiState, onSetPlan: (SubscriptionPlan) -> Unit) {
+private fun AccountPage(
+    state: HabitUiState,
+    onSetPlan: (SubscriptionPlan) -> Unit,
+    onOpenPaywall: () -> Unit
+) {
     val spacing = AppTheme.spacing
     val semantic = AppTheme.colors
     LazyColumn(
@@ -772,9 +860,20 @@ private fun AccountPage(state: HabitUiState, onSetPlan: (SubscriptionPlan) -> Un
     ) {
         item {
             GlassCard {
-                Text("Планы", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text("Account", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(spacing.x1))
-                Text("Выбирай план: Free или PRO (debug-переключение)", color = semantic.textSecondary)
+                Text(
+                    text = if (state.plan == SubscriptionPlan.PRO) {
+                        "You are on PRO. Manage options in Premium."
+                    } else {
+                        "You are on Free. Upgrade to unlock unlimited habits."
+                    },
+                    color = semantic.textSecondary
+                )
+                Spacer(Modifier.height(spacing.x1))
+                Button(onClick = onOpenPaywall, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (state.plan == SubscriptionPlan.PRO) "Open Premium" else "Upgrade to Premium")
+                }
             }
         }
         item {
@@ -802,9 +901,272 @@ private fun AccountPage(state: HabitUiState, onSetPlan: (SubscriptionPlan) -> Un
 private fun SettingsPage(
     state: HabitUiState,
     onSetTheme: (AppThemeMode) -> Unit,
-    onSetLanguage: (AppLanguage) -> Unit
+    onSetLanguage: (AppLanguage) -> Unit,
+    onSetNotificationsEnabled: (Boolean) -> Unit,
+    onSetDefaultReminder: (Int, Int) -> Unit,
+    onOpenPaywall: () -> Unit,
+    onExportData: () -> Result<String>,
+    onResetProgress: () -> Unit,
+    onDeleteAccount: () -> Unit
 ) {
     val spacing = AppTheme.spacing
+    val context = LocalContext.current
+    var showThemeDialog by rememberSaveable { mutableStateOf(false) }
+    var showLanguageDialog by rememberSaveable { mutableStateOf(false) }
+    var showResetConfirm by rememberSaveable { mutableStateOf(false) }
+    var showDeleteConfirm by rememberSaveable { mutableStateOf(false) }
+    val selectedHabit = state.tasks.firstOrNull { it.id == state.selectedTaskId }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(spacing.x2),
+        verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
+    ) {
+        item {
+            SettingsGroup(
+                title = "Account",
+                subtitle = "Profile and app usage overview."
+            ) {
+                SettingsRow(
+                    title = "Current plan",
+                    subtitle = if (state.plan == SubscriptionPlan.PRO) "Unlimited habits" else "One active habit",
+                    value = if (state.plan == SubscriptionPlan.PRO) "PRO" else "FREE",
+                    onClick = onOpenPaywall
+                )
+                SettingsDivider()
+                SettingsRow(
+                    title = "Active habits",
+                    subtitle = "Non-archived habits",
+                    value = state.tasks.size.toString()
+                )
+                SettingsDivider()
+                SettingsRow(
+                    title = "Current habit",
+                    subtitle = "Selected for tracking today",
+                    value = selectedHabit?.title ?: "Not selected"
+                )
+            }
+        }
+
+        item {
+            SettingsGroup(
+                title = "Appearance",
+                subtitle = "Visual style of the app."
+            ) {
+                SettingsRow(
+                    title = "Theme",
+                    subtitle = "System, light or dark mode",
+                    value = themeLabel(state.themeMode),
+                    onClick = { showThemeDialog = true }
+                )
+            }
+        }
+
+        item {
+            SettingsGroup(
+                title = "Language",
+                subtitle = "App interface language."
+            ) {
+                SettingsRow(
+                    title = "Language",
+                    subtitle = "Choose your preferred locale",
+                    value = state.language.label,
+                    onClick = { showLanguageDialog = true }
+                )
+            }
+        }
+
+        item {
+            SettingsGroup(
+                title = "Notifications",
+                subtitle = "Daily reminders and nudges."
+            ) {
+                SettingsSwitchRow(
+                    title = "Reminders",
+                    subtitle = "Enable habit reminder notifications",
+                    checked = state.notificationsEnabled,
+                    onCheckedChange = onSetNotificationsEnabled
+                )
+                SettingsDivider()
+                SettingsRow(
+                    title = "Reminder time",
+                    subtitle = "Daily notification time",
+                    value = formatTime(state.defaultReminderHour, state.defaultReminderMinute),
+                    enabled = state.notificationsEnabled,
+                    onClick = {
+                        TimePickerDialog(
+                            context,
+                            { _, hour, minute -> onSetDefaultReminder(hour, minute) },
+                            state.defaultReminderHour,
+                            state.defaultReminderMinute,
+                            true
+                        ).show()
+                    }
+                )
+            }
+        }
+
+        item {
+            SettingsGroup(
+                title = "Subscription",
+                subtitle = "Manage Free and PRO plans."
+            ) {
+                SettingsRow(
+                    title = "Manage subscription",
+                    subtitle = if (state.plan == SubscriptionPlan.PRO) {
+                        "PRO active: unlimited habits"
+                    } else {
+                        "Free plan: one active habit"
+                    },
+                    value = if (state.plan == SubscriptionPlan.PRO) "PRO" else "FREE",
+                    onClick = onOpenPaywall
+                )
+            }
+        }
+
+        item {
+            SettingsGroup(
+                title = "Data & Privacy",
+                subtitle = "Control your data and account lifecycle."
+            ) {
+                SettingsRow(
+                    title = "Export data",
+                    subtitle = "Save tasks and progress as JSON",
+                    onClick = {
+                        val result = onExportData()
+                        val message = result.fold(
+                            onSuccess = { "Data exported: $it" },
+                            onFailure = { "Export failed: ${it.message ?: "Unknown error"}" }
+                        )
+                        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                    }
+                )
+                SettingsDivider()
+                SettingsRow(
+                    title = "Reset progress",
+                    subtitle = "Clear completion history, keep habits",
+                    onClick = { showResetConfirm = true }
+                )
+                SettingsDivider()
+                SettingsRow(
+                    title = "Delete account",
+                    subtitle = "Remove all habits and settings",
+                    destructive = true,
+                    onClick = { showDeleteConfirm = true }
+                )
+            }
+        }
+
+        item {
+            SettingsGroup(
+                title = "Support",
+                subtitle = "Get help and send feedback."
+            ) {
+                SettingsRow(
+                    title = "Help center",
+                    subtitle = "Quick guidance for app features",
+                    onClick = {
+                        Toast.makeText(context, "Help center is not available in debug build.", Toast.LENGTH_SHORT).show()
+                    }
+                )
+                SettingsDivider()
+                SettingsRow(
+                    title = "Contact support",
+                    subtitle = "Send us your feedback",
+                    onClick = {
+                        Toast.makeText(context, "Support contact will be connected in the next build.", Toast.LENGTH_SHORT).show()
+                    }
+                )
+            }
+        }
+    }
+
+    if (showThemeDialog) {
+        SelectionDialog(
+            title = "Select theme",
+            options = listOf(
+                AppThemeMode.SYSTEM to "System",
+                AppThemeMode.LIGHT to "Light",
+                AppThemeMode.DARK to "Dark"
+            ),
+            selected = state.themeMode,
+            onDismiss = { showThemeDialog = false },
+            onSelect = onSetTheme
+        )
+    }
+
+    if (showLanguageDialog) {
+        SelectionDialog(
+            title = "Select language",
+            options = AppLanguage.entries.map { it to it.label },
+            selected = state.language,
+            onDismiss = { showLanguageDialog = false },
+            onSelect = onSetLanguage
+        )
+    }
+
+    if (showResetConfirm) {
+        AlertDialog(
+            onDismissRequest = { showResetConfirm = false },
+            title = { Text("Reset progress?") },
+            text = { Text("This will remove all completion history and keep your habits.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showResetConfirm = false
+                        onResetProgress()
+                        Toast.makeText(context, "Progress reset.", Toast.LENGTH_SHORT).show()
+                    }
+                ) {
+                    Text("Reset")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetConfirm = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete account?") },
+            text = { Text("This action removes all habits, progress and settings.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteConfirm = false
+                        onDeleteAccount()
+                        Toast.makeText(context, "Account data deleted.", Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun PaywallPage(
+    currentPlan: SubscriptionPlan,
+    selectedBilling: BillingCycle,
+    onSelectBilling: (BillingCycle) -> Unit,
+    onSubscribe: () -> Unit,
+    onRestorePurchase: () -> Unit,
+    onClose: () -> Unit
+) {
+    val spacing = AppTheme.spacing
+    val colors = AppTheme.colors
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(spacing.x2),
@@ -812,34 +1174,239 @@ private fun SettingsPage(
     ) {
         item {
             GlassCard {
-                Text("Тема", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(spacing.x1))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(spacing.x1),
-                    modifier = Modifier.horizontalScroll(rememberScrollState())
-                ) {
-                    SelectChip("Система", state.themeMode == AppThemeMode.SYSTEM) { onSetTheme(AppThemeMode.SYSTEM) }
-                    SelectChip("Светлая", state.themeMode == AppThemeMode.LIGHT) { onSetTheme(AppThemeMode.LIGHT) }
-                    SelectChip("Темная", state.themeMode == AppThemeMode.DARK) { onSetTheme(AppThemeMode.DARK) }
+                Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Column(verticalArrangement = Arrangement.spacedBy(spacing.x0_5)) {
+                            Text(
+                                text = "Premium",
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = colors.textPrimary
+                            )
+                            Text(
+                                text = "Calm focus for consistent habit building.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = colors.textSecondary
+                            )
+                        }
+                        IconButton(onClick = onClose) {
+                            Icon(Icons.Rounded.Close, contentDescription = "Close paywall")
+                        }
+                    }
+
+                    Surface(
+                        color = colors.primaryMuted,
+                        shape = RoundedCornerShape(AppTheme.radius.md)
+                    ) {
+                        Text(
+                            text = if (currentPlan == SubscriptionPlan.PRO) {
+                                "You already have Premium access."
+                            } else {
+                                "Unlock unlimited habits and deeper insights."
+                            },
+                            modifier = Modifier.padding(horizontal = spacing.x1_5, vertical = spacing.x1),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.textPrimary
+                        )
+                    }
                 }
             }
         }
 
         item {
             GlassCard {
-                Text("Язык", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(spacing.x1))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(spacing.x1),
-                    modifier = Modifier.horizontalScroll(rememberScrollState())
-                ) {
-                    AppLanguage.entries.forEach { lang ->
-                        SelectChip(lang.label, state.language == lang) { onSetLanguage(lang) }
+                Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+                    Text(
+                        text = "Included with Premium",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    FeatureBulletRow("Unlimited active habits")
+                    FeatureBulletRow("Advanced analytics and consistency views")
+                    FeatureBulletRow("Priority support and early access updates")
+                    FeatureBulletRow("Future cross-device sync support")
+                }
+            }
+        }
+
+        item {
+            GlassCard {
+                Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+                    Text(
+                        text = "Plan comparison",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+                    ) {
+                        Text(
+                            text = "Feature",
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = colors.textSecondary
+                        )
+                        Text(
+                            text = "Free",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = colors.textSecondary
+                        )
+                        Text(
+                            text = "Premium",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = colors.textSecondary
+                        )
                     }
+                    PlanComparisonRow(
+                        feature = "Active habits",
+                        freeIncluded = true,
+                        premiumIncluded = true
+                    )
+                    PlanComparisonRow(
+                        feature = "More than one habit",
+                        freeIncluded = false,
+                        premiumIncluded = true
+                    )
+                    PlanComparisonRow(
+                        feature = "Advanced analytics",
+                        freeIncluded = false,
+                        premiumIncluded = true
+                    )
+                    PlanComparisonRow(
+                        feature = "Priority support",
+                        freeIncluded = false,
+                        premiumIncluded = true
+                    )
+                }
+            }
+        }
+
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+                PricingPlanCard(
+                    model = PricingCardModel(
+                        title = "Monthly",
+                        priceLabel = "\$4.99 / month",
+                        subtitle = "Flexible monthly billing"
+                    ),
+                    selected = selectedBilling == BillingCycle.MONTHLY,
+                    onClick = { onSelectBilling(BillingCycle.MONTHLY) }
+                )
+                PricingPlanCard(
+                    model = PricingCardModel(
+                        title = "Yearly",
+                        priceLabel = "\$39.99 / year",
+                        subtitle = "Equivalent to \$3.33 / month",
+                        badge = "Recommended"
+                    ),
+                    selected = selectedBilling == BillingCycle.YEARLY,
+                    onClick = { onSelectBilling(BillingCycle.YEARLY) }
+                )
+            }
+        }
+
+        item {
+            GlassCard {
+                Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+                    Button(
+                        onClick = onSubscribe,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = currentPlan != SubscriptionPlan.PRO
+                    ) {
+                        Text(
+                            if (currentPlan == SubscriptionPlan.PRO) {
+                                "Premium active"
+                            } else {
+                                "Continue with ${if (selectedBilling == BillingCycle.YEARLY) "Yearly" else "Monthly"}"
+                            }
+                        )
+                    }
+                    TextButton(
+                        onClick = onRestorePurchase,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Restore purchase")
+                    }
+                    Text(
+                        text = "Billing integration is shown in debug mode for now.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.textTertiary
+                    )
                 }
             }
         }
     }
+}
+
+private fun themeLabel(mode: AppThemeMode): String {
+    return when (mode) {
+        AppThemeMode.SYSTEM -> "System"
+        AppThemeMode.LIGHT -> "Light"
+        AppThemeMode.DARK -> "Dark"
+    }
+}
+
+@Composable
+private fun <T> SelectionDialog(
+    title: String,
+    options: List<Pair<T, String>>,
+    selected: T,
+    onDismiss: () -> Unit,
+    onSelect: (T) -> Unit
+) {
+    val spacing = AppTheme.spacing
+    val colors = AppTheme.colors
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(spacing.x0_5)) {
+                options.forEach { option ->
+                    val isSelected = option.first == selected
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(AppTheme.radius.md))
+                            .clickable {
+                                onSelect(option.first)
+                                onDismiss()
+                            },
+                        color = if (isSelected) colors.primaryMuted else colors.backgroundSurfaceMuted
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = spacing.x1_5, vertical = spacing.x1),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = option.second,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = colors.textPrimary
+                            )
+                            Text(
+                                text = if (isSelected) "Selected" else "",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = colors.primary
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close")
+            }
+        }
+    )
 }
 
 @Composable

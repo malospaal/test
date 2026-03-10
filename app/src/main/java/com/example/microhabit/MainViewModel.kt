@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.microhabit.data.AppLanguage
 import com.example.microhabit.data.AppThemeMode
 import com.example.microhabit.data.HabitCategory
+import com.example.microhabit.data.MAX_HABIT_TITLE_LENGTH
 import com.example.microhabit.data.HabitRepository
 import com.example.microhabit.data.HabitTask
 import com.example.microhabit.data.HabitTemplate
@@ -190,7 +191,7 @@ class MainViewModel(
         reminderHour: Int,
         reminderMinute: Int
     ) {
-        val normalizedName = name.trim()
+        val normalizedName = name.trim().take(MAX_HABIT_TITLE_LENGTH)
         val normalizedFrequency = if (frequency == TaskFrequency.SELECTED_DAYS) {
             TaskFrequency.SELECTED_DAYS
         } else {
@@ -289,7 +290,7 @@ class MainViewModel(
             it.copy(
                 showEditor = true,
                 editingTaskId = task.id,
-                editorTitle = task.title,
+                editorTitle = task.title.take(MAX_HABIT_TITLE_LENGTH),
                 editorEmoji = task.emoji,
                 editorColorHex = task.colorHex,
                 editorTrackingType = task.trackingType,
@@ -312,7 +313,7 @@ class MainViewModel(
     }
 
     fun setEditorTitle(value: String) {
-        _state.update { it.copy(editorTitle = value) }
+        _state.update { it.copy(editorTitle = value.take(MAX_HABIT_TITLE_LENGTH)) }
     }
 
     fun setEditorEmoji(value: String) {
@@ -398,7 +399,7 @@ class MainViewModel(
         }
         return EditorSavePayload(
             current = current,
-            title = current.editorTitle.trim(),
+            title = current.editorTitle.trim().take(MAX_HABIT_TITLE_LENGTH),
             frequency = frequency,
             customDays = customDays
         )
@@ -480,6 +481,7 @@ class MainViewModel(
     fun canSaveEditor(): Boolean {
         val s = _state.value
         if (s.editorTitle.trim().isEmpty()) return false
+        if (s.editorTitle.trim().length > MAX_HABIT_TITLE_LENGTH) return false
         if (s.editorEmoji.trim().isEmpty()) return false
         if (s.editorColorHex.trim().isEmpty()) return false
         if (s.editorFrequency == TaskFrequency.SELECTED_DAYS && s.editorCustomDays.isEmpty()) return false

@@ -75,7 +75,7 @@ class HabitRepository(private val context: Context) {
             (0 until array.length()).mapNotNull { i ->
                 val obj = array.optJSONObject(i) ?: return@mapNotNull null
                 val id = obj.optString("id")
-                val title = obj.optString("title")
+                val title = sanitizeTitle(obj.optString("title"))
                 if (id.isBlank() || title.isBlank()) return@mapNotNull null
 
                 val rawFrequency = obj.optString("frequency", TaskFrequency.DAILY.name)
@@ -139,7 +139,7 @@ class HabitRepository(private val context: Context) {
     ): HabitTask {
         val task = HabitTask(
             id = UUID.randomUUID().toString(),
-            title = title.trim(),
+            title = sanitizeTitle(title),
             emoji = emoji.ifBlank { "✨" },
             colorHex = colorHex.ifBlank { "#1F6F64" },
             trackingType = trackingType,
@@ -175,7 +175,7 @@ class HabitRepository(private val context: Context) {
         val updated = getTasks().map { task ->
             if (task.id == taskId) {
                 task.copy(
-                    title = title.trim(),
+                    title = sanitizeTitle(title),
                     emoji = emoji.ifBlank { "✨" },
                     colorHex = colorHex.ifBlank { "#1F6F64" },
                     trackingType = trackingType,
@@ -587,6 +587,10 @@ class HabitRepository(private val context: Context) {
 
     private fun sanitizeCustomDays(days: Set<Int>): Set<Int> {
         return days.filter { it in 1..7 }.toSet()
+    }
+
+    private fun sanitizeTitle(title: String): String {
+        return title.trim().take(MAX_HABIT_TITLE_LENGTH)
     }
 
     private fun doneKey(taskId: String, date: LocalDate): String {

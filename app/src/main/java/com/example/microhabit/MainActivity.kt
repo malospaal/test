@@ -141,6 +141,7 @@ import com.example.microhabit.data.HabitRepository
 import com.example.microhabit.data.HabitTask
 import com.example.microhabit.data.HabitTemplate
 import com.example.microhabit.data.HabitTemplateCatalog
+import com.example.microhabit.data.MAX_HABIT_TITLE_LENGTH
 import com.example.microhabit.data.SubscriptionPlan
 import com.example.microhabit.data.TaskFrequency
 import com.example.microhabit.data.TrackingType
@@ -2196,6 +2197,7 @@ private fun OnboardingWizard(
                                         onClick = {
                                             if (habitName.isBlank() && selectedTemplate.id != HabitTemplateCatalog.CUSTOM_TEMPLATE.id) {
                                                 habitName = translate(state.language, selectedTemplate.titleKey)
+                                                    .take(MAX_HABIT_TITLE_LENGTH)
                                             }
                                             step = OnboardingStep.SETUP
                                         },
@@ -2227,7 +2229,7 @@ private fun OnboardingWizard(
 
                                 OutlinedTextField(
                                     value = habitName,
-                                    onValueChange = { habitName = it },
+                                    onValueChange = { habitName = it.take(MAX_HABIT_TITLE_LENGTH) },
                                     label = { Text(t("Habit name")) },
                                     modifier = Modifier.fillMaxWidth(),
                                     singleLine = true

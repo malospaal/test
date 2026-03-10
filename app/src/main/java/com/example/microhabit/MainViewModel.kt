@@ -52,11 +52,18 @@ data class HabitUiState(
     val selectedDateDone: Boolean = false,
     val selectedDateScheduled: Boolean = false,
     val selectedDateInFuture: Boolean = false,
+    val todayDone: Boolean = false,
+    val todayScheduled: Boolean = false,
     val streak: Int = 0,
     val bestStreak: Int = 0,
     val completionRate7Day: Int = 0,
     val completionRate30Day: Int = 0,
     val totalCompletions: Int = 0,
+    val streakHistory: List<Int> = emptyList(),
+    val mostConsistentWeekday: Int? = null,
+    val hardestWeekday: Int? = null,
+    val completionConsistency: Int = 0,
+    val selectedTaskNote: String = "",
     val progressPercent: Int = 0,
     val last7Days: List<Int> = List(7) { 0 },
     val last7DaysScheduled: List<Boolean> = List(7) { false },
@@ -261,6 +268,28 @@ class MainViewModel(
         }
     }
 
+    fun completeSelectedHabitToday() {
+        val taskId = _state.value.selectedTaskId ?: return
+        viewModelScope.launch {
+            val task = repository.getTasks()
+                .firstOrNull { it.id == taskId && !it.isArchived }
+                ?: return@launch
+            val today = LocalDate.now()
+            if (!repository.isScheduledOn(task, today) && !(today.isBefore(task.startDate) && repository.isScheduledByFrequency(task, today))) {
+                return@launch
+            }
+            if (!repository.isDone(task.id, today)) {
+                if (today.isBefore(task.startDate) && repository.isScheduledByFrequency(task, today)) {
+                    repository.updateTaskStartDate(task.id, today)
+                }
+                repository.setDone(task.id, today, true)
+                repository.refreshWidget()
+            }
+            _state.update { it.copy(selectedDate = today, currentMonth = YearMonth.from(today)) }
+            refresh()
+        }
+    }
+
     fun openCreateTask() {
         val reminderHour = _state.value.defaultReminderHour
         val reminderMinute = _state.value.defaultReminderMinute
@@ -310,6 +339,19 @@ class MainViewModel(
 
     fun closeEditor() {
         _state.update { it.copy(showEditor = false) }
+    }
+
+    fun setSelectedTaskNote(value: String) {
+        _state.update { it.copy(selectedTaskNote = value.take(180)) }
+    }
+
+    fun saveSelectedTaskNote() {
+        val selectedTaskId = _state.value.selectedTaskId ?: return
+        val note = _state.value.selectedTaskNote
+        viewModelScope.launch {
+            repository.setTaskNote(selectedTaskId, note)
+            _state.update { it.copy(selectedTaskNote = repository.getTaskNote(selectedTaskId)) }
+        }
     }
 
     fun setEditorTitle(value: String) {
@@ -509,7 +551,19 @@ class MainViewModel(
 
             val selectedTask = tasks.firstOrNull { it.id == selectedId }
             val date = _state.value.selectedDate
+            val today = LocalDate.now()
             val isFutureDate = date.isAfter(LocalDate.now())
+            val weekdayConsistency = selectedTask?.let { repository.weekdayConsistency(it, 84, date) } ?: List(7) { 0 }
+            val consistencyNonZero = weekdayConsistency
+                .mapIndexed { index, value -> index to value }
+                .filter { (_, value) -> value > 0 }
+            val mostConsistentWeekday = consistencyNonZero.maxByOrNull { it.second }?.first?.plus(1)
+            val hardestWeekday = consistencyNonZero.minByOrNull { it.second }?.first?.plus(1)
+            val completionConsistency = if (consistencyNonZero.isEmpty()) {
+                0
+            } else {
+                consistencyNonZero.sumOf { it.second } / consistencyNonZero.size
+            }
             _state.update { state ->
                 state.copy(
                     tasks = tasks,
@@ -535,6 +589,11 @@ class MainViewModel(
                     selectedTaskId = selectedId,
                     showEditor = state.showEditor,
                     selectedDateInFuture = isFutureDate,
+                    todayDone = selectedTask?.let { repository.isDone(it.id, today) } ?: false,
+                    todayScheduled = selectedTask?.let { task ->
+                        repository.isScheduledOn(task, today) ||
+                            (today.isBefore(task.startDate) && repository.isScheduledByFrequency(task, today))
+                    } ?: false,
                     selectedDateScheduled = selectedTask?.let { task ->
                         repository.isScheduledOn(task, date) ||
                             (date.isBefore(task.startDate) && repository.isScheduledByFrequency(task, date))
@@ -542,6 +601,13 @@ class MainViewModel(
                     selectedDateDone = selectedTask?.let { repository.isDone(it.id, date) } ?: false,
                     streak = selectedTask?.let { repository.calculateStreak(it) } ?: 0,
                     bestStreak = selectedTask?.let { repository.bestStreak(it) } ?: 0,
+                    streakHistory = selectedTask?.let { task ->
+                        repository.streakHistory(task, limit = 4)
+                    } ?: emptyList(),
+                    mostConsistentWeekday = mostConsistentWeekday,
+                    hardestWeekday = hardestWeekday,
+                    completionConsistency = completionConsistency,
+                    selectedTaskNote = selectedTask?.let { repository.getTaskNote(it.id) }.orEmpty(),
                     completionRate7Day = selectedTask?.let { repository.completionRate(it, 7, date) } ?: 0,
                     completionRate30Day = selectedTask?.let { repository.completionRate(it, 30, date) } ?: 0,
                     totalCompletions = selectedTask?.let { repository.totalCompletions(it) } ?: 0,
@@ -554,7 +620,7 @@ class MainViewModel(
                         }
                     } ?: List(7) { false },
                     monthlyProgress = selectedTask?.let { repository.monthlyWeeklyProgress(it, state.currentMonth) } ?: emptyList(),
-                    weekdayConsistency = selectedTask?.let { repository.weekdayConsistency(it, 84, date) } ?: List(7) { 0 },
+                    weekdayConsistency = weekdayConsistency,
                     doneDatesInCurrentMonth = selectedTask?.let { task ->
                         doneDatesForMonth(task, state.currentMonth)
                     } ?: emptySet(),
@@ -579,10 +645,27 @@ class MainViewModel(
         val selectedTask = current.tasks.firstOrNull { it.id == current.selectedTaskId }
         val date = current.selectedDate
         val month = current.currentMonth
+        val today = LocalDate.now()
         val isFutureDate = date.isAfter(LocalDate.now())
+        val weekdayConsistency = selectedTask?.let { repository.weekdayConsistency(it, 84, date) } ?: List(7) { 0 }
+        val consistencyNonZero = weekdayConsistency
+            .mapIndexed { index, value -> index to value }
+            .filter { (_, value) -> value > 0 }
+        val mostConsistentWeekday = consistencyNonZero.maxByOrNull { it.second }?.first?.plus(1)
+        val hardestWeekday = consistencyNonZero.minByOrNull { it.second }?.first?.plus(1)
+        val completionConsistency = if (consistencyNonZero.isEmpty()) {
+            0
+        } else {
+            consistencyNonZero.sumOf { it.second } / consistencyNonZero.size
+        }
         _state.update {
             it.copy(
                 selectedDateInFuture = isFutureDate,
+                todayDone = selectedTask?.let { repository.isDone(it.id, today) } ?: false,
+                todayScheduled = selectedTask?.let { task ->
+                    repository.isScheduledOn(task, today) ||
+                        (today.isBefore(task.startDate) && repository.isScheduledByFrequency(task, today))
+                } ?: false,
                 selectedDateScheduled = selectedTask?.let { task ->
                     repository.isScheduledOn(task, date) ||
                         (date.isBefore(task.startDate) && repository.isScheduledByFrequency(task, date))
@@ -590,6 +673,12 @@ class MainViewModel(
                 selectedDateDone = selectedTask?.let { task -> repository.isDone(task.id, date) } ?: false,
                 streak = selectedTask?.let { repository.calculateStreak(it) } ?: 0,
                 bestStreak = selectedTask?.let { repository.bestStreak(it) } ?: 0,
+                streakHistory = selectedTask?.let { task ->
+                    repository.streakHistory(task, limit = 4)
+                } ?: emptyList(),
+                mostConsistentWeekday = mostConsistentWeekday,
+                hardestWeekday = hardestWeekday,
+                completionConsistency = completionConsistency,
                 completionRate7Day = selectedTask?.let { repository.completionRate(it, 7, date) } ?: 0,
                 completionRate30Day = selectedTask?.let { repository.completionRate(it, 30, date) } ?: 0,
                 totalCompletions = selectedTask?.let { repository.totalCompletions(it) } ?: 0,
@@ -602,7 +691,7 @@ class MainViewModel(
                     }
                 } ?: List(7) { false },
                 monthlyProgress = selectedTask?.let { repository.monthlyWeeklyProgress(it, month) } ?: emptyList(),
-                weekdayConsistency = selectedTask?.let { repository.weekdayConsistency(it, 84, date) } ?: List(7) { 0 },
+                weekdayConsistency = weekdayConsistency,
                 doneDatesInCurrentMonth = selectedTask?.let { task ->
                     doneDatesForMonth(task, it.currentMonth)
                 } ?: emptySet(),

@@ -64,6 +64,10 @@ data class HabitTask(
     val isArchived: Boolean = false
 )
 
+data class StreakSegment(
+    val length: Int
+)
+
 class HabitRepository(private val context: Context) {
     private val prefs = context.getSharedPreferences("habit_prefs", Context.MODE_PRIVATE)
     private val formatter = DateTimeFormatter.ISO_LOCAL_DATE
@@ -201,6 +205,7 @@ class HabitRepository(private val context: Context) {
         prefs.all.keys
             .filter { it.startsWith("done_${taskId}_") }
             .forEach { key -> prefs.edit().remove(key).apply() }
+        prefs.edit().remove(noteKey(taskId)).apply()
 
         if (getSelectedTaskId() == taskId) {
             prefs.edit().putString(KEY_SELECTED_TASK, updated.firstOrNull()?.id).apply()
@@ -360,6 +365,19 @@ class HabitRepository(private val context: Context) {
         saveTasks(updated)
     }
 
+    fun getTaskNote(taskId: String): String {
+        return prefs.getString(noteKey(taskId), "")?.trim().orEmpty()
+    }
+
+    fun setTaskNote(taskId: String, note: String) {
+        val normalized = note.trim().take(MAX_HABIT_NOTE_LENGTH)
+        if (normalized.isBlank()) {
+            prefs.edit().remove(noteKey(taskId)).apply()
+        } else {
+            prefs.edit().putString(noteKey(taskId), normalized).apply()
+        }
+    }
+
     fun calculateStreak(task: HabitTask, fromDate: LocalDate = LocalDate.now()): Int {
         if (task.frequency == TaskFrequency.TIMES_PER_WEEK) {
             return calculateWeeklyStreak(task, fromDate)
@@ -474,6 +492,20 @@ class HabitRepository(private val context: Context) {
             cursor = cursor.minusDays(1)
         }
         return best
+    }
+
+    fun streakHistory(task: HabitTask, limit: Int = 4, upToDate: LocalDate = LocalDate.now()): List<Int> {
+        if (limit <= 0) return emptyList()
+        val runs = if (task.frequency == TaskFrequency.TIMES_PER_WEEK) {
+            weeklyStreakSegments(task, upToDate)
+        } else {
+            dailyLikeStreakSegments(task, upToDate)
+        }
+        return runs
+            .map { it.length }
+            .filter { it > 0 }
+            .sortedDescending()
+            .take(limit)
     }
 
     fun totalCompletions(task: HabitTask): Int {
@@ -593,9 +625,59 @@ class HabitRepository(private val context: Context) {
         return title.trim().take(MAX_HABIT_TITLE_LENGTH)
     }
 
+    private fun dailyLikeStreakSegments(task: HabitTask, upToDate: LocalDate): List<StreakSegment> {
+        if (upToDate.isBefore(task.startDate)) return emptyList()
+        val segments = mutableListOf<StreakSegment>()
+        var cursor = task.startDate
+        var currentRun = 0
+        while (!cursor.isAfter(upToDate)) {
+            if (isScheduledOn(task, cursor)) {
+                if (isDone(task.id, cursor)) {
+                    currentRun += 1
+                } else if (currentRun > 0) {
+                    segments += StreakSegment(currentRun)
+                    currentRun = 0
+                }
+            }
+            cursor = cursor.plusDays(1)
+        }
+        if (currentRun > 0) {
+            segments += StreakSegment(currentRun)
+        }
+        return segments
+    }
+
+    private fun weeklyStreakSegments(task: HabitTask, upToDate: LocalDate): List<StreakSegment> {
+        val segments = mutableListOf<StreakSegment>()
+        var currentRun = 0
+        var weekStart = task.startDate.minusDays((task.startDate.dayOfWeek.value - 1).toLong())
+        val lastWeekStart = upToDate.minusDays((upToDate.dayOfWeek.value - 1).toLong())
+        while (!weekStart.isAfter(lastWeekStart)) {
+            var completionsInWeek = 0
+            for (i in 0..6) {
+                val day = weekStart.plusDays(i.toLong())
+                if (day.isBefore(task.startDate) || day.isAfter(upToDate)) continue
+                if (isDone(task.id, day)) completionsInWeek += 1
+            }
+            if (completionsInWeek >= task.timesPerWeek) {
+                currentRun += 1
+            } else if (currentRun > 0) {
+                segments += StreakSegment(currentRun)
+                currentRun = 0
+            }
+            weekStart = weekStart.plusWeeks(1)
+        }
+        if (currentRun > 0) {
+            segments += StreakSegment(currentRun)
+        }
+        return segments
+    }
+
     private fun doneKey(taskId: String, date: LocalDate): String {
         return "done_${taskId}_${date.format(formatter)}"
     }
+
+    private fun noteKey(taskId: String): String = "${KEY_NOTE_PREFIX}${taskId}"
 
     companion object {
         private const val KEY_TASKS_JSON = "tasks_json"
@@ -607,5 +689,7 @@ class HabitRepository(private val context: Context) {
         private const val KEY_DEFAULT_REMINDER_HOUR = "default_reminder_hour"
         private const val KEY_DEFAULT_REMINDER_MINUTE = "default_reminder_minute"
         private const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"
+        private const val KEY_NOTE_PREFIX = "habit_note_"
+        private const val MAX_HABIT_NOTE_LENGTH = 180
     }
 }

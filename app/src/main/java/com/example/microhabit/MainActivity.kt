@@ -93,10 +93,12 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
@@ -194,6 +196,7 @@ import com.example.microhabit.ui.components.SettingsSwitchRow
 import com.example.microhabit.ui.components.parseColorHex
 import com.example.microhabit.ui.theme.AppTheme
 import com.example.microhabit.ui.theme.MicroHabitTheme
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -935,114 +938,237 @@ private fun HabitsPage(
     val spacing = AppTheme.spacing
     val colors = AppTheme.colors
     val canAdd = state.plan == SubscriptionPlan.PRO || state.tasks.size < 1
+    val selectedTask = state.tasks.firstOrNull { it.id == state.selectedTaskId }
     var pendingDeleteTaskId by rememberSaveable { mutableStateOf<String?>(null) }
+    var noteDraft by remember(state.selectedTaskId, state.selectedTaskNote) {
+        mutableStateOf(state.selectedTaskNote)
+    }
+    var streakOverlay by remember { mutableStateOf<StreakOverlayModel?>(null) }
+    var overlayVisible by remember { mutableStateOf(false) }
+    var previousTotalCompletions by remember(state.selectedTaskId) { mutableStateOf(state.totalCompletions) }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(spacing.x2),
-        verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
-    ) {
-        if (state.habits.isEmpty()) {
-            item {
-                GlassCard {
-                    Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
-                        Text(
-                            text = t("No habits yet"),
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            color = colors.textPrimary
-                        )
-                        Text(
-                            text = t("Create your first habit to start building momentum."),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = colors.textSecondary
-                        )
-                        Button(
-                            onClick = { if (canAdd) vm.openCreateTask() else onUpgrade() },
-                            shape = RoundedCornerShape(AppTheme.radius.md)
-                        ) {
-                            Text(if (canAdd) t("Create habit") else t("Upgrade to PRO"))
+    LaunchedEffect(state.selectedTaskId, state.selectedTaskNote) {
+        noteDraft = state.selectedTaskNote
+    }
+    LaunchedEffect(state.selectedTaskId) {
+        previousTotalCompletions = state.totalCompletions
+        overlayVisible = false
+        streakOverlay = null
+    }
+    LaunchedEffect(state.totalCompletions, state.streak) {
+        if (state.totalCompletions > previousTotalCompletions) {
+            streakOverlay = StreakOverlayModel(
+                streak = state.streak,
+                milestone = isStreakMilestone(state.streak)
+            )
+            overlayVisible = true
+        }
+        previousTotalCompletions = state.totalCompletions
+    }
+    LaunchedEffect(overlayVisible, streakOverlay) {
+        if (overlayVisible && streakOverlay != null) {
+            delay(1100)
+            overlayVisible = false
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(spacing.x2),
+            verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
+        ) {
+            if (state.habits.isEmpty()) {
+                item {
+                    GlassCard {
+                        Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+                            Text(
+                                text = t("No habits yet"),
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = colors.textPrimary
+                            )
+                            Text(
+                                text = t("Create your first habit to start building momentum."),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = colors.textSecondary
+                            )
+                            Button(
+                                onClick = { if (canAdd) vm.openCreateTask() else onUpgrade() },
+                                shape = RoundedCornerShape(AppTheme.radius.md)
+                            ) {
+                                Text(if (canAdd) t("Create habit") else t("Upgrade to PRO"))
+                            }
                         }
                     }
                 }
-            }
-        } else {
-            val activeHabits = state.habits.filterNot { it.isArchived }
-            val archivedHabits = state.habits.filter { it.isArchived }
+            } else {
+                val activeHabits = state.habits.filterNot { it.isArchived }
+                val archivedHabits = state.habits.filter { it.isArchived }
 
-            if (activeHabits.isNotEmpty()) {
                 item {
-                    Text(
-                        text = t("Active habits"),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = colors.textPrimary
+                    TaskSelector(
+                        tasks = state.tasks,
+                        selectedTaskId = state.selectedTaskId,
+                        onSelect = vm::selectTask,
+                        onAddHabit = { if (canAdd) vm.openCreateTask() else onUpgrade() }
                     )
                 }
-                items(items = activeHabits, key = { it.id }) { habit ->
-                    val reminderStatus = if (habit.reminderEnabled) {
-                        tf("Reminder: %s", formatTimeForDevice(context, habit.reminderHour, habit.reminderMinute))
-                    } else {
-                        t("Reminder off")
+
+                selectedTask?.let { habit ->
+                    item {
+                        HabitDepthHero(
+                            task = habit,
+                            streak = state.streak,
+                            weeklyCompletion = state.completionRate7Day,
+                            todayDone = state.todayDone,
+                            todayScheduled = state.todayScheduled,
+                            onCompleteToday = vm::completeSelectedHabitToday
+                        )
                     }
-                    HabitCard(
-                        habit = HabitCardModel(
-                            emoji = habit.emoji,
-                            name = habit.name,
-                            colorHex = habit.colorHex,
-                            trackingType = habit.trackingType,
-                            streak = habit.streak,
-                            frequency = habit.frequency,
-                            reminderStatus = reminderStatus,
-                            completionRate = habit.completionRate,
-                            isArchived = habit.isArchived
-                        ),
-                        onOpen = {
-                            vm.selectTask(habit.id)
-                            onOpenHabit()
-                        },
-                        onEdit = { vm.openEditTask(habit.id) },
-                        onArchive = { vm.archiveTask(habit.id) },
-                        onUnarchive = { vm.unarchiveTask(habit.id) },
-                        onDelete = { pendingDeleteTaskId = habit.id }
-                    )
+                    item {
+                        HabitLevelProgressCard(
+                            streak = state.streak,
+                            bestStreak = state.bestStreak
+                        )
+                    }
+                    item {
+                        HabitMiniCalendarCard(
+                            month = state.currentMonth,
+                            selectedDate = state.selectedDate,
+                            doneDates = state.doneDatesInCurrentMonth,
+                            scheduledDates = state.scheduledDatesInCurrentMonth,
+                            onMoveMonth = vm::moveMonth,
+                            onDateSelect = vm::selectDate
+                        )
+                    }
+                    item {
+                        SevenDayChart(
+                            points = state.last7Days,
+                            scheduled = state.last7DaysScheduled,
+                            anchorDate = state.selectedDate
+                        )
+                    }
+                    item {
+                        HabitDepthStats(
+                            streak = state.streak,
+                            bestStreak = state.bestStreak,
+                            completion30Day = state.completionRate30Day,
+                            totalCompletions = state.totalCompletions
+                        )
+                    }
+                    item {
+                        HabitStreakHistoryCard(
+                            bestStreak = state.bestStreak,
+                            history = state.streakHistory
+                        )
+                    }
+                    item {
+                        HabitInsightsCard(
+                            mostConsistentWeekday = state.mostConsistentWeekday,
+                            hardestWeekday = state.hardestWeekday,
+                            completionConsistency = state.completionConsistency
+                        )
+                    }
+                    item {
+                        HabitNotesCard(
+                            note = noteDraft,
+                            onNoteChange = { value ->
+                                noteDraft = value
+                                vm.setSelectedTaskNote(value)
+                            },
+                            onSave = vm::saveSelectedTaskNote
+                        )
+                    }
+                }
+
+                if (activeHabits.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = t("All habits"),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = colors.textPrimary
+                        )
+                    }
+                    items(items = activeHabits, key = { it.id }) { habit ->
+                        val reminderStatus = if (habit.reminderEnabled) {
+                            tf("Reminder: %s", formatTimeForDevice(context, habit.reminderHour, habit.reminderMinute))
+                        } else {
+                            t("Reminder off")
+                        }
+                        HabitCard(
+                            habit = HabitCardModel(
+                                emoji = habit.emoji,
+                                name = habit.name,
+                                colorHex = habit.colorHex,
+                                trackingType = habit.trackingType,
+                                streak = habit.streak,
+                                frequency = habit.frequency,
+                                reminderStatus = reminderStatus,
+                                completionRate = habit.completionRate,
+                                isArchived = habit.isArchived
+                            ),
+                            onOpen = {
+                                vm.selectTask(habit.id)
+                                onOpenHabit()
+                            },
+                            onEdit = { vm.openEditTask(habit.id) },
+                            onArchive = { vm.archiveTask(habit.id) },
+                            onUnarchive = { vm.unarchiveTask(habit.id) },
+                            onDelete = { pendingDeleteTaskId = habit.id }
+                        )
+                    }
+                }
+
+                if (archivedHabits.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = t("Archived habits"),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = colors.textPrimary
+                        )
+                    }
+                    items(items = archivedHabits, key = { it.id }) { habit ->
+                        val reminderStatus = if (habit.reminderEnabled) {
+                            tf("Reminder: %s", formatTimeForDevice(context, habit.reminderHour, habit.reminderMinute))
+                        } else {
+                            t("Reminder off")
+                        }
+                        HabitCard(
+                            habit = HabitCardModel(
+                                emoji = habit.emoji,
+                                name = habit.name,
+                                colorHex = habit.colorHex,
+                                trackingType = habit.trackingType,
+                                streak = habit.streak,
+                                frequency = habit.frequency,
+                                reminderStatus = reminderStatus,
+                                completionRate = habit.completionRate,
+                                isArchived = habit.isArchived
+                            ),
+                            onOpen = { vm.openEditTask(habit.id) },
+                            onEdit = { vm.openEditTask(habit.id) },
+                            onArchive = { vm.archiveTask(habit.id) },
+                            onUnarchive = { vm.unarchiveTask(habit.id) },
+                            onDelete = { pendingDeleteTaskId = habit.id }
+                        )
+                    }
                 }
             }
+        }
 
-            if (archivedHabits.isNotEmpty()) {
-                item {
-                    Text(
-                        text = t("Archived habits"),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = colors.textPrimary
-                    )
-                }
-                items(items = archivedHabits, key = { it.id }) { habit ->
-                    val reminderStatus = if (habit.reminderEnabled) {
-                        tf("Reminder: %s", formatTimeForDevice(context, habit.reminderHour, habit.reminderMinute))
-                    } else {
-                        t("Reminder off")
-                    }
-                    HabitCard(
-                        habit = HabitCardModel(
-                            emoji = habit.emoji,
-                            name = habit.name,
-                            colorHex = habit.colorHex,
-                            trackingType = habit.trackingType,
-                            streak = habit.streak,
-                            frequency = habit.frequency,
-                            reminderStatus = reminderStatus,
-                            completionRate = habit.completionRate,
-                            isArchived = habit.isArchived
-                        ),
-                        onOpen = { vm.openEditTask(habit.id) },
-                        onEdit = { vm.openEditTask(habit.id) },
-                        onArchive = { vm.archiveTask(habit.id) },
-                        onUnarchive = { vm.unarchiveTask(habit.id) },
-                        onDelete = { pendingDeleteTaskId = habit.id }
-                    )
-                }
+        AnimatedVisibility(
+            visible = overlayVisible && streakOverlay != null,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = spacing.x1_5),
+            enter = fadeIn(tween(170)) + slideInVertically(initialOffsetY = { -it / 3 }, animationSpec = tween(170)),
+            exit = fadeOut(tween(170)) + slideOutVertically(targetOffsetY = { -it / 4 }, animationSpec = tween(170))
+        ) {
+            streakOverlay?.let { model ->
+                StreakRewardOverlay(model = model)
             }
         }
     }
@@ -1069,6 +1195,540 @@ private fun HabitsPage(
                 }
             }
         )
+    }
+}
+
+private data class HabitLevelInfo(
+    val achievedLevel: Int,
+    val nextLevel: Int,
+    val progressToNext: Float,
+    val daysToNext: Int
+)
+
+private fun levelInfoForStreak(streak: Int): HabitLevelInfo {
+    val value = streak.coerceAtLeast(0)
+    val baseMilestones = listOf(7, 30, 60, 120)
+
+    fun thresholdForLevel(level: Int): Int {
+        if (level <= 0) return 0
+        if (level <= baseMilestones.size) return baseMilestones[level - 1]
+        return 120 + (level - baseMilestones.size) * 30
+    }
+
+    val achievedLevel = generateSequence(1) { it + 1 }
+        .takeWhile { thresholdForLevel(it) <= value }
+        .lastOrNull() ?: 0
+    val nextLevel = achievedLevel + 1
+    val currentThreshold = thresholdForLevel(achievedLevel)
+    val nextThreshold = thresholdForLevel(nextLevel)
+    val progressToNext = ((value - currentThreshold).toFloat() / (nextThreshold - currentThreshold).coerceAtLeast(1))
+        .coerceIn(0f, 1f)
+    val daysToNext = (nextThreshold - value).coerceAtLeast(0)
+
+    return HabitLevelInfo(
+        achievedLevel = achievedLevel,
+        nextLevel = nextLevel,
+        progressToNext = progressToNext,
+        daysToNext = daysToNext
+    )
+}
+
+@Composable
+private fun HabitDepthHero(
+    task: HabitTask,
+    streak: Int,
+    weeklyCompletion: Int,
+    todayDone: Boolean,
+    todayScheduled: Boolean,
+    onCompleteToday: () -> Unit
+) {
+    val spacing = AppTheme.spacing
+    val semantic = AppTheme.colors
+    val radius = AppTheme.radius
+    val animatedRing by animateFloatAsState(
+        targetValue = (weeklyCompletion / 100f).coerceIn(0f, 1f),
+        animationSpec = tween(durationMillis = 380, easing = FastOutSlowInEasing),
+        label = "habitsDepthRingProgress"
+    )
+
+    GlassCard(contentPadding = PaddingValues(spacing.x2)) {
+        Column(verticalArrangement = Arrangement.spacedBy(spacing.x1_5)) {
+            Text(
+                text = "${task.emoji.ifBlank { "✨" }} ${task.title}",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = semantic.textPrimary
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(spacing.x2),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier.size(spacing.x6 + spacing.x6),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        progress = { 1f },
+                        modifier = Modifier.fillMaxSize(),
+                        color = semantic.borderSubtle,
+                        strokeWidth = 8.dp
+                    )
+                    CircularProgressIndicator(
+                        progress = { animatedRing },
+                        modifier = Modifier.fillMaxSize(),
+                        color = semantic.success,
+                        strokeWidth = 8.dp
+                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        AnimatedContent(targetState = streak, label = "habitsDepthStreakValue") { value ->
+                            Text(
+                                text = "🔥 $value",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = semantic.textPrimary
+                            )
+                        }
+                        Text(
+                            text = t("Current streak"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = semantic.textSecondary
+                        )
+                    }
+                }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(spacing.x1)
+                ) {
+                    Text(
+                        text = tf("%d day streak", streak),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = semantic.textPrimary
+                    )
+                    Text(
+                        text = tf("Weekly completion: %d%%", weeklyCompletion),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = semantic.textSecondary
+                    )
+                    Button(
+                        onClick = onCompleteToday,
+                        enabled = todayScheduled && !todayDone,
+                        shape = RoundedCornerShape(radius.md),
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (todayDone) semantic.success else semantic.primary
+                        )
+                    ) {
+                        Text(
+                            text = when {
+                                todayDone -> t("Completed today")
+                                todayScheduled -> t("Complete today")
+                                else -> t("Not scheduled today")
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HabitLevelProgressCard(
+    streak: Int,
+    bestStreak: Int
+) {
+    val spacing = AppTheme.spacing
+    val semantic = AppTheme.colors
+    val info = remember(streak) { levelInfoForStreak(streak) }
+    val animatedProgress by animateFloatAsState(
+        targetValue = info.progressToNext,
+        animationSpec = tween(durationMillis = 360, easing = FastOutSlowInEasing),
+        label = "habitLevelProgress"
+    )
+
+    GlassCard(contentPadding = PaddingValues(spacing.x2)) {
+        Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+            Text(
+                text = t("Level progress"),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = semantic.textPrimary
+            )
+            Text(
+                text = tf("Level %d", info.achievedLevel),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = semantic.textPrimary
+            )
+            LinearProgressIndicator(
+                progress = { animatedProgress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(AppTheme.radius.full)),
+                color = semantic.success,
+                trackColor = semantic.backgroundSurfaceMuted
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = tf("Best streak: %d", bestStreak),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = semantic.textSecondary
+                )
+                Text(
+                    text = if (info.daysToNext > 0) {
+                        tf("%d days to level %d", info.daysToNext, info.nextLevel)
+                    } else {
+                        tf("Level %d unlocked", info.nextLevel)
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = semantic.textSecondary
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HabitMiniCalendarCard(
+    month: YearMonth,
+    selectedDate: LocalDate,
+    doneDates: Set<LocalDate>,
+    scheduledDates: Set<LocalDate>,
+    onMoveMonth: (Long) -> Unit,
+    onDateSelect: (LocalDate) -> Unit
+) {
+    val spacing = AppTheme.spacing
+    val colors = AppTheme.colors
+    val locale = appLocale()
+    val today = LocalDate.now()
+
+    GlassCard(contentPadding = PaddingValues(spacing.x2)) {
+        Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = t("Calendar"),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = colors.textPrimary
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = { onMoveMonth(-1) }) { Text("<") }
+                    Text(
+                        text = localizedMonthYear(month, LocalAppLanguage.current, locale),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.textSecondary
+                    )
+                    TextButton(onClick = { onMoveMonth(1) }) { Text(">") }
+                }
+            }
+            val labels = weekdayLabels(LocalAppLanguage.current)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                labels.forEach { label ->
+                    Text(
+                        text = label,
+                        modifier = Modifier.weight(1f),
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.textSecondary
+                    )
+                }
+            }
+            monthGrid(month).forEach { week ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    week.forEach { day ->
+                        val state = dayStateFor(
+                            date = day,
+                            doneDates = doneDates,
+                            scheduledDates = scheduledDates,
+                            today = today
+                        )
+                        MiniCalendarCell(
+                            modifier = Modifier.weight(1f),
+                            date = day,
+                            state = state,
+                            selected = day == selectedDate,
+                            today = day == today,
+                            onClick = { day?.let(onDateSelect) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MiniCalendarCell(
+    modifier: Modifier = Modifier,
+    date: LocalDate?,
+    state: CalendarDayState,
+    selected: Boolean,
+    today: Boolean,
+    onClick: () -> Unit
+) {
+    val spacing = AppTheme.spacing
+    val semantic = AppTheme.colors
+    val radius = AppTheme.radius
+    val stroke = AppTheme.stroke
+    val background = when (state) {
+        CalendarDayState.COMPLETED -> semantic.success.copy(alpha = 0.9f)
+        CalendarDayState.MISSED -> semantic.danger.copy(alpha = 0.10f)
+        CalendarDayState.NOT_SCHEDULED -> semantic.neutralMuted.copy(alpha = 0.35f)
+        CalendarDayState.FUTURE -> semantic.backgroundSurfaceMuted.copy(alpha = 0.28f)
+    }
+    val textColor = when (state) {
+        CalendarDayState.COMPLETED -> MaterialTheme.colorScheme.onPrimary
+        CalendarDayState.MISSED -> semantic.danger
+        CalendarDayState.NOT_SCHEDULED -> semantic.textSecondary
+        CalendarDayState.FUTURE -> semantic.textTertiary
+    }
+
+    Box(
+        modifier = modifier
+            .height(spacing.x4)
+            .clip(RoundedCornerShape(radius.sm))
+            .background(if (date == null) Color.Transparent else background)
+            .border(
+                width = if (selected || today) stroke.medium else stroke.thin,
+                color = when {
+                    selected -> semantic.primary
+                    today -> semantic.calendarTodayRing
+                    state == CalendarDayState.MISSED -> semantic.danger.copy(alpha = 0.45f)
+                    else -> semantic.borderSubtle.copy(alpha = 0.45f)
+                },
+                shape = RoundedCornerShape(radius.sm)
+            )
+            .clickable(enabled = date != null, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        if (date != null) {
+            Text(
+                text = date.dayOfMonth.toString(),
+                style = MaterialTheme.typography.bodySmall,
+                color = textColor,
+                fontWeight = if (selected || today) FontWeight.SemiBold else FontWeight.Normal
+            )
+        }
+    }
+}
+
+@Composable
+private fun HabitDepthStats(
+    streak: Int,
+    bestStreak: Int,
+    completion30Day: Int,
+    totalCompletions: Int
+) {
+    val spacing = AppTheme.spacing
+
+    GlassCard(contentPadding = PaddingValues(spacing.x1)) {
+        Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+            Text(
+                text = t("Stats"),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+            ) {
+                AnalyticsMetricTile(
+                    label = t("Current streak"),
+                    value = "${streak}d",
+                    modifier = Modifier.weight(1f)
+                )
+                AnalyticsMetricTile(
+                    label = t("Best streak"),
+                    value = "${bestStreak}d",
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+            ) {
+                AnalyticsMetricTile(
+                    label = t("30 day completion"),
+                    value = "$completion30Day%",
+                    modifier = Modifier.weight(1f)
+                )
+                AnalyticsMetricTile(
+                    label = t("Total completions"),
+                    value = totalCompletions.toString(),
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HabitStreakHistoryCard(
+    bestStreak: Int,
+    history: List<Int>
+) {
+    val spacing = AppTheme.spacing
+    val semantic = AppTheme.colors
+    val previous = remember(bestStreak, history) {
+        val normalized = history.filter { it > 0 }.sortedDescending()
+        if (normalized.firstOrNull() == bestStreak) normalized.drop(1).take(3) else normalized.take(3)
+    }
+
+    GlassCard(contentPadding = PaddingValues(spacing.x2)) {
+        Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+            Text(
+                text = t("Streak history"),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = semantic.textPrimary
+            )
+            Text(
+                text = "🔥 ${bestStreak} ${t("days")}",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = semantic.textPrimary
+            )
+            Text(
+                text = t("Previous streaks"),
+                style = MaterialTheme.typography.bodySmall,
+                color = semantic.textSecondary
+            )
+            if (previous.isEmpty()) {
+                Text(
+                    text = t("No streak history yet"),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = semantic.textSecondary
+                )
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+                ) {
+                    previous.forEach { value ->
+                        Surface(
+                            color = semantic.backgroundSurfaceMuted,
+                            shape = RoundedCornerShape(AppTheme.radius.full)
+                        ) {
+                            Text(
+                                text = "🔥 $value",
+                                modifier = Modifier.padding(horizontal = spacing.x1, vertical = spacing.x0_5),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = semantic.textPrimary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HabitInsightsCard(
+    mostConsistentWeekday: Int?,
+    hardestWeekday: Int?,
+    completionConsistency: Int
+) {
+    val spacing = AppTheme.spacing
+    val semantic = AppTheme.colors
+    val locale = appLocale()
+    val noDataLabel = t("No data")
+
+    fun weekdayLabelOrFallback(value: Int?): String {
+        if (value == null || value !in 1..7) return noDataLabel
+        return DayOfWeek.of(value).getDisplayName(TextStyle.SHORT, locale).replaceFirstChar {
+            if (it.isLowerCase()) it.titlecase(locale) else it.toString()
+        }
+    }
+
+    GlassCard(contentPadding = PaddingValues(spacing.x2)) {
+        Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+            Text(
+                text = t("Insights"),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = semantic.textPrimary
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+            ) {
+                AnalyticsMetricTile(
+                    label = t("Most consistent day"),
+                    value = weekdayLabelOrFallback(mostConsistentWeekday),
+                    modifier = Modifier.weight(1f)
+                )
+                AnalyticsMetricTile(
+                    label = t("Hardest day"),
+                    value = weekdayLabelOrFallback(hardestWeekday),
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            AnalyticsMetricTile(
+                label = t("Completion consistency"),
+                value = "$completionConsistency%",
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+@Composable
+private fun HabitNotesCard(
+    note: String,
+    onNoteChange: (String) -> Unit,
+    onSave: () -> Unit
+) {
+    val spacing = AppTheme.spacing
+    val semantic = AppTheme.colors
+
+    GlassCard(contentPadding = PaddingValues(spacing.x2)) {
+        Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+            Text(
+                text = t("Habit notes"),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = semantic.textPrimary
+            )
+            OutlinedTextField(
+                value = note,
+                onValueChange = { onNoteChange(it.take(180)) },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 2,
+                maxLines = 4,
+                label = { Text(t("Why did you miss today?")) },
+                supportingText = {
+                    Text(
+                        text = "${note.length}/180",
+                        color = semantic.textSecondary
+                    )
+                }
+            )
+            Button(
+                onClick = onSave,
+                shape = RoundedCornerShape(AppTheme.radius.md),
+                modifier = Modifier.align(Alignment.End)
+            ) {
+                Text(t("Save note"))
+            }
+        }
     }
 }
 

@@ -1177,6 +1177,7 @@ private fun HabitDetailPage(
                         doneDates = state.doneDatesInCurrentMonth,
                         scheduledDates = state.scheduledDatesInCurrentMonth,
                         onMoveMonth = vm::moveMonth,
+                        onToday = vm::jumpToToday,
                         onDateSelect = vm::selectDate
                     )
                 }
@@ -1439,6 +1440,7 @@ private fun HabitMiniCalendarCard(
     doneDates: Set<LocalDate>,
     scheduledDates: Set<LocalDate>,
     onMoveMonth: (Long) -> Unit,
+    onToday: () -> Unit,
     onDateSelect: (LocalDate) -> Unit
 ) {
     val spacing = AppTheme.spacing
@@ -1446,29 +1448,24 @@ private fun HabitMiniCalendarCard(
     val locale = appLocale()
     val today = LocalDate.now()
 
-    GlassCard(contentPadding = PaddingValues(spacing.x2)) {
+    GlassCard(
+        modifier = Modifier.height(352.dp),
+        contentPadding = PaddingValues(spacing.x2)
+    ) {
         Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = t("Calendar"),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = colors.textPrimary
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = { onMoveMonth(-1) }) { Text("<") }
-                    Text(
-                        text = localizedMonthYear(month, LocalAppLanguage.current, locale),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.textSecondary
-                    )
-                    TextButton(onClick = { onMoveMonth(1) }) { Text(">") }
-                }
-            }
+            Text(
+                text = t("Calendar"),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = colors.textPrimary
+            )
+            CalendarHeaderRow(
+                monthLabel = localizedMonthYear(month, LocalAppLanguage.current, locale),
+                isTodaySelected = selectedDate == today && month == YearMonth.now(),
+                onPrev = { onMoveMonth(-1) },
+                onToday = onToday,
+                onNext = { onMoveMonth(1) }
+            )
             val labels = weekdayLabels(LocalAppLanguage.current)
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1489,7 +1486,12 @@ private fun HabitMiniCalendarCard(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    week.forEach { day ->
+                    val leadingEmpty = week.takeWhile { it == null }.size
+                    val trailingEmpty = week.reversed().takeWhile { it == null }.size
+                    repeat(leadingEmpty) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                    week.filterNotNull().forEach { day ->
                         val state = dayStateFor(
                             date = day,
                             doneDates = doneDates,
@@ -1502,8 +1504,11 @@ private fun HabitMiniCalendarCard(
                             state = state,
                             selected = day == selectedDate,
                             today = day == today,
-                            onClick = { day?.let(onDateSelect) }
+                            onClick = { onDateSelect(day) }
                         )
+                    }
+                    repeat(trailingEmpty) {
+                        Spacer(modifier = Modifier.weight(1f))
                     }
                 }
             }
@@ -1514,7 +1519,7 @@ private fun HabitMiniCalendarCard(
 @Composable
 private fun MiniCalendarCell(
     modifier: Modifier = Modifier,
-    date: LocalDate?,
+    date: LocalDate,
     state: CalendarDayState,
     selected: Boolean,
     today: Boolean,
@@ -1541,7 +1546,7 @@ private fun MiniCalendarCell(
         modifier = modifier
             .height(spacing.x4)
             .clip(RoundedCornerShape(radius.sm))
-            .background(if (date == null) Color.Transparent else background)
+            .background(background)
             .border(
                 width = if (selected || today) stroke.medium else stroke.thin,
                 color = when {
@@ -1552,17 +1557,15 @@ private fun MiniCalendarCell(
                 },
                 shape = RoundedCornerShape(radius.sm)
             )
-            .clickable(enabled = date != null, onClick = onClick),
+            .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        if (date != null) {
-            Text(
-                text = date.dayOfMonth.toString(),
-                style = MaterialTheme.typography.bodySmall,
-                color = textColor,
-                fontWeight = if (selected || today) FontWeight.SemiBold else FontWeight.Normal
-            )
-        }
+        Text(
+            text = date.dayOfMonth.toString(),
+            style = MaterialTheme.typography.bodyMedium,
+            color = textColor,
+            fontWeight = if (selected || today) FontWeight.SemiBold else FontWeight.Medium
+        )
     }
 }
 
@@ -1993,7 +1996,7 @@ private fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
         }
 
         item {
-            GlassCard {
+            GlassCard(modifier = Modifier.height(416.dp)) {
                 Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
                     CalendarHeaderRow(
                         monthLabel = localizedMonthYear(state.currentMonth, state.language, locale),
@@ -4677,7 +4680,10 @@ private fun CalendarCard(
     val locale = appLocale()
     val today = LocalDate.now()
 
-    GlassCard(contentPadding = PaddingValues(spacing.x2)) {
+    GlassCard(
+        modifier = Modifier.height(416.dp),
+        contentPadding = PaddingValues(spacing.x2)
+    ) {
         Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
             CalendarHeaderRow(
                 monthLabel = localizedMonthYear(month, language, locale),
@@ -5196,6 +5202,7 @@ private fun localizedMonthYear(month: YearMonth, language: AppLanguage, locale: 
 
 @Composable
 private fun GlassCard(
+    modifier: Modifier = Modifier,
     contentPadding: PaddingValues? = null,
     content: @Composable () -> Unit
 ) {
@@ -5206,6 +5213,7 @@ private fun GlassCard(
     val resolvedPadding = contentPadding ?: PaddingValues(spacing.x2)
 
     Card(
+        modifier = modifier,
         colors = CardDefaults.cardColors(containerColor = semantic.backgroundSurface),
         shape = RoundedCornerShape(radius.lg),
         elevation = CardDefaults.cardElevation(defaultElevation = elevation.md)

@@ -183,17 +183,14 @@ fun CalendarDay(
         ) {
             Text(
                 text = date.dayOfMonth.toString(),
-                style = MaterialTheme.typography.bodySmall,
-                color = textColor
+                style = MaterialTheme.typography.bodyMedium,
+                color = textColor,
+                fontWeight = if (selected || today || state == CalendarDayState.COMPLETED) {
+                    androidx.compose.ui.text.font.FontWeight.SemiBold
+                } else {
+                    androidx.compose.ui.text.font.FontWeight.Medium
+                }
             )
-            if (state == CalendarDayState.COMPLETED) {
-                Box(
-                    modifier = Modifier
-                        .padding(top = spacing.x0_5)
-                        .size(spacing.x0_5)
-                        .background(MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f), RoundedCornerShape(radius.full))
-                )
-            }
         }
     }
 }

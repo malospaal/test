@@ -441,7 +441,11 @@ class HabitRepository(private val context: Context) {
         }
         if (value <= 0) return 0
         if (isCompletedByValue(task, value)) return 100
-        val threshold = getMinimumCompletionPercent().coerceAtLeast(1)
+        val threshold = when (task.trackingType) {
+            TrackingType.COUNT -> 100
+            TrackingType.DURATION -> getMinimumCompletionPercent().coerceAtLeast(1)
+            TrackingType.YES_NO -> 100
+        }
         val raw = completionPercentByValue(task, value).coerceAtLeast(0)
         return ((raw.toFloat() / threshold.toFloat()) * 100f).roundToInt().coerceIn(0, 100)
     }
@@ -835,9 +839,8 @@ class HabitRepository(private val context: Context) {
     private fun isCompletedByValue(task: HabitTask, value: Int): Boolean {
         return when (task.trackingType) {
             TrackingType.YES_NO -> value >= 1
-            TrackingType.COUNT, TrackingType.DURATION -> {
-                completionPercentByValue(task, value) >= getMinimumCompletionPercent()
-            }
+            TrackingType.COUNT -> completionPercentByValue(task, value) >= 100
+            TrackingType.DURATION -> completionPercentByValue(task, value) >= getMinimumCompletionPercent()
         }
     }
 

@@ -113,6 +113,7 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "Today" to v("Heute", "Aujourd'hui", "Hoy", "Oggi", "Сегодня"),
     "Completion details" to v("Details zur Erfullung", "Details de realisation", "Detalles de cumplimiento", "Dettagli completamento", "Детали выполнения"),
     "Completed" to v("Abgeschlossen", "Termine", "Completado", "Completato", "Выполнено"),
+    "Partial" to v("Teilweise", "Partiel", "Parcial", "Parziale", "Частично"),
     "Missed" to v("Verpasst", "Manque", "Perdido", "Saltato", "Пропущено"),
     "Not scheduled" to v("Nicht geplant", "Non planifie", "No programado", "Non pianificato", "Не запланировано"),
     "Future" to v("Zukunft", "Futur", "Futuro", "Futuro", "Будущее"),
@@ -450,6 +451,82 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "Save changes" to v("Anderungen speichern", "Enregistrer les modifications", "Guardar cambios", "Salva modifiche", "Сохранить изменения"),
     "Create Habit" to v("Gewohnheit erstellen", "Creer une habitude", "Crear habito", "Crea abitudine", "Создать привычку"),
     "Edit Habit" to v("Gewohnheit bearbeiten", "Modifier l'habitude", "Editar habito", "Modifica abitudine", "Редактировать привычку"),
+    "Do once" to v("Einmal tun", "Faire une fois", "Hacer una vez", "Fallo una volta", "Сделать один раз"),
+    "Do N times" to v("N-mal tun", "Faire N fois", "Hacer N veces", "Fallo N volte", "Сделать N раз"),
+    "Do N minutes" to v("N Minuten tun", "Faire N minutes", "Hacer N minutos", "Fallo N minuti", "Делать N минут"),
+    "Just mark whether you did it today" to v(
+        "Markiere nur, ob du es heute gemacht hast",
+        "Indiquez simplement si vous l'avez fait aujourd'hui",
+        "Solo marca si lo hiciste hoy",
+        "Segna solo se l'hai fatto oggi",
+        "Просто отметь, сделал ли ты это сегодня"
+    ),
+    "Set a daily quantity target" to v(
+        "Setze ein Tagesziel nach Anzahl",
+        "Definissez un objectif quotidien en quantite",
+        "Establece un objetivo diario por cantidad",
+        "Imposta un obiettivo giornaliero di quantita",
+        "Поставь цель по количеству на день"
+    ),
+    "Set a daily time target" to v(
+        "Setze ein Tagesziel nach Zeit",
+        "Definissez un objectif quotidien de temps",
+        "Establece un objetivo diario de tiempo",
+        "Imposta un obiettivo giornaliero di tempo",
+        "Поставь цель по времени на день"
+    ),
+    "Count target" to v("Zahlziel", "Objectif de quantite", "Objetivo de cantidad", "Obiettivo quantita", "Цель по количеству"),
+    "Daily target" to v("Tagesziel", "Objectif quotidien", "Objetivo diario", "Obiettivo giornaliero", "Ежедневная цель"),
+    "Unit label" to v("Einheit", "Unite", "Unidad", "Unita", "Единица измерения"),
+    "e.g. glasses, pages, reps" to v(
+        "z.B. Glaser, Seiten, Wiederholungen",
+        "ex. verres, pages, repetitions",
+        "p. ej. vasos, paginas, repeticiones",
+        "es. bicchieri, pagine, ripetizioni",
+        "напр. стаканов, страниц, повторений"
+    ),
+    "Duration target" to v("Zeitziel", "Objectif de duree", "Objetivo de duracion", "Obiettivo durata", "Цель по времени"),
+    "Daily minute goal" to v("Tagesziel in Minuten", "Objectif quotidien en minutes", "Meta diaria en minutos", "Obiettivo minuti al giorno", "Ежедневная цель в минутах"),
+    "Tracking" to v("Tracking", "Suivi", "Seguimiento", "Monitoraggio", "Отслеживание"),
+    "How much progress counts as completed." to v(
+        "Wie viel Fortschritt als erledigt gilt.",
+        "Quel progres compte comme accompli.",
+        "Cuanto progreso cuenta como completado.",
+        "Quanto progresso conta come completato.",
+        "Сколько прогресса считается выполнением."
+    ),
+    "Minimum completion percent" to v(
+        "Minimaler Erfullungsprozentsatz",
+        "Pourcentage minimal de completion",
+        "Porcentaje minimo de cumplimiento",
+        "Percentuale minima di completamento",
+        "Минимальный процент выполнения"
+    ),
+    "Used for count and duration habits" to v(
+        "Gilt fur Gewohnheiten mit Anzahl und Dauer",
+        "Utilise pour les habitudes de quantite et duree",
+        "Se usa para habitos de cantidad y duracion",
+        "Usato per abitudini di conteggio e durata",
+        "Используется для привычек по количеству и времени"
+    ),
+    "Completion threshold" to v("Erfullungsschwelle", "Seuil de completion", "Umbral de cumplimiento", "Soglia di completamento", "Порог выполнения"),
+    "In progress" to v("In Arbeit", "En cours", "En progreso", "In corso", "В процессе"),
+    "%d%% of %d%% threshold" to v(
+        "%d%% von %d%% Schwelle",
+        "%d%% sur seuil %d%%",
+        "%d%% de umbral %d%%",
+        "%d%% della soglia %d%%",
+        "%d%% из %d%% порога"
+    ),
+    "times" to v("Mal", "fois", "veces", "volte", "раз"),
+    "min" to v("Min", "min", "min", "min", "мин"),
+    "Manual minutes" to v("Minuten manuell", "Minutes manuelles", "Minutos manuales", "Minuti manuali", "Минуты вручную"),
+    "Added %d min" to v("%d Min hinzugefugt", "%d min ajoutees", "%d min agregados", "%d min aggiunti", "Добавлено %d мин"),
+    "Stop timer" to v("Timer stoppen", "Arreter le minuteur", "Detener temporizador", "Ferma timer", "Остановить таймер"),
+    "Start timer" to v("Timer starten", "Demarrer le minuteur", "Iniciar temporizador", "Avvia timer", "Запустить таймер"),
+    "Timer (Premium)" to v("Timer (Premium)", "Minuteur (Premium)", "Temporizador (Premium)", "Timer (Premium)", "Таймер (Премиум)"),
+    "Total value" to v("Gesamtwert", "Valeur totale", "Valor total", "Valore totale", "Общее значение"),
+    "Average per day" to v("Durchschnitt pro Tag", "Moyenne par jour", "Promedio por dia", "Media al giorno", "Среднее в день"),
     "Yes / No" to v("Ja / Nein", "Oui / Non", "Si / No", "Si / No", "Да / Нет"),
     "Count" to v("Anzahl", "Compteur", "Cantidad", "Conteggio", "Количество"),
     "Duration" to v("Dauer", "Duree", "Duracion", "Durata", "Длительность"),

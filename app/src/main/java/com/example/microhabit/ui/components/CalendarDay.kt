@@ -34,6 +34,7 @@ import java.time.LocalDate
 
 enum class CalendarDayState {
     COMPLETED,
+    PARTIAL,
     MISSED,
     NOT_SCHEDULED,
     FUTURE
@@ -82,18 +83,21 @@ fun CalendarDay(
 
     val fillColor = when (state) {
         CalendarDayState.COMPLETED -> colors.success.copy(alpha = 0.90f)
+        CalendarDayState.PARTIAL -> colors.successMuted.copy(alpha = 0.70f)
         CalendarDayState.MISSED -> colors.danger.copy(alpha = 0.08f)
         CalendarDayState.NOT_SCHEDULED -> colors.neutralMuted.copy(alpha = 0.40f)
         CalendarDayState.FUTURE -> colors.backgroundSurfaceMuted.copy(alpha = 0.25f)
     }
     val borderColor = when (state) {
         CalendarDayState.COMPLETED -> Color.Transparent
+        CalendarDayState.PARTIAL -> colors.success.copy(alpha = 0.35f)
         CalendarDayState.MISSED -> colors.danger.copy(alpha = 0.45f)
         CalendarDayState.NOT_SCHEDULED -> colors.borderSubtle
         CalendarDayState.FUTURE -> colors.borderSubtle.copy(alpha = 0.45f)
     }
     val textColor = when (state) {
         CalendarDayState.COMPLETED -> MaterialTheme.colorScheme.onPrimary
+        CalendarDayState.PARTIAL -> colors.success
         CalendarDayState.MISSED -> colors.danger
         CalendarDayState.NOT_SCHEDULED -> colors.textSecondary
         CalendarDayState.FUTURE -> colors.textTertiary
@@ -185,7 +189,7 @@ fun CalendarDay(
                 text = date.dayOfMonth.toString(),
                 style = MaterialTheme.typography.bodyMedium,
                 color = textColor,
-                fontWeight = if (selected || today || state == CalendarDayState.COMPLETED) {
+                fontWeight = if (selected || today || state == CalendarDayState.COMPLETED || state == CalendarDayState.PARTIAL) {
                     androidx.compose.ui.text.font.FontWeight.SemiBold
                 } else {
                     androidx.compose.ui.text.font.FontWeight.Medium

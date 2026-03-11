@@ -244,6 +244,9 @@ private data class OnboardingHabitDraft(
     val name: String,
     val category: HabitCategory,
     val template: HabitTemplate,
+    val trackingType: TrackingType = TrackingType.YES_NO,
+    val dailyTarget: Int = 1,
+    val unitLabel: String = "",
     val frequency: TaskFrequency,
     val customDays: Set<Int>,
     val reminderEnabled: Boolean,
@@ -400,6 +403,9 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                         name = draft.name,
                         category = draft.category,
                         template = draft.template,
+                        trackingType = draft.trackingType,
+                        dailyTarget = draft.dailyTarget,
+                        unitLabel = draft.unitLabel,
                         frequency = draft.frequency,
                         customDays = draft.customDays,
                         reminderEnabled = draft.reminderEnabled,
@@ -500,6 +506,10 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                                 state = state,
                                 vm = vm,
                                 onOpenDetails = { page = AppPage.HABIT_DETAIL },
+                                onOpenPaywall = {
+                                    previousPage = AppPage.TRACKER
+                                    page = AppPage.PAYWALL
+                                },
                                 highlightCompletionButton = highlightCompletionButton,
                                 onHighlightConsumed = { highlightCompletionButton = false }
                             )
@@ -569,6 +579,7 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                                     }
                                 },
                                 onSetDefaultReminder = vm::setDefaultReminder,
+                                onSetMinimumCompletionPercent = vm::setMinimumCompletionPercent,
                                 onOpenPaywall = {
                                     previousPage = AppPage.SETTINGS
                                     page = AppPage.PAYWALL
@@ -739,6 +750,7 @@ private fun TrackerPage(
     state: HabitUiState,
     vm: MainViewModel,
     onOpenDetails: () -> Unit,
+    onOpenPaywall: () -> Unit,
     highlightCompletionButton: Boolean,
     onHighlightConsumed: () -> Unit
 ) {
@@ -851,8 +863,21 @@ private fun TrackerPage(
                                 task = animatedTask,
                                 selectedDate = state.selectedDate,
                                 done = state.selectedDateDone,
+                                partial = state.selectedDatePartial,
                                 scheduled = state.selectedDateScheduled,
+                                selectedValue = state.selectedDateValue,
+                                selectedTarget = state.selectedDateTarget,
+                                selectedUnit = state.selectedDateUnit,
+                                selectedCompletionPercent = state.selectedDateCompletionPercent,
+                                minimumCompletionPercent = state.minimumCompletionPercent,
+                                plan = state.plan,
+                                durationTimerRunning = state.durationTimerRunning,
+                                durationTimerElapsedSeconds = state.durationTimerElapsedSeconds,
                                 onDone = vm::toggleSelectedDateDone,
+                                onIncrementValue = vm::incrementSelectedDateValue,
+                                onStartDurationTimer = vm::startDurationTimer,
+                                onStopDurationTimerAndApply = vm::stopDurationTimerAndApply,
+                                onOpenPaywall = onOpenPaywall,
                                 highlightMarkButton = highlightCompletionButton,
                                 onHighlightConsumed = onHighlightConsumed,
                                 appThemeMode = state.themeMode,
@@ -893,6 +918,7 @@ private fun TrackerPage(
                                 selectedDate = state.selectedDate,
                                 selectedTask = animatedTask,
                                 doneDates = state.doneDatesInCurrentMonth,
+                                partialDates = state.partialDatesInCurrentMonth,
                                 scheduledDates = state.scheduledDatesInCurrentMonth,
                                 onMoveMonth = vm::moveMonth,
                                 onToday = vm::jumpToToday,
@@ -1175,6 +1201,7 @@ private fun HabitDetailPage(
                         month = state.currentMonth,
                         selectedDate = state.selectedDate,
                         doneDates = state.doneDatesInCurrentMonth,
+                        partialDates = state.partialDatesInCurrentMonth,
                         scheduledDates = state.scheduledDatesInCurrentMonth,
                         onMoveMonth = vm::moveMonth,
                         onToday = vm::jumpToToday,
@@ -1190,10 +1217,14 @@ private fun HabitDetailPage(
                 }
                 item {
                     HabitDepthStats(
+                        trackingType = selectedTask.trackingType,
                         streak = state.streak,
                         bestStreak = state.bestStreak,
                         completion30Day = state.completionRate30Day,
-                        totalCompletions = state.totalCompletions
+                        totalCompletions = state.totalCompletions,
+                        totalTrackedValue = state.totalTrackedValue,
+                        averageTrackedValue = state.averageTrackedValue,
+                        unitLabel = if (selectedTask.trackingType == TrackingType.DURATION) t("min") else selectedTask.unitLabel
                     )
                 }
                 item {
@@ -1438,6 +1469,7 @@ private fun HabitMiniCalendarCard(
     month: YearMonth,
     selectedDate: LocalDate,
     doneDates: Set<LocalDate>,
+    partialDates: Set<LocalDate>,
     scheduledDates: Set<LocalDate>,
     onMoveMonth: (Long) -> Unit,
     onToday: () -> Unit,
@@ -1495,6 +1527,7 @@ private fun HabitMiniCalendarCard(
                         val state = dayStateFor(
                             date = day,
                             doneDates = doneDates,
+                            partialDates = partialDates,
                             scheduledDates = scheduledDates,
                             today = today
                         )
@@ -1531,12 +1564,14 @@ private fun MiniCalendarCell(
     val stroke = AppTheme.stroke
     val background = when (state) {
         CalendarDayState.COMPLETED -> semantic.success.copy(alpha = 0.9f)
+        CalendarDayState.PARTIAL -> semantic.successMuted.copy(alpha = 0.70f)
         CalendarDayState.MISSED -> semantic.danger.copy(alpha = 0.10f)
         CalendarDayState.NOT_SCHEDULED -> semantic.neutralMuted.copy(alpha = 0.35f)
         CalendarDayState.FUTURE -> semantic.backgroundSurfaceMuted.copy(alpha = 0.28f)
     }
     val textColor = when (state) {
         CalendarDayState.COMPLETED -> MaterialTheme.colorScheme.onPrimary
+        CalendarDayState.PARTIAL -> semantic.success
         CalendarDayState.MISSED -> semantic.danger
         CalendarDayState.NOT_SCHEDULED -> semantic.textSecondary
         CalendarDayState.FUTURE -> semantic.textTertiary
@@ -1571,10 +1606,14 @@ private fun MiniCalendarCell(
 
 @Composable
 private fun HabitDepthStats(
+    trackingType: TrackingType,
     streak: Int,
     bestStreak: Int,
     completion30Day: Int,
-    totalCompletions: Int
+    totalCompletions: Int,
+    totalTrackedValue: Int,
+    averageTrackedValue: Int,
+    unitLabel: String
 ) {
     val spacing = AppTheme.spacing
 
@@ -1614,6 +1653,31 @@ private fun HabitDepthStats(
                     value = totalCompletions.toString(),
                     modifier = Modifier.weight(1f)
                 )
+            }
+            if (trackingType != TrackingType.YES_NO) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+                ) {
+                    AnalyticsMetricTile(
+                        label = t("Total value"),
+                        value = if (unitLabel.isBlank()) {
+                            totalTrackedValue.toString()
+                        } else {
+                            "$totalTrackedValue $unitLabel"
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                    AnalyticsMetricTile(
+                        label = t("Average per day"),
+                        value = if (unitLabel.isBlank()) {
+                            averageTrackedValue.toString()
+                        } else {
+                            "$averageTrackedValue $unitLabel"
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
         }
     }
@@ -1820,7 +1884,7 @@ private fun AnalyticsPage(
 
     val locale = appLocale()
     val chartAnchorDate = LocalDate.now()
-    val weeklyValues = state.last7Days.map { if (it > 0) 100 else 0 }
+    val weeklyValues = state.last7Days.map { it.coerceIn(0, 100) }
     val weeklyLabels = (6 downTo 0).map { offset ->
         chartAnchorDate.minusDays(offset.toLong()).dayOfWeek.getDisplayName(TextStyle.SHORT, locale)
     }
@@ -1977,6 +2041,7 @@ private fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
     val selectedState = dayStateFor(
         date = state.selectedDate,
         doneDates = state.doneDatesInCurrentMonth,
+        partialDates = state.partialDatesInCurrentMonth,
         scheduledDates = state.scheduledDatesInCurrentMonth,
         today = today
     )
@@ -2031,6 +2096,7 @@ private fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
                                 val dayState = dayStateFor(
                                     date = day,
                                     doneDates = state.doneDatesInCurrentMonth,
+                                    partialDates = state.partialDatesInCurrentMonth,
                                     scheduledDates = state.scheduledDatesInCurrentMonth,
                                     today = today
                                 )
@@ -2075,6 +2141,7 @@ private fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
                             selectedIsTodayPending -> colors.primary
                             else -> when (selectedState) {
                             CalendarDayState.COMPLETED -> colors.success
+                            CalendarDayState.PARTIAL -> colors.success
                             CalendarDayState.MISSED -> colors.danger
                             CalendarDayState.NOT_SCHEDULED -> colors.textSecondary
                             CalendarDayState.FUTURE -> colors.textSecondary
@@ -2090,12 +2157,14 @@ private fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
 private fun dayStateFor(
     date: LocalDate?,
     doneDates: Set<LocalDate>,
+    partialDates: Set<LocalDate>,
     scheduledDates: Set<LocalDate>,
     today: LocalDate
 ): CalendarDayState {
     if (date == null) return CalendarDayState.FUTURE
     if (date.isAfter(today)) return CalendarDayState.FUTURE
     if (date in doneDates) return CalendarDayState.COMPLETED
+    if (date in partialDates) return CalendarDayState.PARTIAL
     if (date in scheduledDates && date.isBefore(today)) return CalendarDayState.MISSED
     return CalendarDayState.NOT_SCHEDULED
 }
@@ -2103,6 +2172,7 @@ private fun dayStateFor(
 private fun statusLabel(state: CalendarDayState, language: AppLanguage): String {
     return when (state) {
         CalendarDayState.COMPLETED -> translate(language, "Completed")
+        CalendarDayState.PARTIAL -> translate(language, "Partial")
         CalendarDayState.MISSED -> translate(language, "Missed")
         CalendarDayState.NOT_SCHEDULED -> translate(language, "Not scheduled")
         CalendarDayState.FUTURE -> translate(language, "Future")
@@ -2168,6 +2238,7 @@ private fun SettingsPage(
     onSetLanguage: (AppLanguage) -> Unit,
     onSetNotificationsEnabled: (Boolean) -> Unit,
     onSetDefaultReminder: (Int, Int) -> Unit,
+    onSetMinimumCompletionPercent: (Int) -> Unit,
     onOpenPaywall: () -> Unit,
     onExportData: () -> Result<String>,
     onResetProgress: () -> Unit,
@@ -2180,6 +2251,10 @@ private fun SettingsPage(
     var showLanguageDialog by rememberSaveable { mutableStateOf(false) }
     var showResetConfirm by rememberSaveable { mutableStateOf(false) }
     var showDeleteConfirm by rememberSaveable { mutableStateOf(false) }
+    var showCompletionThresholdDialog by rememberSaveable { mutableStateOf(false) }
+    var completionPercentDraft by rememberSaveable(state.minimumCompletionPercent) {
+        mutableStateOf(state.minimumCompletionPercent.coerceIn(50, 100))
+    }
     val selectedHabit = state.tasks.firstOrNull { it.id == state.selectedTaskId }
     val supportedLanguages = listOf(
         AppLanguage.EN,
@@ -2267,6 +2342,23 @@ private fun SettingsPage(
                             state.defaultReminderMinute,
                             is24HourView
                         ).show()
+                    }
+                )
+            }
+        }
+
+        item {
+            SettingsGroup(
+                title = t("Tracking"),
+                subtitle = t("How much progress counts as completed.")
+            ) {
+                SettingsRow(
+                    title = t("Minimum completion percent"),
+                    subtitle = t("Used for count and duration habits"),
+                    value = "${state.minimumCompletionPercent}%",
+                    onClick = {
+                        completionPercentDraft = state.minimumCompletionPercent.coerceIn(50, 100)
+                        showCompletionThresholdDialog = true
                     }
                 )
             }
@@ -2436,6 +2528,43 @@ private fun SettingsPage(
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text(t("Cancel"))
+                }
+            }
+        )
+    }
+
+    if (showCompletionThresholdDialog) {
+        AlertDialog(
+            onDismissRequest = { showCompletionThresholdDialog = false },
+            title = { Text(t("Minimum completion percent")) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+                    Text(
+                        text = t("Used for count and duration habits"),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Stepper(
+                        label = t("Completion threshold"),
+                        value = completionPercentDraft,
+                        min = 50,
+                        max = 100,
+                        onValueChange = { completionPercentDraft = it }
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showCompletionThresholdDialog = false
+                        onSetMinimumCompletionPercent(completionPercentDraft.coerceIn(50, 100))
+                    }
+                ) {
+                    Text(t("Save changes"))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCompletionThresholdDialog = false }) {
                     Text(t("Cancel"))
                 }
             }
@@ -2746,6 +2875,8 @@ private fun OnboardingWizard(
     var selectedCategory by rememberSaveable { mutableStateOf(HabitCategory.HEALTH) }
     var selectedTemplateId by rememberSaveable { mutableStateOf(HabitTemplateCatalog.templatesFor(HabitCategory.HEALTH).first().id) }
     var habitName by rememberSaveable { mutableStateOf("") }
+    var onboardingTrackingType by rememberSaveable { mutableStateOf(TrackingType.YES_NO) }
+    var onboardingDurationTarget by rememberSaveable { mutableStateOf(20) }
     var frequency by rememberSaveable { mutableStateOf(TaskFrequency.DAILY) }
     var customDays by rememberSaveable { mutableStateOf(listOf(1, 2, 3, 4, 5)) }
     var reminderEnabled by rememberSaveable { mutableStateOf(false) }
@@ -2762,8 +2893,10 @@ private fun OnboardingWizard(
     var habitCreatedNotified by remember { mutableStateOf(false) }
     val templates = remember(selectedCategory) { HabitTemplateCatalog.templatesFor(selectedCategory) }
     val selectedTemplate = templates.firstOrNull { it.id == selectedTemplateId } ?: templates.first()
-    val setupValid = remember(habitName, frequency, customDays) {
-        habitName.trim().isNotEmpty() && (frequency != TaskFrequency.SELECTED_DAYS || customDays.isNotEmpty())
+    val setupValid = remember(habitName, frequency, customDays, onboardingTrackingType, onboardingDurationTarget) {
+        habitName.trim().isNotEmpty() &&
+            (frequency != TaskFrequency.SELECTED_DAYS || customDays.isNotEmpty()) &&
+            (onboardingTrackingType != TrackingType.DURATION || onboardingDurationTarget > 0)
     }
 
     LaunchedEffect(step) {
@@ -3003,6 +3136,64 @@ private fun OnboardingWizard(
                                     singleLine = true
                                 )
 
+                                FormSection(title = t("Tracking type")) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+                                        listOf(
+                                            Triple(
+                                                TrackingType.YES_NO,
+                                                t("Do once"),
+                                                t("Just mark whether you did it today")
+                                            ),
+                                            Triple(
+                                                TrackingType.DURATION,
+                                                t("Do N minutes"),
+                                                t("Set a daily time target")
+                                            )
+                                        ).forEach { (type, title, description) ->
+                                            val selected = onboardingTrackingType == type
+                                            Surface(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clip(RoundedCornerShape(radius.md))
+                                                    .clickable { onboardingTrackingType = type },
+                                                shape = RoundedCornerShape(radius.md),
+                                                color = if (selected) colors.primary.copy(alpha = 0.14f) else colors.backgroundSurfaceMuted,
+                                                border = BorderStroke(
+                                                    width = if (selected) stroke.medium else stroke.thin,
+                                                    color = if (selected) colors.primary else colors.borderSubtle
+                                                )
+                                            ) {
+                                                Column(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(horizontal = spacing.x1_5, vertical = spacing.x1),
+                                                    verticalArrangement = Arrangement.spacedBy(spacing.x0_5)
+                                                ) {
+                                                    Text(
+                                                        text = title,
+                                                        style = MaterialTheme.typography.titleSmall,
+                                                        fontWeight = FontWeight.SemiBold
+                                                    )
+                                                    Text(
+                                                        text = description,
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = colors.textSecondary
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        if (onboardingTrackingType == TrackingType.DURATION) {
+                                            Stepper(
+                                                label = t("Daily minute goal"),
+                                                value = onboardingDurationTarget,
+                                                min = 1,
+                                                max = 600,
+                                                onValueChange = { onboardingDurationTarget = it }
+                                            )
+                                        }
+                                    }
+                                }
+
                                 FormSection(title = t("Frequency")) {
                                     Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
                                         Row(
@@ -3106,6 +3297,13 @@ private fun OnboardingWizard(
                                                     name = habitName.trim(),
                                                     category = selectedCategory,
                                                     template = selectedTemplate,
+                                                    trackingType = onboardingTrackingType,
+                                                    dailyTarget = if (onboardingTrackingType == TrackingType.DURATION) {
+                                                        onboardingDurationTarget
+                                                    } else {
+                                                        1
+                                                    },
+                                                    unitLabel = "",
                                                     frequency = frequency,
                                                     customDays = customDays.toSet(),
                                                     reminderEnabled = reminderEnabled,
@@ -3650,8 +3848,21 @@ private fun HeroCard(
     task: HabitTask?,
     selectedDate: LocalDate,
     done: Boolean,
+    partial: Boolean,
     scheduled: Boolean,
+    selectedValue: Int,
+    selectedTarget: Int,
+    selectedUnit: String,
+    selectedCompletionPercent: Int,
+    minimumCompletionPercent: Int,
+    plan: SubscriptionPlan,
+    durationTimerRunning: Boolean,
+    durationTimerElapsedSeconds: Int,
     onDone: () -> Unit,
+    onIncrementValue: (Int) -> Unit,
+    onStartDurationTimer: () -> Boolean,
+    onStopDurationTimerAndApply: () -> Int,
+    onOpenPaywall: () -> Unit,
     highlightMarkButton: Boolean,
     onHighlightConsumed: () -> Unit,
     appThemeMode: AppThemeMode,
@@ -3665,6 +3876,11 @@ private fun HeroCard(
     val semantic = AppTheme.colors
     val context = LocalContext.current
     val locale = appLocale()
+    val trackingType = task?.trackingType ?: TrackingType.YES_NO
+    val isValueTracking = trackingType != TrackingType.YES_NO
+    val isDurationTracking = trackingType == TrackingType.DURATION
+    val isCountTracking = trackingType == TrackingType.COUNT
+    val isPro = plan == SubscriptionPlan.PRO
     val canMarkForSelectedDate = scheduled
     val highlightActive = highlightMarkButton && !done && canMarkForSelectedDate
     val pressScaleTarget = 0.985f
@@ -3761,6 +3977,30 @@ private fun HeroCard(
         ),
         label = "heroHighlightPulseScale"
     )
+    var durationManualInput by remember(task?.id, selectedDate) { mutableStateOf("") }
+    val unitLabel = when {
+        trackingType == TrackingType.DURATION -> t("min")
+        trackingType == TrackingType.COUNT && selectedUnit.isNotBlank() -> selectedUnit
+        trackingType == TrackingType.COUNT -> t("times")
+        else -> ""
+    }
+    val timerLabel = remember(durationTimerElapsedSeconds) {
+        val totalSeconds = durationTimerElapsedSeconds.coerceAtLeast(0)
+        val minutes = totalSeconds / 60
+        val seconds = totalSeconds % 60
+        String.format("%02d:%02d", minutes, seconds)
+    }
+    val addedMinutesTemplate = t("Added %d min")
+    val progressLabel = when (trackingType) {
+        TrackingType.YES_NO -> ""
+        TrackingType.COUNT -> "$selectedValue / $selectedTarget $unitLabel"
+        TrackingType.DURATION -> "$selectedValue / $selectedTarget ${t("min")}"
+    }
+    val completionStatusText = when {
+        done -> t("Completed")
+        partial -> tf("%d%% of %d%% threshold", selectedCompletionPercent, minimumCompletionPercent)
+        else -> t("In progress")
+    }
 
     Column(
         modifier = Modifier
@@ -3795,7 +4035,33 @@ private fun HeroCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = semantic.textSecondary
             )
-            if (done && canMarkForSelectedDate) {
+            if (!canMarkForSelectedDate) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 36.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    OutlinedButton(
+                        onClick = {},
+                        enabled = false,
+                        modifier = Modifier
+                            .fillMaxWidth(0.94f)
+                            .height(56.dp),
+                        shape = RoundedCornerShape(radius.full),
+                        border = BorderStroke(stroke.thin * 1.5f, semantic.borderSubtle),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = Color.Transparent,
+                            disabledContentColor = semantic.textSecondary
+                        )
+                    ) {
+                        Text(
+                            text = t("Not scheduled for this date"),
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    }
+                }
+            } else if (!isValueTracking && done) {
                 val interactionSource = remember { MutableInteractionSource() }
                 val pressed by interactionSource.collectIsPressedAsState()
                 val pressScale by animateFloatAsState(
@@ -3859,7 +4125,7 @@ private fun HeroCard(
                         }
                     }
                 }
-            } else {
+            } else if (!isValueTracking) {
                 val interactionSource = remember { MutableInteractionSource() }
                 val pressed by interactionSource.collectIsPressedAsState()
                 val pressScale by animateFloatAsState(
@@ -3910,6 +4176,167 @@ private fun HeroCard(
                             },
                             style = MaterialTheme.typography.labelLarge
                         )
+                    }
+                }
+            } else {
+                GlassCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = spacing.x1),
+                    contentPadding = PaddingValues(spacing.x1_5)
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(spacing.x1),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = progressLabel,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = semantic.textPrimary
+                        )
+                        Text(
+                            text = completionStatusText,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (done) semantic.success else semantic.textSecondary
+                        )
+
+                        if (isCountTracking) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(spacing.x1),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                OutlinedButton(
+                                    onClick = { onIncrementValue(-1) },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(radius.full)
+                                ) {
+                                    Text("−")
+                                }
+                                Surface(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(48.dp),
+                                    shape = RoundedCornerShape(radius.md),
+                                    color = semantic.backgroundSurfaceMuted
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            text = selectedValue.toString(),
+                                            style = MaterialTheme.typography.titleLarge,
+                                            fontWeight = FontWeight.Bold,
+                                            color = semantic.textPrimary
+                                        )
+                                    }
+                                }
+                                OutlinedButton(
+                                    onClick = { onIncrementValue(1) },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(radius.full)
+                                ) {
+                                    Text("+")
+                                }
+                            }
+                        }
+
+                        if (isDurationTracking) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+                            ) {
+                                listOf(5, 10, 15).forEach { delta ->
+                                    OutlinedButton(
+                                        onClick = { onIncrementValue(delta) },
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(radius.full)
+                                    ) {
+                                        Text("+$delta")
+                                    }
+                                }
+                            }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(spacing.x1),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                OutlinedTextField(
+                                    value = durationManualInput,
+                                    onValueChange = { value ->
+                                        durationManualInput = value.filter { it.isDigit() }.take(4)
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    singleLine = true,
+                                    label = { Text(t("Manual minutes")) },
+                                    placeholder = { Text("20") }
+                                )
+                                Button(
+                                    onClick = {
+                                        val minutes = durationManualInput.toIntOrNull()?.coerceAtLeast(0) ?: 0
+                                        if (minutes > 0) {
+                                            onIncrementValue(minutes)
+                                            durationManualInput = ""
+                                        }
+                                    },
+                                    shape = RoundedCornerShape(radius.md)
+                                ) {
+                                    Text(t("Add"))
+                                }
+                            }
+
+                            if (isPro) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(spacing.x1),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            if (durationTimerRunning) {
+                                                val addedMinutes = onStopDurationTimerAndApply()
+                                                if (addedMinutes > 0) {
+                                                    Toast.makeText(
+                                                        context,
+                                                        String.format(locale, addedMinutesTemplate, addedMinutes),
+                                                        Toast.LENGTH_SHORT
+                                                    ).show()
+                                                }
+                                            } else {
+                                                onStartDurationTimer()
+                                            }
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(radius.full)
+                                    ) {
+                                        Text(if (durationTimerRunning) t("Stop timer") else t("Start timer"))
+                                    }
+                                    Surface(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(44.dp),
+                                        shape = RoundedCornerShape(radius.md),
+                                        color = semantic.backgroundSurfaceMuted
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Text(
+                                                text = timerLabel,
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.SemiBold
+                                            )
+                                        }
+                                    }
+                                }
+                            } else {
+                                OutlinedButton(
+                                    onClick = onOpenPaywall,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(radius.full)
+                                ) {
+                                    Text(t("Timer (Premium)"))
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -4514,29 +4941,34 @@ private fun SevenDayChart(
                     val date = anchorDate.minusDays((6 - index).toLong())
                     val isToday = date == today
                     val isFuture = date.isAfter(today)
-                    val isDone = value == 1
+                    val progressPercent = value.coerceIn(0, 100)
+                    val isDone = progressPercent >= 100
+                    val isPartial = progressPercent in 1..99
                     val isScheduled = safeScheduled[index]
                     val state = when {
                         isFuture -> CalendarDayState.FUTURE
                         isDone -> CalendarDayState.COMPLETED
+                        isPartial && isScheduled -> CalendarDayState.PARTIAL
                         isScheduled && date.isBefore(today) -> CalendarDayState.MISSED
                         else -> CalendarDayState.NOT_SCHEDULED
                     }
                     val leftDone = if (index > 0) {
                         val leftDate = anchorDate.minusDays((6 - (index - 1)).toLong())
-                        safe[index - 1] == 1 && !leftDate.isAfter(today)
+                        safe[index - 1].coerceIn(0, 100) >= 100 && !leftDate.isAfter(today)
                     } else {
                         false
                     }
                     val rightDone = if (index < safe.lastIndex) {
                         val rightDate = anchorDate.minusDays((6 - (index + 1)).toLong())
-                        safe[index + 1] == 1 && !rightDate.isAfter(today)
+                        safe[index + 1].coerceIn(0, 100) >= 100 && !rightDate.isAfter(today)
                     } else {
                         false
                     }
                     DayBar(
                         modifier = Modifier.weight(1f),
                         state = state,
+                        progressPercent = progressPercent,
+                        isScheduled = isScheduled,
                         isToday = isToday,
                         connectLeft = isDone && leftDone,
                         connectRight = isDone && rightDone,
@@ -4552,6 +4984,8 @@ private fun SevenDayChart(
 private fun DayBar(
     modifier: Modifier = Modifier,
     state: CalendarDayState,
+    progressPercent: Int,
+    isScheduled: Boolean,
     isToday: Boolean,
     connectLeft: Boolean,
     connectRight: Boolean,
@@ -4561,8 +4995,9 @@ private fun DayBar(
     val radius = AppTheme.radius
     val stroke = AppTheme.stroke
     val semantic = AppTheme.colors
+    val safeProgress = progressPercent.coerceIn(0, 100)
     val completionProgress by animateFloatAsState(
-        targetValue = if (state == CalendarDayState.COMPLETED) 1f else 0f,
+        targetValue = safeProgress / 100f,
         animationSpec = tween(durationMillis = 220, easing = FastOutSlowInEasing),
         label = "dayBarCompletionProgress"
     )
@@ -4581,6 +5016,7 @@ private fun DayBar(
     val backgroundColor by animateColorAsState(
         targetValue = when (state) {
             CalendarDayState.COMPLETED -> semantic.success.copy(alpha = 0.90f)
+            CalendarDayState.PARTIAL -> semantic.successMuted.copy(alpha = 0.72f)
             CalendarDayState.MISSED -> semantic.danger.copy(alpha = 0.08f)
             CalendarDayState.NOT_SCHEDULED -> semantic.neutralMuted.copy(alpha = 0.42f)
             CalendarDayState.FUTURE -> semantic.backgroundSurfaceMuted.copy(alpha = 0.28f)
@@ -4590,12 +5026,14 @@ private fun DayBar(
     )
     val borderColor = when (state) {
         CalendarDayState.COMPLETED -> Color.Transparent
+        CalendarDayState.PARTIAL -> semantic.success.copy(alpha = 0.35f)
         CalendarDayState.MISSED -> semantic.danger.copy(alpha = 0.45f)
         CalendarDayState.NOT_SCHEDULED -> semantic.borderSubtle
         CalendarDayState.FUTURE -> semantic.borderSubtle.copy(alpha = 0.4f)
     }
     val dayColor = when (state) {
         CalendarDayState.COMPLETED -> MaterialTheme.colorScheme.onPrimary
+        CalendarDayState.PARTIAL -> semantic.success
         CalendarDayState.MISSED -> semantic.danger
         CalendarDayState.NOT_SCHEDULED -> semantic.textSecondary
         CalendarDayState.FUTURE -> semantic.textTertiary
@@ -4646,11 +5084,24 @@ private fun DayBar(
                     )
                 }
                 Text(
-                    text = if (state == CalendarDayState.COMPLETED) "✓" else "",
+                    text = when (state) {
+                        CalendarDayState.COMPLETED -> "✓"
+                        CalendarDayState.PARTIAL -> "${safeProgress}%"
+                        else -> ""
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = dayColor,
                     fontWeight = FontWeight.Bold
                 )
+                if (isScheduled && state != CalendarDayState.FUTURE) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth(completionProgress)
+                            .height(3.dp)
+                            .background(semantic.success, RoundedCornerShape(radius.full))
+                    )
+                }
             }
         }
         Text(
@@ -4669,6 +5120,7 @@ private fun CalendarCard(
     selectedDate: LocalDate,
     selectedTask: HabitTask?,
     doneDates: Set<LocalDate>,
+    partialDates: Set<LocalDate>,
     scheduledDates: Set<LocalDate>,
     onMoveMonth: (Long) -> Unit,
     onToday: () -> Unit,
@@ -4718,6 +5170,7 @@ private fun CalendarCard(
                         val state = dayStateFor(
                             date = day,
                             doneDates = doneDates,
+                            partialDates = partialDates,
                             scheduledDates = scheduledDates,
                             today = today
                         )
@@ -4850,10 +5303,22 @@ private fun TaskEditorDialog(
     val pickerTheme = R.style.ThemeOverlay_MicroHabit_Picker
     val pickerActionColor = colors.primary.toArgb()
 
-    val trackingOptions = listOf(
-        ChoiceOption(TrackingType.YES_NO, t("Yes / No")),
-        ChoiceOption(TrackingType.COUNT, t("Count")),
-        ChoiceOption(TrackingType.DURATION, t("Duration"))
+    val trackingCards = listOf(
+        Triple(
+            TrackingType.YES_NO,
+            t("Do once"),
+            t("Just mark whether you did it today")
+        ),
+        Triple(
+            TrackingType.COUNT,
+            t("Do N times"),
+            t("Set a daily quantity target")
+        ),
+        Triple(
+            TrackingType.DURATION,
+            t("Do N minutes"),
+            t("Set a daily time target")
+        )
     )
     val frequencyOptions = listOf(
         ChoiceOption(TaskFrequency.DAILY, t("Every day")),
@@ -4978,11 +5443,82 @@ private fun TaskEditorDialog(
                 }
 
                 FormSection(title = t("Tracking type")) {
-                    SingleSelectChips(
-                        options = trackingOptions,
-                        selected = state.editorTrackingType,
-                        onSelect = vm::setEditorTrackingType
-                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+                        trackingCards.forEach { (type, title, description) ->
+                            val selected = state.editorTrackingType == type
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(AppTheme.radius.md))
+                                    .clickable { vm.setEditorTrackingType(type) },
+                                shape = RoundedCornerShape(AppTheme.radius.md),
+                                color = if (selected) {
+                                    colors.primary.copy(alpha = 0.14f)
+                                } else {
+                                    colors.backgroundSurfaceMuted
+                                },
+                                border = BorderStroke(
+                                    width = if (selected) stroke.medium else stroke.thin,
+                                    color = if (selected) colors.primary else colors.borderSubtle
+                                )
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = spacing.x1_5, vertical = spacing.x1),
+                                    verticalArrangement = Arrangement.spacedBy(spacing.x0_5)
+                                ) {
+                                    Text(
+                                        text = title,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = colors.textPrimary
+                                    )
+                                    Text(
+                                        text = description,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = colors.textSecondary
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                when (state.editorTrackingType) {
+                    TrackingType.YES_NO -> Unit
+                    TrackingType.COUNT -> {
+                        FormSection(title = t("Count target")) {
+                            Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+                                Stepper(
+                                    label = t("Daily target"),
+                                    value = state.editorDailyTarget,
+                                    min = 1,
+                                    max = 999,
+                                    onValueChange = vm::setEditorDailyTarget
+                                )
+                                OutlinedTextField(
+                                    value = state.editorUnitLabel,
+                                    onValueChange = vm::setEditorUnitLabel,
+                                    label = { Text(t("Unit label")) },
+                                    placeholder = { Text(t("e.g. glasses, pages, reps")) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true
+                                )
+                            }
+                        }
+                    }
+                    TrackingType.DURATION -> {
+                        FormSection(title = t("Duration target")) {
+                            Stepper(
+                                label = t("Daily minute goal"),
+                                value = state.editorDailyTarget,
+                                min = 1,
+                                max = 600,
+                                onValueChange = vm::setEditorDailyTarget
+                            )
+                        }
+                    }
                 }
 
                 FormSection(title = t("Frequency")) {

@@ -17,15 +17,19 @@ import com.example.microhabit.data.TrackingType
 import com.example.microhabit.i18n.localeForLanguage
 import com.example.microhabit.i18n.translate
 import com.example.microhabit.notifications.HabitReminderScheduler
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.TextStyle
+import kotlin.math.roundToInt
 
 data class HabitListItem(
     val id: String,
@@ -50,8 +54,13 @@ data class HabitUiState(
     val selectedDate: LocalDate = LocalDate.now(),
     val currentMonth: YearMonth = YearMonth.now(),
     val selectedDateDone: Boolean = false,
+    val selectedDatePartial: Boolean = false,
     val selectedDateScheduled: Boolean = false,
     val selectedDateInFuture: Boolean = false,
+    val selectedDateValue: Int = 0,
+    val selectedDateTarget: Int = 1,
+    val selectedDateUnit: String = "",
+    val selectedDateCompletionPercent: Int = 0,
     val todayDone: Boolean = false,
     val todayScheduled: Boolean = false,
     val streakSaverCount: Int = 0,
@@ -62,6 +71,8 @@ data class HabitUiState(
     val completionRate7Day: Int = 0,
     val completionRate30Day: Int = 0,
     val totalCompletions: Int = 0,
+    val totalTrackedValue: Int = 0,
+    val averageTrackedValue: Int = 0,
     val streakHistory: List<Int> = emptyList(),
     val mostConsistentWeekday: Int? = null,
     val hardestWeekday: Int? = null,
@@ -73,6 +84,7 @@ data class HabitUiState(
     val monthlyProgress: List<Int> = emptyList(),
     val weekdayConsistency: List<Int> = List(7) { 0 },
     val doneDatesInCurrentMonth: Set<LocalDate> = emptySet(),
+    val partialDatesInCurrentMonth: Set<LocalDate> = emptySet(),
     val scheduledDatesInCurrentMonth: Set<LocalDate> = emptySet(),
     val showEditor: Boolean = false,
     val editingTaskId: String? = null,
@@ -80,6 +92,8 @@ data class HabitUiState(
     val editorEmoji: String = "✨",
     val editorColorHex: String = "#1F6F64",
     val editorTrackingType: TrackingType = TrackingType.YES_NO,
+    val editorDailyTarget: Int = 1,
+    val editorUnitLabel: String = "",
     val editorFrequency: TaskFrequency = TaskFrequency.DAILY,
     val editorTimesPerWeek: Int = 3,
     val editorCustomDays: Set<Int> = setOf(1, 2, 3, 4, 5),
@@ -92,8 +106,11 @@ data class HabitUiState(
     val themeMode: AppThemeMode = AppThemeMode.SYSTEM,
     val language: AppLanguage = AppLanguage.RU,
     val notificationsEnabled: Boolean = true,
+    val minimumCompletionPercent: Int = 80,
     val defaultReminderHour: Int = 8,
     val defaultReminderMinute: Int = 0,
+    val durationTimerRunning: Boolean = false,
+    val durationTimerElapsedSeconds: Int = 0,
     val onboardingCompleted: Boolean = false,
     val isLoaded: Boolean = false
 )
@@ -101,6 +118,8 @@ data class HabitUiState(
 private data class EditorSavePayload(
     val current: HabitUiState,
     val title: String,
+    val dailyTarget: Int,
+    val unitLabel: String,
     val frequency: TaskFrequency,
     val customDays: Set<Int>
 )
@@ -113,6 +132,9 @@ class MainViewModel(
     val state: StateFlow<HabitUiState> = _state.asStateFlow()
     private val dismissedStreakSaverPromptDates = mutableMapOf<String, LocalDate>()
     private val saverRewardedCompletionDates = mutableSetOf<String>()
+    private var durationTimerJob: Job? = null
+    private var timerTaskId: String? = null
+    private var timerDate: LocalDate? = null
 
     init {
         refresh()
@@ -197,6 +219,9 @@ class MainViewModel(
         name: String,
         category: HabitCategory,
         template: HabitTemplate,
+        trackingType: TrackingType,
+        dailyTarget: Int,
+        unitLabel: String,
         frequency: TaskFrequency,
         customDays: Set<Int>,
         reminderEnabled: Boolean,
@@ -221,7 +246,13 @@ class MainViewModel(
                 editorTitle = normalizedName,
                 editorEmoji = template.emoji.ifBlank { "✨" }.take(2),
                 editorColorHex = HabitTemplateCatalog.defaultColorHex(category),
-                editorTrackingType = TrackingType.YES_NO,
+                editorTrackingType = trackingType,
+                editorDailyTarget = when (trackingType) {
+                    TrackingType.YES_NO -> 1
+                    TrackingType.COUNT -> dailyTarget.coerceAtLeast(1)
+                    TrackingType.DURATION -> dailyTarget.coerceAtLeast(1)
+                },
+                editorUnitLabel = if (trackingType == TrackingType.COUNT) unitLabel.trim().take(20) else "",
                 editorFrequency = normalizedFrequency,
                 editorTimesPerWeek = 3,
                 editorCustomDays = normalizedCustomDays,
@@ -267,8 +298,12 @@ class MainViewModel(
             if (shouldShiftStartDate) {
                 repository.updateTaskStartDate(task.id, selectedDate)
             }
-            val alreadyDone = repository.isDone(task.id, selectedDate)
-            repository.setDone(task.id, selectedDate, !alreadyDone)
+            val alreadyDone = repository.isCompletedOn(task, selectedDate)
+            if (alreadyDone) {
+                repository.setDayValue(task, selectedDate, 0)
+            } else {
+                repository.setDayValue(task, selectedDate, 1)
+            }
             if (!alreadyDone && selectedDate == LocalDate.now()) {
                 maybeAwardStreakSaver(task.id, previousStreak)
             }
@@ -287,7 +322,7 @@ class MainViewModel(
             if (!repository.isScheduledOn(task, today) && !(today.isBefore(task.startDate) && repository.isScheduledByFrequency(task, today))) {
                 return@launch
             }
-            if (!repository.isDone(task.id, today)) {
+            if (!repository.isCompletedOn(task, today)) {
                 val previousStreak = repository.calculateStreak(task)
                 if (today.isBefore(task.startDate) && repository.isScheduledByFrequency(task, today)) {
                     repository.updateTaskStartDate(task.id, today)
@@ -335,6 +370,8 @@ class MainViewModel(
                 editorEmoji = "✨",
                 editorColorHex = "#1F6F64",
                 editorTrackingType = TrackingType.YES_NO,
+                editorDailyTarget = 1,
+                editorUnitLabel = "",
                 editorFrequency = TaskFrequency.DAILY,
                 editorTimesPerWeek = 3,
                 editorCustomDays = setOf(1, 2, 3, 4, 5),
@@ -357,6 +394,8 @@ class MainViewModel(
                 editorEmoji = task.emoji,
                 editorColorHex = task.colorHex,
                 editorTrackingType = task.trackingType,
+                editorDailyTarget = task.dailyTarget.coerceAtLeast(1),
+                editorUnitLabel = task.unitLabel,
                 editorFrequency = task.frequency,
                 editorTimesPerWeek = task.timesPerWeek,
                 editorCustomDays = if (task.customDays.isEmpty()) setOf(1, 2, 3, 4, 5) else task.customDays
@@ -402,7 +441,34 @@ class MainViewModel(
     }
 
     fun setEditorTrackingType(value: TrackingType) {
-        _state.update { it.copy(editorTrackingType = value) }
+        _state.update {
+            val target = when (value) {
+                TrackingType.YES_NO -> 1
+                TrackingType.COUNT -> if (it.editorTrackingType == TrackingType.COUNT) {
+                    it.editorDailyTarget.coerceAtLeast(1)
+                } else {
+                    8
+                }
+                TrackingType.DURATION -> if (it.editorTrackingType == TrackingType.DURATION) {
+                    it.editorDailyTarget.coerceAtLeast(1)
+                } else {
+                    20
+                }
+            }
+            it.copy(
+                editorTrackingType = value,
+                editorDailyTarget = target,
+                editorUnitLabel = if (value == TrackingType.COUNT) it.editorUnitLabel else ""
+            )
+        }
+    }
+
+    fun setEditorDailyTarget(value: Int) {
+        _state.update { it.copy(editorDailyTarget = value.coerceAtLeast(1)) }
+    }
+
+    fun setEditorUnitLabel(value: String) {
+        _state.update { it.copy(editorUnitLabel = value.trimStart().take(20)) }
     }
 
     fun setEditorFrequency(value: TaskFrequency) {
@@ -433,6 +499,108 @@ class MainViewModel(
 
     fun setEditorReminderEnabled(value: Boolean) {
         _state.update { it.copy(editorReminderEnabled = value) }
+    }
+
+    fun setMinimumCompletionPercent(value: Int) {
+        viewModelScope.launch {
+            repository.setMinimumCompletionPercent(value)
+            refreshDerivedOnly()
+        }
+    }
+
+    fun setSelectedDateValue(value: Int) {
+        val current = _state.value
+        val task = current.tasks.firstOrNull { it.id == current.selectedTaskId } ?: return
+        val selectedDate = current.selectedDate
+        val shouldShiftStartDate =
+            selectedDate.isBefore(task.startDate) && repository.isScheduledByFrequency(task, selectedDate)
+        if (!repository.isScheduledOn(task, selectedDate) && !shouldShiftStartDate) return
+        viewModelScope.launch {
+            val previousStreak = repository.calculateStreak(task)
+            if (shouldShiftStartDate) {
+                repository.updateTaskStartDate(task.id, selectedDate)
+            }
+            repository.setDayValue(task, selectedDate, value.coerceAtLeast(0))
+            if (selectedDate == LocalDate.now()) {
+                maybeAwardStreakSaver(task.id, previousStreak)
+            }
+            repository.refreshWidget()
+            refresh()
+        }
+    }
+
+    fun incrementSelectedDateValue(delta: Int) {
+        val current = _state.value
+        val task = current.tasks.firstOrNull { it.id == current.selectedTaskId } ?: return
+        val selectedDate = current.selectedDate
+        val shouldShiftStartDate =
+            selectedDate.isBefore(task.startDate) && repository.isScheduledByFrequency(task, selectedDate)
+        if (!repository.isScheduledOn(task, selectedDate) && !shouldShiftStartDate) return
+        viewModelScope.launch {
+            val previousStreak = repository.calculateStreak(task)
+            if (shouldShiftStartDate) {
+                repository.updateTaskStartDate(task.id, selectedDate)
+            }
+            repository.addToDayValue(task, selectedDate, delta)
+            if (selectedDate == LocalDate.now() && delta > 0) {
+                maybeAwardStreakSaver(task.id, previousStreak)
+            }
+            repository.refreshWidget()
+            refresh()
+        }
+    }
+
+    fun startDurationTimer(): Boolean {
+        val current = _state.value
+        val task = current.tasks.firstOrNull { it.id == current.selectedTaskId } ?: return false
+        if (task.trackingType != TrackingType.DURATION) return false
+        if (current.plan != SubscriptionPlan.PRO) return false
+        if (durationTimerJob != null) return true
+        timerTaskId = task.id
+        timerDate = current.selectedDate
+        _state.update { it.copy(durationTimerRunning = true, durationTimerElapsedSeconds = 0) }
+        durationTimerJob = viewModelScope.launch {
+            while (isActive) {
+                delay(1000)
+                _state.update { state ->
+                    state.copy(durationTimerElapsedSeconds = state.durationTimerElapsedSeconds + 1)
+                }
+            }
+        }
+        return true
+    }
+
+    fun stopDurationTimerAndApply(): Int {
+        val current = _state.value
+        val elapsed = current.durationTimerElapsedSeconds
+        durationTimerJob?.cancel()
+        durationTimerJob = null
+        _state.update { it.copy(durationTimerRunning = false, durationTimerElapsedSeconds = 0) }
+        val targetTaskId = timerTaskId ?: return 0
+        val targetDate = timerDate ?: return 0
+        timerTaskId = null
+        timerDate = null
+        if (elapsed <= 0) return 0
+        val minutesToAdd = (elapsed / 60f).roundToInt().coerceAtLeast(1)
+        viewModelScope.launch {
+            val task = repository.getTasks().firstOrNull { it.id == targetTaskId } ?: return@launch
+            val previousStreak = repository.calculateStreak(task)
+            repository.addToDayValue(task, targetDate, minutesToAdd)
+            if (targetDate == LocalDate.now()) {
+                maybeAwardStreakSaver(task.id, previousStreak)
+            }
+            repository.refreshWidget()
+            refresh()
+        }
+        return minutesToAdd
+    }
+
+    fun cancelDurationTimer() {
+        durationTimerJob?.cancel()
+        durationTimerJob = null
+        timerTaskId = null
+        timerDate = null
+        _state.update { it.copy(durationTimerRunning = false, durationTimerElapsedSeconds = 0) }
     }
 
     fun setEditorStartDate(value: LocalDate) {
@@ -476,6 +644,8 @@ class MainViewModel(
         return EditorSavePayload(
             current = current,
             title = current.editorTitle.trim().take(MAX_HABIT_TITLE_LENGTH),
+            dailyTarget = current.editorDailyTarget.coerceAtLeast(1),
+            unitLabel = current.editorUnitLabel.trim().take(20),
             frequency = frequency,
             customDays = customDays
         )
@@ -489,6 +659,8 @@ class MainViewModel(
                     emoji = current.editorEmoji,
                     colorHex = current.editorColorHex,
                     trackingType = current.editorTrackingType,
+                    dailyTarget = payload.dailyTarget,
+                    unitLabel = payload.unitLabel,
                     frequency = payload.frequency,
                     customDays = payload.customDays,
                     timesPerWeek = current.editorTimesPerWeek,
@@ -506,6 +678,8 @@ class MainViewModel(
                     emoji = current.editorEmoji,
                     colorHex = current.editorColorHex,
                     trackingType = current.editorTrackingType,
+                    dailyTarget = payload.dailyTarget,
+                    unitLabel = payload.unitLabel,
                     frequency = payload.frequency,
                     customDays = payload.customDays,
                     timesPerWeek = current.editorTimesPerWeek,
@@ -558,6 +732,7 @@ class MainViewModel(
         val s = _state.value
         if (s.editorTitle.trim().isEmpty()) return false
         if (s.editorTitle.trim().length > MAX_HABIT_TITLE_LENGTH) return false
+        if (s.editorDailyTarget <= 0) return false
         if (s.editorEmoji.trim().isEmpty()) return false
         if (s.editorColorHex.trim().isEmpty()) return false
         if (s.editorFrequency == TaskFrequency.SELECTED_DAYS && s.editorCustomDays.isEmpty()) return false
@@ -573,6 +748,7 @@ class MainViewModel(
             val themeMode = repository.getThemeMode()
             val language = repository.getLanguage()
             val notificationsEnabled = repository.getNotificationsEnabled()
+            val minimumCompletionPercent = repository.getMinimumCompletionPercent()
             val defaultReminderHour = repository.getDefaultReminderHour()
             val defaultReminderMinute = repository.getDefaultReminderMinute()
             val onboardingCompleted = repository.isOnboardingCompleted()
@@ -589,6 +765,12 @@ class MainViewModel(
             val metricsAnchorDate = today
             val yesterday = today.minusDays(1)
             val isFutureDate = date.isAfter(LocalDate.now())
+            val selectedDateValue = selectedTask?.let { repository.getDayValue(it, date) } ?: 0
+            val selectedDateTarget = selectedTask?.let { repository.dailyTarget(it) } ?: 1
+            val selectedDateUnit = selectedTask?.let { repository.unitLabel(it) }.orEmpty()
+            val selectedDateCompletionPercent = selectedTask?.let { repository.completionPercent(it, date) } ?: 0
+            val selectedDateDone = selectedTask?.let { repository.isCompletedOn(it, date) } ?: false
+            val selectedDatePartial = selectedTask?.let { repository.isPartialOn(it, date) } ?: false
             val weekdayConsistency = selectedTask?.let { repository.weekdayConsistency(it, 84, metricsAnchorDate) } ?: List(7) { 0 }
             val consistencyNonZero = weekdayConsistency
                 .mapIndexed { index, value -> index to value }
@@ -643,6 +825,10 @@ class MainViewModel(
                     selectedTaskId = selectedId,
                     showEditor = state.showEditor,
                     selectedDateInFuture = isFutureDate,
+                    selectedDateValue = selectedDateValue,
+                    selectedDateTarget = selectedDateTarget,
+                    selectedDateUnit = selectedDateUnit,
+                    selectedDateCompletionPercent = selectedDateCompletionPercent,
                     todayDone = selectedTask?.let { repository.isDone(it.id, today) } ?: false,
                     todayScheduled = selectedTask?.let { task ->
                         repository.isScheduledOn(task, today) ||
@@ -655,7 +841,8 @@ class MainViewModel(
                         repository.isScheduledOn(task, date) ||
                             (date.isBefore(task.startDate) && repository.isScheduledByFrequency(task, date))
                     } ?: false,
-                    selectedDateDone = selectedTask?.let { repository.isDone(it.id, date) } ?: false,
+                    selectedDateDone = selectedDateDone,
+                    selectedDatePartial = selectedDatePartial,
                     streak = selectedTask?.let { repository.calculateStreak(it) } ?: 0,
                     bestStreak = selectedTask?.let { repository.bestStreak(it) } ?: 0,
                     streakHistory = selectedTask?.let { task ->
@@ -668,6 +855,8 @@ class MainViewModel(
                     completionRate7Day = selectedTask?.let { repository.completionRate(it, 7, metricsAnchorDate) } ?: 0,
                     completionRate30Day = selectedTask?.let { repository.completionRate(it, 30, metricsAnchorDate) } ?: 0,
                     totalCompletions = selectedTask?.let { repository.totalCompletions(it) } ?: 0,
+                    totalTrackedValue = selectedTask?.let { repository.totalTrackedValue(it) } ?: 0,
+                    averageTrackedValue = selectedTask?.let { repository.averageTrackedValue(it, 30, metricsAnchorDate) } ?: 0,
                     progressPercent = selectedTask?.let { repository.progressForLast30Days(it, metricsAnchorDate) } ?: 0,
                     last7Days = selectedTask?.let { repository.last7Days(it, metricsAnchorDate) } ?: List(7) { 0 },
                     last7DaysScheduled = selectedTask?.let { task ->
@@ -681,6 +870,9 @@ class MainViewModel(
                     doneDatesInCurrentMonth = selectedTask?.let { task ->
                         doneDatesForMonth(task, state.currentMonth)
                     } ?: emptySet(),
+                    partialDatesInCurrentMonth = selectedTask?.let { task ->
+                        partialDatesForMonth(task, state.currentMonth)
+                    } ?: emptySet(),
                     scheduledDatesInCurrentMonth = selectedTask?.let { task ->
                         scheduledDatesForMonth(task, state.currentMonth)
                     } ?: emptySet(),
@@ -688,6 +880,7 @@ class MainViewModel(
                     themeMode = themeMode,
                     language = language,
                     notificationsEnabled = notificationsEnabled,
+                    minimumCompletionPercent = minimumCompletionPercent,
                     defaultReminderHour = defaultReminderHour,
                     defaultReminderMinute = defaultReminderMinute,
                     onboardingCompleted = onboardingCompleted,
@@ -704,8 +897,15 @@ class MainViewModel(
         val month = current.currentMonth
         val today = LocalDate.now()
         val metricsAnchorDate = today
+        val minimumCompletionPercent = repository.getMinimumCompletionPercent()
         val yesterday = today.minusDays(1)
         val isFutureDate = date.isAfter(LocalDate.now())
+        val selectedDateValue = selectedTask?.let { repository.getDayValue(it, date) } ?: 0
+        val selectedDateTarget = selectedTask?.let { repository.dailyTarget(it) } ?: 1
+        val selectedDateUnit = selectedTask?.let { repository.unitLabel(it) }.orEmpty()
+        val selectedDateCompletionPercent = selectedTask?.let { repository.completionPercent(it, date) } ?: 0
+        val selectedDateDone = selectedTask?.let { repository.isCompletedOn(it, date) } ?: false
+        val selectedDatePartial = selectedTask?.let { repository.isPartialOn(it, date) } ?: false
         val weekdayConsistency = selectedTask?.let { repository.weekdayConsistency(it, 84, metricsAnchorDate) } ?: List(7) { 0 }
         val consistencyNonZero = weekdayConsistency
             .mapIndexed { index, value -> index to value }
@@ -738,6 +938,10 @@ class MainViewModel(
         _state.update {
             it.copy(
                 selectedDateInFuture = isFutureDate,
+                selectedDateValue = selectedDateValue,
+                selectedDateTarget = selectedDateTarget,
+                selectedDateUnit = selectedDateUnit,
+                selectedDateCompletionPercent = selectedDateCompletionPercent,
                 todayDone = selectedTask?.let { repository.isDone(it.id, today) } ?: false,
                 todayScheduled = selectedTask?.let { task ->
                     repository.isScheduledOn(task, today) ||
@@ -750,7 +954,8 @@ class MainViewModel(
                     repository.isScheduledOn(task, date) ||
                         (date.isBefore(task.startDate) && repository.isScheduledByFrequency(task, date))
                 } ?: false,
-                selectedDateDone = selectedTask?.let { task -> repository.isDone(task.id, date) } ?: false,
+                selectedDateDone = selectedDateDone,
+                selectedDatePartial = selectedDatePartial,
                 streak = selectedTask?.let { repository.calculateStreak(it) } ?: 0,
                 bestStreak = selectedTask?.let { repository.bestStreak(it) } ?: 0,
                 streakHistory = selectedTask?.let { task ->
@@ -762,6 +967,8 @@ class MainViewModel(
                 completionRate7Day = selectedTask?.let { repository.completionRate(it, 7, metricsAnchorDate) } ?: 0,
                 completionRate30Day = selectedTask?.let { repository.completionRate(it, 30, metricsAnchorDate) } ?: 0,
                 totalCompletions = selectedTask?.let { repository.totalCompletions(it) } ?: 0,
+                totalTrackedValue = selectedTask?.let { repository.totalTrackedValue(it) } ?: 0,
+                averageTrackedValue = selectedTask?.let { repository.averageTrackedValue(it, 30, metricsAnchorDate) } ?: 0,
                 progressPercent = selectedTask?.let { repository.progressForLast30Days(it, metricsAnchorDate) } ?: 0,
                 last7Days = selectedTask?.let { repository.last7Days(it, metricsAnchorDate) } ?: List(7) { 0 },
                 last7DaysScheduled = selectedTask?.let { task ->
@@ -775,9 +982,13 @@ class MainViewModel(
                 doneDatesInCurrentMonth = selectedTask?.let { task ->
                     doneDatesForMonth(task, it.currentMonth)
                 } ?: emptySet(),
+                partialDatesInCurrentMonth = selectedTask?.let { task ->
+                    partialDatesForMonth(task, it.currentMonth)
+                } ?: emptySet(),
                 scheduledDatesInCurrentMonth = selectedTask?.let { task ->
                     scheduledDatesForMonth(task, it.currentMonth)
-                } ?: emptySet()
+                } ?: emptySet(),
+                minimumCompletionPercent = minimumCompletionPercent
             )
         }
     }
@@ -786,9 +997,18 @@ class MainViewModel(
         val done = mutableSetOf<LocalDate>()
         for (day in 1..month.lengthOfMonth()) {
             val date = month.atDay(day)
-            if (repository.isDone(task.id, date)) done += date
+            if (repository.isCompletedOn(task, date)) done += date
         }
         return done
+    }
+
+    private fun partialDatesForMonth(task: HabitTask, month: YearMonth): Set<LocalDate> {
+        val partial = mutableSetOf<LocalDate>()
+        for (day in 1..month.lengthOfMonth()) {
+            val date = month.atDay(day)
+            if (repository.isPartialOn(task, date)) partial += date
+        }
+        return partial
     }
 
     private fun scheduledDatesForMonth(task: HabitTask, month: YearMonth): Set<LocalDate> {
@@ -834,6 +1054,11 @@ class MainViewModel(
                     }
             }
         }
+    }
+
+    override fun onCleared() {
+        cancelDurationTimer()
+        super.onCleared()
     }
 
     class Factory(

@@ -197,9 +197,9 @@ fun HabitCard(
 
 private fun trackingLabel(type: TrackingType, language: AppLanguage): String {
     return when (type) {
-        TrackingType.YES_NO -> translate(language, "Yes / No")
-        TrackingType.COUNT -> translate(language, "Count")
-        TrackingType.DURATION -> translate(language, "Duration")
+        TrackingType.YES_NO -> translate(language, "Do once")
+        TrackingType.COUNT -> translate(language, "Do N times")
+        TrackingType.DURATION -> translate(language, "Do N minutes")
     }
 }
 

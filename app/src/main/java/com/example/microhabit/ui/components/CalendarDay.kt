@@ -1,6 +1,7 @@
 package com.example.microhabit.ui.components
 
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -15,7 +16,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -99,7 +104,27 @@ fun CalendarDay(
         bottomEnd = if (state == CalendarDayState.COMPLETED && connectRight) 4.dp else radius.md,
         bottomStart = if (state == CalendarDayState.COMPLETED && connectLeft) 4.dp else radius.md
     )
-    val cellScale = if (state == CalendarDayState.COMPLETED) 0.94f + (completionProgress * 0.06f) else 1f
+    val popScale = remember(date) { Animatable(1f) }
+    var wasCompleted by remember(date) { mutableStateOf(state == CalendarDayState.COMPLETED) }
+    LaunchedEffect(state, today, date) {
+        val isCompletedNow = state == CalendarDayState.COMPLETED
+        if (today && isCompletedNow && !wasCompleted) {
+            popScale.snapTo(0.8f)
+            popScale.animateTo(
+                targetValue = 1.1f,
+                animationSpec = tween(durationMillis = 130, easing = FastOutSlowInEasing)
+            )
+            popScale.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 130, easing = FastOutSlowInEasing)
+            )
+        } else if (!isCompletedNow) {
+            popScale.snapTo(1f)
+        }
+        wasCompleted = isCompletedNow
+    }
+    val completionScale = if (state == CalendarDayState.COMPLETED) 0.94f + (completionProgress * 0.06f) else 1f
+    val cellScale = completionScale * popScale.value
 
     val selectedRingWidthPx = with(androidx.compose.ui.platform.LocalDensity.current) {
         stroke.medium.toPx()

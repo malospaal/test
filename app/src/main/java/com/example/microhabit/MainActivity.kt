@@ -23,6 +23,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -52,10 +53,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
@@ -69,12 +68,14 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.AddCircle
 import androidx.compose.material.icons.rounded.Check
@@ -207,6 +208,7 @@ import kotlinx.coroutines.launch
 
 private enum class AppPage {
     TRACKER,
+    HABIT_DETAIL,
     HABITS,
     ANALYTICS,
     CALENDAR,
@@ -276,6 +278,7 @@ class MainActivity : ComponentActivity() {
 private fun pageTitle(page: AppPage): String {
     return when (page) {
         AppPage.TRACKER -> t("Tracker")
+        AppPage.HABIT_DETAIL -> t("Habit details")
         AppPage.HABITS -> t("Habits")
         AppPage.ANALYTICS -> t("Analytics")
         AppPage.CALENDAR -> t("Calendar")
@@ -436,17 +439,30 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
             ) {
                 Scaffold(
                     topBar = {
+                        val selectedTaskTitle = state.tasks
+                            .firstOrNull { it.id == state.selectedTaskId }
+                            ?.let { "${it.emoji.ifBlank { "✨" }} ${it.title}" }
+                            ?: t("Habits")
                         CenterAlignedTopAppBar(
                             title = {
                                 Text(
-                                    pageTitle(page),
+                                    if (page == AppPage.HABIT_DETAIL) selectedTaskTitle else pageTitle(page),
                                     style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.Bold
                                 )
                             },
                             navigationIcon = {
-                                IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                                    Icon(Icons.Rounded.Menu, contentDescription = t("Menu"))
+                                if (page == AppPage.HABIT_DETAIL) {
+                                    IconButton(onClick = { page = AppPage.TRACKER }) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                                            contentDescription = t("Back")
+                                        )
+                                    }
+                                } else {
+                                    IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                                        Icon(Icons.Rounded.Menu, contentDescription = t("Menu"))
+                                    }
                                 }
                             },
                             actions = {
@@ -483,18 +499,19 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                             AppPage.TRACKER -> TrackerPage(
                                 state = state,
                                 vm = vm,
-                                onUpgrade = {
-                                    previousPage = AppPage.TRACKER
-                                    page = AppPage.PAYWALL
-                                },
+                                onOpenDetails = { page = AppPage.HABIT_DETAIL },
                                 highlightCompletionButton = highlightCompletionButton,
                                 onHighlightConsumed = { highlightCompletionButton = false }
+                            )
+                            AppPage.HABIT_DETAIL -> HabitDetailPage(
+                                state = state,
+                                vm = vm
                             )
                             AppPage.HABITS -> HabitsPage(
                                 state = state,
                                 vm = vm,
                                 onOpenHabit = {
-                                    page = AppPage.TRACKER
+                                    page = AppPage.HABIT_DETAIL
                                 },
                                 onUpgrade = {
                                     previousPage = AppPage.HABITS
@@ -617,6 +634,33 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                 }
             )
         }
+
+        if (state.showStreakSaverDialog) {
+            AlertDialog(
+                onDismissRequest = vm::dismissStreakSaverDialog,
+                title = { Text(t("Streak Saver")) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(AppTheme.spacing.x1)) {
+                        Text(t("You missed yesterday.\nSave your streak?"))
+                        Text(
+                            text = tf("Streak savers: %d", state.streakSaverCount),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = AppTheme.colors.textSecondary
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(onClick = vm::useStreakSaverForYesterday) {
+                        Text(t("Use saver"))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = vm::dismissStreakSaverDialog) {
+                        Text(t("Cancel"))
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -694,14 +738,11 @@ private fun DrawerContent(current: AppPage, plan: SubscriptionPlan, onNavigate: 
 private fun TrackerPage(
     state: HabitUiState,
     vm: MainViewModel,
-    onUpgrade: () -> Unit,
+    onOpenDetails: () -> Unit,
     highlightCompletionButton: Boolean,
     onHighlightConsumed: () -> Unit
 ) {
-    val selectedTask = state.tasks.firstOrNull { it.id == state.selectedTaskId }
-    val canAdd = state.plan == SubscriptionPlan.PRO || state.tasks.size < 1
     val spacing = AppTheme.spacing
-    var pendingDeleteTaskId by rememberSaveable { mutableStateOf<String?>(null) }
     var previousTotalCompletions by remember(state.selectedTaskId) { mutableStateOf(state.totalCompletions) }
     var streakOverlay by remember { mutableStateOf<StreakOverlayModel?>(null) }
     var overlayVisible by remember { mutableStateOf(false) }
@@ -765,20 +806,11 @@ private fun TrackerPage(
                 item { OnboardingCard(vm, state) }
             } else {
                 item {
-                    TaskControlsRow(
-                        canAddTask = canAdd,
-                        onCreate = { if (canAdd) vm.openCreateTask() else onUpgrade() },
-                        onEdit = { selectedTask?.id?.let(vm::openEditTask) },
-                        onDelete = { selectedTask?.id?.let { pendingDeleteTaskId = it } },
-                        canEditDelete = selectedTask != null
-                    )
-                }
-                item {
-                    TaskSelector(
+                    TrackerHabitContextHeader(
                         tasks = state.tasks,
                         selectedTaskId = state.selectedTaskId,
                         onSelect = { taskId -> switchToTask(taskId, 0) },
-                        onAddHabit = { if (canAdd) vm.openCreateTask() else onUpgrade() }
+                        onAddHabit = vm::openCreateTask
                     )
                 }
                 item {
@@ -823,6 +855,7 @@ private fun TrackerPage(
                                 onDone = vm::toggleSelectedDateDone,
                                 highlightMarkButton = highlightCompletionButton,
                                 onHighlightConsumed = onHighlightConsumed,
+                                appThemeMode = state.themeMode,
                                 swipeEnabled = state.tasks.size > 1,
                                 onSwipeNext = { switchHabitBy(1) },
                                 onSwipePrevious = { switchHabitBy(-1) }
@@ -833,11 +866,9 @@ private fun TrackerPage(
                             animationSpec = tween(durationMillis = 150),
                             label = "trackerStatsCrossfade"
                         ) {
-                            StatsRow(
+                            TrackerStreakRow(
                                 streak = state.streak,
-                                bestStreak = state.bestStreak,
-                                progress = state.progressPercent,
-                                total = state.totalCompletions
+                                bestStreak = state.bestStreak
                             )
                         }
                         Crossfade(
@@ -848,7 +879,7 @@ private fun TrackerPage(
                             SevenDayChart(
                                 points = state.last7Days,
                                 scheduled = state.last7DaysScheduled,
-                                anchorDate = state.selectedDate
+                                anchorDate = LocalDate.now()
                             )
                         }
                         Crossfade(
@@ -866,6 +897,17 @@ private fun TrackerPage(
                                 onMoveMonth = vm::moveMonth,
                                 onToday = vm::jumpToToday,
                                 onDateSelect = vm::selectDate
+                            )
+                        }
+                        TextButton(
+                            onClick = onOpenDetails,
+                            modifier = Modifier.align(Alignment.End),
+                            contentPadding = PaddingValues(horizontal = spacing.x0_5, vertical = spacing.x0)
+                        ) {
+                            Text(
+                                text = t("More details →"),
+                                style = MaterialTheme.typography.titleSmall,
+                                color = AppTheme.colors.primary
                             )
                         }
                     }
@@ -902,6 +944,130 @@ private fun TrackerPage(
         }
     }
 
+}
+
+@Composable
+private fun HabitsPage(
+    state: HabitUiState,
+    vm: MainViewModel,
+    onOpenHabit: () -> Unit,
+    onUpgrade: () -> Unit
+) {
+    val context = LocalContext.current
+    val spacing = AppTheme.spacing
+    val colors = AppTheme.colors
+    val canAdd = state.plan == SubscriptionPlan.PRO || state.tasks.size < 1
+    var pendingDeleteTaskId by rememberSaveable { mutableStateOf<String?>(null) }
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(spacing.x2),
+        verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
+    ) {
+        if (state.habits.isEmpty()) {
+            item {
+                GlassCard {
+                    Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+                        Text(
+                            text = t("No habits yet"),
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = colors.textPrimary
+                        )
+                        Text(
+                            text = t("Create your first habit to start building momentum."),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.textSecondary
+                        )
+                        Button(
+                            onClick = { if (canAdd) vm.openCreateTask() else onUpgrade() },
+                            shape = RoundedCornerShape(AppTheme.radius.md)
+                        ) {
+                            Text(if (canAdd) t("Create habit") else t("Upgrade to PRO"))
+                        }
+                    }
+                }
+            }
+        } else {
+            val activeHabits = state.habits.filterNot { it.isArchived }
+            val archivedHabits = state.habits.filter { it.isArchived }
+
+            if (activeHabits.isNotEmpty()) {
+                item {
+                    Text(
+                        text = t("Active habits"),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.textPrimary
+                    )
+                }
+                items(items = activeHabits, key = { it.id }) { habit ->
+                    val reminderStatus = if (habit.reminderEnabled) {
+                        tf("Reminder: %s", formatTimeForDevice(context, habit.reminderHour, habit.reminderMinute))
+                    } else {
+                        t("Reminder off")
+                    }
+                    HabitCard(
+                        habit = HabitCardModel(
+                            emoji = habit.emoji,
+                            name = habit.name,
+                            colorHex = habit.colorHex,
+                            trackingType = habit.trackingType,
+                            streak = habit.streak,
+                            frequency = habit.frequency,
+                            reminderStatus = reminderStatus,
+                            completionRate = habit.completionRate,
+                            isArchived = habit.isArchived
+                        ),
+                        onOpen = {
+                            vm.selectTask(habit.id)
+                            onOpenHabit()
+                        },
+                        onEdit = { vm.openEditTask(habit.id) },
+                        onArchive = { vm.archiveTask(habit.id) },
+                        onUnarchive = { vm.unarchiveTask(habit.id) },
+                        onDelete = { pendingDeleteTaskId = habit.id }
+                    )
+                }
+            }
+
+            if (archivedHabits.isNotEmpty()) {
+                item {
+                    Text(
+                        text = t("Archived habits"),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.textPrimary
+                    )
+                }
+                items(items = archivedHabits, key = { it.id }) { habit ->
+                    val reminderStatus = if (habit.reminderEnabled) {
+                        tf("Reminder: %s", formatTimeForDevice(context, habit.reminderHour, habit.reminderMinute))
+                    } else {
+                        t("Reminder off")
+                    }
+                    HabitCard(
+                        habit = HabitCardModel(
+                            emoji = habit.emoji,
+                            name = habit.name,
+                            colorHex = habit.colorHex,
+                            trackingType = habit.trackingType,
+                            streak = habit.streak,
+                            frequency = habit.frequency,
+                            reminderStatus = reminderStatus,
+                            completionRate = habit.completionRate,
+                            isArchived = habit.isArchived
+                        ),
+                        onOpen = { vm.openEditTask(habit.id) },
+                        onEdit = { vm.openEditTask(habit.id) },
+                        onArchive = { vm.archiveTask(habit.id) },
+                        onUnarchive = { vm.unarchiveTask(habit.id) },
+                        onDelete = { pendingDeleteTaskId = habit.id }
+                    )
+                }
+            }
+        }
+    }
+
     pendingDeleteTaskId?.let { taskId ->
         AlertDialog(
             onDismissRequest = { pendingDeleteTaskId = null },
@@ -928,18 +1094,12 @@ private fun TrackerPage(
 }
 
 @Composable
-private fun HabitsPage(
+private fun HabitDetailPage(
     state: HabitUiState,
-    vm: MainViewModel,
-    onOpenHabit: () -> Unit,
-    onUpgrade: () -> Unit
+    vm: MainViewModel
 ) {
-    val context = LocalContext.current
     val spacing = AppTheme.spacing
-    val colors = AppTheme.colors
-    val canAdd = state.plan == SubscriptionPlan.PRO || state.tasks.size < 1
     val selectedTask = state.tasks.firstOrNull { it.id == state.selectedTaskId }
-    var pendingDeleteTaskId by rememberSaveable { mutableStateOf<String?>(null) }
     var noteDraft by remember(state.selectedTaskId, state.selectedTaskNote) {
         mutableStateOf(state.selectedTaskNote)
     }
@@ -973,228 +1133,106 @@ private fun HabitsPage(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(spacing.x2),
-            verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
-        ) {
-            if (state.habits.isEmpty()) {
+        if (selectedTask == null) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(spacing.x2),
+                verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
+            ) {
                 item {
                     GlassCard {
-                        Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
-                            Text(
-                                text = t("No habits yet"),
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.SemiBold,
-                                color = colors.textPrimary
-                            )
-                            Text(
-                                text = t("Create your first habit to start building momentum."),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = colors.textSecondary
-                            )
-                            Button(
-                                onClick = { if (canAdd) vm.openCreateTask() else onUpgrade() },
-                                shape = RoundedCornerShape(AppTheme.radius.md)
-                            ) {
-                                Text(if (canAdd) t("Create habit") else t("Upgrade to PRO"))
-                            }
-                        }
+                        Text(
+                            text = t("No active habit"),
+                            style = MaterialTheme.typography.titleMedium
+                        )
                     }
                 }
-            } else {
-                val activeHabits = state.habits.filterNot { it.isArchived }
-                val archivedHabits = state.habits.filter { it.isArchived }
-
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(spacing.x2),
+                verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
+            ) {
                 item {
-                    TaskSelector(
-                        tasks = state.tasks,
-                        selectedTaskId = state.selectedTaskId,
-                        onSelect = vm::selectTask,
-                        onAddHabit = { if (canAdd) vm.openCreateTask() else onUpgrade() }
+                    HabitDepthHero(
+                        task = selectedTask,
+                        streak = state.streak,
+                        weeklyCompletion = state.completionRate7Day,
+                        todayDone = state.todayDone,
+                        todayScheduled = state.todayScheduled,
+                        onCompleteToday = vm::completeSelectedHabitToday
                     )
                 }
-
-                selectedTask?.let { habit ->
-                    item {
-                        HabitDepthHero(
-                            task = habit,
-                            streak = state.streak,
-                            weeklyCompletion = state.completionRate7Day,
-                            todayDone = state.todayDone,
-                            todayScheduled = state.todayScheduled,
-                            onCompleteToday = vm::completeSelectedHabitToday
-                        )
-                    }
-                    item {
-                        HabitLevelProgressCard(
-                            streak = state.streak,
-                            bestStreak = state.bestStreak
-                        )
-                    }
-                    item {
-                        HabitMiniCalendarCard(
-                            month = state.currentMonth,
-                            selectedDate = state.selectedDate,
-                            doneDates = state.doneDatesInCurrentMonth,
-                            scheduledDates = state.scheduledDatesInCurrentMonth,
-                            onMoveMonth = vm::moveMonth,
-                            onDateSelect = vm::selectDate
-                        )
-                    }
-                    item {
-                        SevenDayChart(
-                            points = state.last7Days,
-                            scheduled = state.last7DaysScheduled,
-                            anchorDate = state.selectedDate
-                        )
-                    }
-                    item {
-                        HabitDepthStats(
-                            streak = state.streak,
-                            bestStreak = state.bestStreak,
-                            completion30Day = state.completionRate30Day,
-                            totalCompletions = state.totalCompletions
-                        )
-                    }
-                    item {
-                        HabitStreakHistoryCard(
-                            bestStreak = state.bestStreak,
-                            history = state.streakHistory
-                        )
-                    }
-                    item {
-                        HabitInsightsCard(
-                            mostConsistentWeekday = state.mostConsistentWeekday,
-                            hardestWeekday = state.hardestWeekday,
-                            completionConsistency = state.completionConsistency
-                        )
-                    }
-                    item {
-                        HabitNotesCard(
-                            note = noteDraft,
-                            onNoteChange = { value ->
-                                noteDraft = value
-                                vm.setSelectedTaskNote(value)
-                            },
-                            onSave = vm::saveSelectedTaskNote
-                        )
-                    }
+                item {
+                    HabitLevelProgressCard(
+                        streak = state.streak,
+                        bestStreak = state.bestStreak
+                    )
                 }
-
-                if (activeHabits.isNotEmpty()) {
-                    item {
-                        Text(
-                            text = t("All habits"),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = colors.textPrimary
-                        )
-                    }
-                    items(items = activeHabits, key = { it.id }) { habit ->
-                        val reminderStatus = if (habit.reminderEnabled) {
-                            tf("Reminder: %s", formatTimeForDevice(context, habit.reminderHour, habit.reminderMinute))
-                        } else {
-                            t("Reminder off")
-                        }
-                        HabitCard(
-                            habit = HabitCardModel(
-                                emoji = habit.emoji,
-                                name = habit.name,
-                                colorHex = habit.colorHex,
-                                trackingType = habit.trackingType,
-                                streak = habit.streak,
-                                frequency = habit.frequency,
-                                reminderStatus = reminderStatus,
-                                completionRate = habit.completionRate,
-                                isArchived = habit.isArchived
-                            ),
-                            onOpen = {
-                                vm.selectTask(habit.id)
-                                onOpenHabit()
-                            },
-                            onEdit = { vm.openEditTask(habit.id) },
-                            onArchive = { vm.archiveTask(habit.id) },
-                            onUnarchive = { vm.unarchiveTask(habit.id) },
-                            onDelete = { pendingDeleteTaskId = habit.id }
-                        )
-                    }
+                item {
+                    HabitMiniCalendarCard(
+                        month = state.currentMonth,
+                        selectedDate = state.selectedDate,
+                        doneDates = state.doneDatesInCurrentMonth,
+                        scheduledDates = state.scheduledDatesInCurrentMonth,
+                        onMoveMonth = vm::moveMonth,
+                        onDateSelect = vm::selectDate
+                    )
                 }
+                item {
+                    SevenDayChart(
+                        points = state.last7Days,
+                        scheduled = state.last7DaysScheduled,
+                        anchorDate = LocalDate.now()
+                    )
+                }
+                item {
+                    HabitDepthStats(
+                        streak = state.streak,
+                        bestStreak = state.bestStreak,
+                        completion30Day = state.completionRate30Day,
+                        totalCompletions = state.totalCompletions
+                    )
+                }
+                item {
+                    HabitStreakHistoryCard(
+                        bestStreak = state.bestStreak,
+                        history = state.streakHistory
+                    )
+                }
+                item {
+                    HabitInsightsCard(
+                        mostConsistentWeekday = state.mostConsistentWeekday,
+                        hardestWeekday = state.hardestWeekday,
+                        completionConsistency = state.completionConsistency
+                    )
+                }
+                item {
+                    HabitNotesCard(
+                        note = noteDraft,
+                        onNoteChange = { value ->
+                            noteDraft = value
+                            vm.setSelectedTaskNote(value)
+                        },
+                        onSave = vm::saveSelectedTaskNote
+                    )
+                }
+            }
 
-                if (archivedHabits.isNotEmpty()) {
-                    item {
-                        Text(
-                            text = t("Archived habits"),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = colors.textPrimary
-                        )
-                    }
-                    items(items = archivedHabits, key = { it.id }) { habit ->
-                        val reminderStatus = if (habit.reminderEnabled) {
-                            tf("Reminder: %s", formatTimeForDevice(context, habit.reminderHour, habit.reminderMinute))
-                        } else {
-                            t("Reminder off")
-                        }
-                        HabitCard(
-                            habit = HabitCardModel(
-                                emoji = habit.emoji,
-                                name = habit.name,
-                                colorHex = habit.colorHex,
-                                trackingType = habit.trackingType,
-                                streak = habit.streak,
-                                frequency = habit.frequency,
-                                reminderStatus = reminderStatus,
-                                completionRate = habit.completionRate,
-                                isArchived = habit.isArchived
-                            ),
-                            onOpen = { vm.openEditTask(habit.id) },
-                            onEdit = { vm.openEditTask(habit.id) },
-                            onArchive = { vm.archiveTask(habit.id) },
-                            onUnarchive = { vm.unarchiveTask(habit.id) },
-                            onDelete = { pendingDeleteTaskId = habit.id }
-                        )
-                    }
+            AnimatedVisibility(
+                visible = overlayVisible && streakOverlay != null,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = spacing.x1_5),
+                enter = fadeIn(tween(170)) + slideInVertically(initialOffsetY = { -it / 3 }, animationSpec = tween(170)),
+                exit = fadeOut(tween(170)) + slideOutVertically(targetOffsetY = { -it / 4 }, animationSpec = tween(170))
+            ) {
+                streakOverlay?.let { model ->
+                    StreakRewardOverlay(model = model)
                 }
             }
         }
-
-        AnimatedVisibility(
-            visible = overlayVisible && streakOverlay != null,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = spacing.x1_5),
-            enter = fadeIn(tween(170)) + slideInVertically(initialOffsetY = { -it / 3 }, animationSpec = tween(170)),
-            exit = fadeOut(tween(170)) + slideOutVertically(targetOffsetY = { -it / 4 }, animationSpec = tween(170))
-        ) {
-            streakOverlay?.let { model ->
-                StreakRewardOverlay(model = model)
-            }
-        }
-    }
-
-    pendingDeleteTaskId?.let { taskId ->
-        AlertDialog(
-            onDismissRequest = { pendingDeleteTaskId = null },
-            title = { Text(t("Delete habit?")) },
-            text = { Text(t("This will permanently delete this habit and its completion history.")) },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        pendingDeleteTaskId = null
-                        vm.deleteTask(taskId)
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text(t("Delete"))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingDeleteTaskId = null }) {
-                    Text(t("Cancel"))
-                }
-            }
-        )
     }
 }
 
@@ -1778,9 +1816,10 @@ private fun AnalyticsPage(
     }
 
     val locale = appLocale()
+    val chartAnchorDate = LocalDate.now()
     val weeklyValues = state.last7Days.map { if (it > 0) 100 else 0 }
     val weeklyLabels = (6 downTo 0).map { offset ->
-        state.selectedDate.minusDays(offset.toLong()).dayOfWeek.getDisplayName(TextStyle.SHORT, locale)
+        chartAnchorDate.minusDays(offset.toLong()).dayOfWeek.getDisplayName(TextStyle.SHORT, locale)
     }
     val monthlyValues = if (state.monthlyProgress.isEmpty()) listOf(0, 0, 0, 0) else state.monthlyProgress
     val monthlyLabels = monthlyValues.indices.map { "${t("W")}${it + 1}" }
@@ -1956,28 +1995,13 @@ private fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
         item {
             GlassCard {
                 Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        TextButton(onClick = { vm.moveMonth(-1) }) { Text("<") }
-                        Text(
-                            text = localizedMonthYear(state.currentMonth, state.language, locale),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = colors.textPrimary
-                        )
-                        TextButton(onClick = { vm.moveMonth(1) }) { Text(">") }
-                    }
-
-                    Button(
-                        onClick = vm::jumpToToday,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(AppTheme.radius.md)
-                    ) {
-                        Text(t("Today"))
-                    }
+                    CalendarHeaderRow(
+                        monthLabel = localizedMonthYear(state.currentMonth, state.language, locale),
+                        isTodaySelected = state.selectedDate == today && state.currentMonth == YearMonth.now(),
+                        onPrev = { vm.moveMonth(-1) },
+                        onToday = vm::jumpToToday,
+                        onNext = { vm.moveMonth(1) }
+                    )
 
                     val weekdayLabels = weekdayLabels(LocalAppLanguage.current)
                     Row(
@@ -3566,7 +3590,8 @@ private fun TaskSelector(
                                         }
                                     }
                                 }
-                                onAddHabit?.let { addHabit ->
+                                onAddHabit?.let { onAdd ->
+                                    Spacer(modifier = Modifier.height(spacing.x0_5))
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -3574,7 +3599,7 @@ private fun TaskSelector(
                                             .clip(RoundedCornerShape(radius.sm))
                                             .clickable {
                                                 expanded = false
-                                                addHabit()
+                                                onAdd()
                                             }
                                             .padding(horizontal = spacing.x1, vertical = 6.dp),
                                         verticalAlignment = Alignment.CenterVertically,
@@ -3583,7 +3608,8 @@ private fun TaskSelector(
                                         Icon(
                                             imageVector = Icons.Rounded.AddCircle,
                                             contentDescription = null,
-                                            tint = semantic.primary
+                                            tint = semantic.primary,
+                                            modifier = Modifier.size(spacing.x2)
                                         )
                                         Text(
                                             text = t("Create habit"),
@@ -3602,6 +3628,21 @@ private fun TaskSelector(
 }
 
 @Composable
+private fun TrackerHabitContextHeader(
+    tasks: List<HabitTask>,
+    selectedTaskId: String?,
+    onSelect: (String) -> Unit,
+    onAddHabit: () -> Unit
+) {
+    TaskSelector(
+        tasks = tasks,
+        selectedTaskId = selectedTaskId,
+        onSelect = onSelect,
+        onAddHabit = onAddHabit
+    )
+}
+
+@Composable
 private fun HeroCard(
     task: HabitTask?,
     selectedDate: LocalDate,
@@ -3610,6 +3651,7 @@ private fun HeroCard(
     onDone: () -> Unit,
     highlightMarkButton: Boolean,
     onHighlightConsumed: () -> Unit,
+    appThemeMode: AppThemeMode,
     swipeEnabled: Boolean = false,
     onSwipeNext: () -> Unit = {},
     onSwipePrevious: () -> Unit = {}
@@ -3622,11 +3664,30 @@ private fun HeroCard(
     val locale = appLocale()
     val canMarkForSelectedDate = scheduled
     val highlightActive = highlightMarkButton && !done && canMarkForSelectedDate
+    val pressScaleTarget = 0.985f
+    val pressScaleDuration = 80
     val density = LocalDensity.current
+    val systemDark = isSystemInDarkTheme()
+    val useDarkCompletedLottie = when (appThemeMode) {
+        AppThemeMode.SYSTEM -> systemDark
+        AppThemeMode.DARK -> true
+        AppThemeMode.LIGHT -> false
+    }
     val swipeThresholdPx = with(density) { 56.dp.toPx() }
     var horizontalDragDistance by remember(task?.id, selectedDate) { mutableStateOf(0f) }
-    val completedButtonLottieResId = remember(context) {
-        context.resources.getIdentifier("completed_button_lottie", "raw", context.packageName)
+    val completedButtonLottieResId = remember(context, useDarkCompletedLottie) {
+        val packageName = context.packageName
+        if (useDarkCompletedLottie) {
+            val darkUnderscore = context.resources.getIdentifier("completed_button_lottie_dark", "raw", packageName)
+            val darkDash = context.resources.getIdentifier("completed_button_lottie-dark", "raw", packageName)
+            when {
+                darkUnderscore != 0 -> darkUnderscore
+                darkDash != 0 -> darkDash
+                else -> context.resources.getIdentifier("completed_button_lottie", "raw", packageName)
+            }
+        } else {
+            context.resources.getIdentifier("completed_button_lottie", "raw", packageName)
+        }
     }
     val completedButtonComposition by if (completedButtonLottieResId != 0) {
         rememberLottieComposition(LottieCompositionSpec.RawRes(completedButtonLottieResId))
@@ -3638,7 +3699,10 @@ private fun HeroCard(
         val durationFrames = completedButtonComposition?.durationFrames ?: 1f
         (completedTargetFrame / durationFrames.coerceAtLeast(1f)).coerceIn(0f, 1f)
     }
+    val completionPulseScale = remember(task?.id, selectedDate) { Animatable(1f) }
     var completedAnimationPlaying by remember(task?.id, selectedDate) { mutableStateOf(false) }
+    var completedLottieReady by remember(task?.id, selectedDate) { mutableStateOf(done) }
+    var showSuccessMessage by remember(task?.id, selectedDate) { mutableStateOf(false) }
     var previousDoneState by remember(task?.id, selectedDate) { mutableStateOf(done) }
     val completedAnimationProgress by animateLottieCompositionAsState(
         composition = completedButtonComposition,
@@ -3648,109 +3712,124 @@ private fun HeroCard(
     )
     val completedButtonLottieProgress = when {
         done && completedAnimationPlaying -> completedAnimationProgress
-        done -> completedTargetProgress
+        done && completedLottieReady -> completedTargetProgress
         else -> 0f
     }
     LaunchedEffect(done, task?.id, selectedDate) {
         if (done && !previousDoneState) {
+            showSuccessMessage = true
+            completedAnimationPlaying = false
+            completedLottieReady = false
+            completionPulseScale.snapTo(1f)
+            completionPulseScale.animateTo(
+                targetValue = 1.018f,
+                animationSpec = tween(durationMillis = 95, easing = FastOutSlowInEasing)
+            )
+            delay(40)
             completedAnimationPlaying = true
+            completionPulseScale.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 130, easing = FastOutSlowInEasing)
+            )
+            delay(1400)
+            showSuccessMessage = false
         }
         if (!done) {
             completedAnimationPlaying = false
+            completionPulseScale.snapTo(1f)
+            showSuccessMessage = false
+            completedLottieReady = false
         }
         previousDoneState = done
     }
     LaunchedEffect(completedAnimationPlaying, completedAnimationProgress, completedTargetProgress) {
         if (completedAnimationPlaying && completedAnimationProgress >= completedTargetProgress) {
             completedAnimationPlaying = false
+            completedLottieReady = true
         }
     }
     val highlightPulseTransition = rememberInfiniteTransition(label = "heroHighlightPulse")
     val highlightPulse by highlightPulseTransition.animateFloat(
         initialValue = 1f,
-        targetValue = 1.04f,
+        targetValue = 1.012f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 880, easing = FastOutSlowInEasing),
+            animation = tween(durationMillis = 1300, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "heroHighlightPulseScale"
     )
 
-    GlassCard(contentPadding = PaddingValues(spacing.x2)) {
-        Column(
-            modifier = Modifier
-                .animateContentSize(
-                    animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing)
-                )
-                .then(
-                    if (!swipeEnabled) {
-                        Modifier
-                    } else {
-                        Modifier.pointerInput(task?.id, selectedDate, swipeEnabled) {
-                            detectHorizontalDragGestures(
-                                onHorizontalDrag = { change, dragAmount ->
-                                    change.consume()
-                                    horizontalDragDistance += dragAmount
-                                },
-                                onDragEnd = {
-                                    when {
-                                        horizontalDragDistance <= -swipeThresholdPx -> onSwipeNext()
-                                        horizontalDragDistance >= swipeThresholdPx -> onSwipePrevious()
-                                    }
-                                    horizontalDragDistance = 0f
-                                },
-                                onDragCancel = { horizontalDragDistance = 0f }
-                            )
-                        }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (!swipeEnabled) {
+                    Modifier
+                } else {
+                    Modifier.pointerInput(task?.id, selectedDate, swipeEnabled) {
+                        detectHorizontalDragGestures(
+                            onHorizontalDrag = { change, dragAmount ->
+                                change.consume()
+                                horizontalDragDistance += dragAmount
+                            },
+                            onDragEnd = {
+                                when {
+                                    horizontalDragDistance <= -swipeThresholdPx -> onSwipeNext()
+                                    horizontalDragDistance >= swipeThresholdPx -> onSwipePrevious()
+                                }
+                                horizontalDragDistance = 0f
+                            },
+                            onDragCancel = { horizontalDragDistance = 0f }
+                        )
                     }
-                ),
-            verticalArrangement = Arrangement.spacedBy(spacing.x1)
-        ) {
-            Crossfade(
-                targetState = task?.title.orEmpty(),
-                animationSpec = tween(durationMillis = 140),
-                label = "heroTitleCrossfade"
-            ) { title ->
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+                }
+            ),
+        verticalArrangement = Arrangement.spacedBy(spacing.x1),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
             Text(
                 text = selectedDate.format(DateTimeFormatter.ofPattern(t("dd MMM yyyy"), locale)),
                 style = MaterialTheme.typography.bodySmall,
                 color = semantic.textSecondary
             )
-            Text(
-                text = t("Did you complete it on this date?"),
-                style = MaterialTheme.typography.headlineSmall
-            )
             if (done && canMarkForSelectedDate) {
                 val interactionSource = remember { MutableInteractionSource() }
                 val pressed by interactionSource.collectIsPressedAsState()
                 val pressScale by animateFloatAsState(
-                    targetValue = if (pressed) 0.975f else 1f,
-                    animationSpec = tween(durationMillis = 90),
+                    targetValue = if (pressed) pressScaleTarget else 1f,
+                    animationSpec = tween(durationMillis = pressScaleDuration, easing = FastOutSlowInEasing),
                     label = "completeButtonPressScale"
                 )
-                Button(
-                    onClick = onDone,
-                    interactionSource = interactionSource,
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(spacing.x5 + spacing.x1)
-                        .graphicsLayer {
-                            scaleX = pressScale
-                            scaleY = pressScale
-                        },
-                    shape = RoundedCornerShape(radius.lg),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = semantic.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    )
+                        .padding(vertical = 36.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    if (completedButtonComposition != null) {
+                    val showCompletedLottie = completedButtonComposition != null &&
+                        (completedAnimationPlaying || completedLottieReady)
+                    val completedLottieSize = (spacing.x2 + spacing.x1) * 1.5f
+                    val completedLottieSlotWidth by animateDpAsState(
+                        targetValue = if (showCompletedLottie) completedLottieSize else 0.dp,
+                        animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing),
+                        label = "completedLottieSlotWidth"
+                    )
+                    Button(
+                        onClick = onDone,
+                        interactionSource = interactionSource,
+                        modifier = Modifier
+                            .fillMaxWidth(0.94f)
+                            .height(56.dp)
+                            .graphicsLayer {
+                                scaleX = pressScale * completionPulseScale.value
+                                scaleY = pressScale * completionPulseScale.value
+                            },
+                        shape = RoundedCornerShape(radius.full),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = semantic.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        )
+                    ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(1.5.dp)
@@ -3761,103 +3840,103 @@ private fun HeroCard(
                             )
                             Box(
                                 modifier = Modifier
-                                    .size((spacing.x2 + spacing.x1) * 1.5f)
+                                    .width(completedLottieSlotWidth)
+                                    .height(completedLottieSize)
                                     .clip(RoundedCornerShape(AppTheme.radius.sm)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                LottieAnimation(
-                                    composition = completedButtonComposition,
-                                    progress = { completedButtonLottieProgress },
-                                    modifier = Modifier.fillMaxSize()
-                                )
+                                if (completedButtonComposition != null && completedLottieSlotWidth > 0.dp) {
+                                    LottieAnimation(
+                                        composition = completedButtonComposition,
+                                        progress = { completedButtonLottieProgress },
+                                        modifier = Modifier.size(completedLottieSize)
+                                    )
+                                }
                             }
                         }
-                    } else {
-                        Text(
-                            text = t("Completed"),
-                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.W600)
-                        )
                     }
                 }
             } else {
                 val interactionSource = remember { MutableInteractionSource() }
                 val pressed by interactionSource.collectIsPressedAsState()
                 val pressScale by animateFloatAsState(
-                    targetValue = if (pressed) 0.98f else 1f,
-                    animationSpec = tween(durationMillis = 90),
+                    targetValue = if (pressed) pressScaleTarget else 1f,
+                    animationSpec = tween(durationMillis = pressScaleDuration, easing = FastOutSlowInEasing),
                     label = "markButtonPressScale"
                 )
-                OutlinedButton(
-                    onClick = {
-                        if (highlightActive) onHighlightConsumed()
-                        onDone()
-                    },
-                    enabled = canMarkForSelectedDate,
-                    interactionSource = interactionSource,
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(spacing.x5 + spacing.x1)
-                        .graphicsLayer {
-                            val pulse = if (highlightActive) highlightPulse else 1f
-                            scaleX = pressScale * pulse
-                            scaleY = pressScale * pulse
+                        .padding(vertical = 36.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            if (highlightActive) onHighlightConsumed()
+                            onDone()
                         },
-                    shape = RoundedCornerShape(radius.lg),
-                    border = BorderStroke(
-                        stroke.thin * if (highlightActive) 2.4f else 1.5f,
-                        when {
-                            !canMarkForSelectedDate -> semantic.borderSubtle
-                            highlightActive -> semantic.success
-                            else -> semantic.primary
-                        }
-                    ),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = Color.Transparent,
-                        contentColor = if (highlightActive) semantic.success else semantic.primary,
-                        disabledContentColor = semantic.textSecondary
-                    )
+                        enabled = canMarkForSelectedDate,
+                        interactionSource = interactionSource,
+                        modifier = Modifier
+                            .fillMaxWidth(0.94f)
+                            .height(56.dp)
+                            .graphicsLayer {
+                                val pulse = if (highlightActive && !pressed) highlightPulse else 1f
+                                scaleX = pressScale * pulse * completionPulseScale.value
+                                scaleY = pressScale * pulse * completionPulseScale.value
+                            },
+                        shape = RoundedCornerShape(radius.full),
+                        border = BorderStroke(
+                            stroke.thin * if (highlightActive) 2.4f else 1.5f,
+                            when {
+                                !canMarkForSelectedDate -> semantic.borderSubtle
+                                highlightActive -> semantic.success
+                                else -> semantic.primary
+                            }
+                        ),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = Color.Transparent,
+                            contentColor = if (highlightActive) semantic.success else semantic.primary,
+                            disabledContentColor = semantic.textSecondary
+                        )
+                    ) {
+                        Text(
+                            text = when {
+                                !canMarkForSelectedDate -> t("Not scheduled for this date")
+                                else -> t("Mark as done")
+                            },
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    }
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(22.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = showSuccessMessage,
+                    enter = fadeIn(animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing)) +
+                        slideInVertically(
+                            initialOffsetY = { it / 3 },
+                            animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing)
+                        ),
+                    exit = fadeOut(animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing)) +
+                        slideOutVertically(
+                            targetOffsetY = { -it / 4 },
+                            animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing)
+                        )
                 ) {
                     Text(
-                        text = when {
-                            !canMarkForSelectedDate -> t("Not scheduled for this date")
-                            else -> t("Mark as done")
-                        },
-                        style = MaterialTheme.typography.labelLarge
+                        text = t("Great job, your streak is safe."),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = semantic.success
                     )
                 }
             }
 
-            AnimatedVisibility(
-                visible = done && canMarkForSelectedDate,
-                enter = fadeIn(animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing)) +
-                    expandVertically(
-                        animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing),
-                        expandFrom = Alignment.Top
-                    ),
-                exit = fadeOut(animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing)) +
-                    shrinkVertically(
-                        animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
-                        shrinkTowards = Alignment.Top
-                    )
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(spacing.x1)
-                ) {
-                    Icon(
-                        Icons.Rounded.CheckCircle,
-                        contentDescription = null,
-                        tint = semantic.success,
-                        modifier = Modifier.size(spacing.x2 + spacing.x0_5)
-                    )
-                    Text(
-                        t("Great job, your streak is safe."),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = semantic.textSecondary
-                    )
-                }
-            }
-        }
     }
 }
 
@@ -4242,8 +4321,77 @@ private fun isStreakMilestone(streak: Int): Boolean {
 }
 
 @Composable
+private fun TrackerStreakRow(
+    streak: Int,
+    bestStreak: Int
+) {
+    val spacing = AppTheme.spacing
+    val streakScale = remember { Animatable(1f) }
+    var previousStreak by remember { mutableStateOf(streak) }
+
+    LaunchedEffect(streak) {
+        if (streak > previousStreak) {
+            streakScale.snapTo(1f)
+            streakScale.animateTo(
+                targetValue = 1.12f,
+                animationSpec = tween(durationMillis = 130, easing = FastOutSlowInEasing)
+            )
+            streakScale.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 130, easing = FastOutSlowInEasing)
+            )
+        }
+        previousStreak = streak
+    }
+
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(spacing.x1),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min)
+    ) {
+        StatTile(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+            label = t("Current streak"),
+            value = if (streak >= 7) "🔥 ${streak}d" else "${streak}d",
+            valueScale = streakScale.value
+        )
+        StatTile(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+            label = t("Best streak"),
+            value = "${bestStreak}d"
+        )
+    }
+}
+
+@Composable
 private fun StatsRow(streak: Int, bestStreak: Int, progress: Int, total: Int) {
     val spacing = AppTheme.spacing
+    val streakScale = remember { Animatable(1f) }
+    var previousStreak by remember { mutableStateOf(streak) }
+    var previousTotal by remember { mutableStateOf(total) }
+
+    LaunchedEffect(streak, total) {
+        val shouldAnimate = total == previousTotal + 1 && streak >= previousStreak
+        if (shouldAnimate) {
+            streakScale.snapTo(1f)
+            streakScale.animateTo(
+                targetValue = 1.12f,
+                animationSpec = tween(durationMillis = 130, easing = FastOutSlowInEasing)
+            )
+            streakScale.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(durationMillis = 130, easing = FastOutSlowInEasing)
+            )
+        }
+        previousStreak = streak
+        previousTotal = total
+    }
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(spacing.x1)
@@ -4259,7 +4407,8 @@ private fun StatsRow(streak: Int, bestStreak: Int, progress: Int, total: Int) {
                     .weight(1f)
                     .fillMaxHeight(),
                 label = t("Current streak"),
-                value = if (streak >= 7) "🔥 ${streak}d" else "${streak}d"
+                value = if (streak >= 7) "🔥 ${streak}d" else "${streak}d",
+                valueScale = streakScale.value
             )
             StatTile(
                 modifier = Modifier
@@ -4294,7 +4443,12 @@ private fun StatsRow(streak: Int, bestStreak: Int, progress: Int, total: Int) {
 }
 
 @Composable
-private fun StatTile(modifier: Modifier = Modifier, label: String, value: String) {
+private fun StatTile(
+    modifier: Modifier = Modifier,
+    label: String,
+    value: String,
+    valueScale: Float = 1f
+) {
     val spacing = AppTheme.spacing
     val radius = AppTheme.radius
     val semantic = AppTheme.colors
@@ -4315,6 +4469,10 @@ private fun StatTile(modifier: Modifier = Modifier, label: String, value: String
             AnimatedContent(targetState = value, label = "statValue") { animatedValue ->
                 Text(
                     text = animatedValue,
+                    modifier = Modifier.graphicsLayer {
+                        scaleX = valueScale
+                        scaleY = valueScale
+                    },
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -4514,40 +4672,20 @@ private fun CalendarCard(
     onDateSelect: (LocalDate) -> Unit
 ) {
     val spacing = AppTheme.spacing
-    val radius = AppTheme.radius
     val semantic = AppTheme.colors
     val language = LocalAppLanguage.current
     val locale = appLocale()
+    val today = LocalDate.now()
 
     GlassCard(contentPadding = PaddingValues(spacing.x2)) {
         Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    localizedMonthYear(month, language, locale),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = semantic.textPrimary
-                )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(spacing.x1),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TextButton(onClick = { onMoveMonth(-1) }) { Text("<") }
-                    TextButton(onClick = { onMoveMonth(1) }) { Text(">") }
-                }
-            }
-
-            Button(
-                onClick = onToday,
-                modifier = Modifier.fillMaxWidth().height(spacing.x5),
-                shape = RoundedCornerShape(radius.md)
-            ) {
-                Text(t("Today"))
-            }
+            CalendarHeaderRow(
+                monthLabel = localizedMonthYear(month, language, locale),
+                isTodaySelected = selectedDate == today && month == YearMonth.now(),
+                onPrev = { onMoveMonth(-1) },
+                onToday = onToday,
+                onNext = { onMoveMonth(1) }
+            )
 
             val days = weekdayLabels(LocalAppLanguage.current)
             Row(
@@ -4575,7 +4713,7 @@ private fun CalendarCard(
                             date = day,
                             doneDates = doneDates,
                             scheduledDates = scheduledDates,
-                            today = LocalDate.now()
+                            today = today
                         )
                         val dayDate = day
                         val done = dayDate != null && dayDate in doneDates
@@ -4584,7 +4722,7 @@ private fun CalendarCard(
                             date = dayDate,
                             state = state,
                             selected = dayDate == selectedDate,
-                            today = dayDate == LocalDate.now(),
+                            today = dayDate == today,
                             connectLeft = done && dayDate != null && dayDate.minusDays(1) in doneDates,
                             connectRight = done && dayDate != null && dayDate.plusDays(1) in doneDates,
                             enabled = selectedTask != null,
@@ -4592,6 +4730,70 @@ private fun CalendarCard(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CalendarHeaderRow(
+    monthLabel: String,
+    isTodaySelected: Boolean,
+    onPrev: () -> Unit,
+    onToday: () -> Unit,
+    onNext: () -> Unit
+) {
+    val spacing = AppTheme.spacing
+    val radius = AppTheme.radius
+    val stroke = AppTheme.stroke
+    val colors = AppTheme.colors
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = monthLabel,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = colors.textPrimary
+        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(spacing.x0_5),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TextButton(
+                onClick = onPrev,
+                contentPadding = PaddingValues(horizontal = spacing.x0_5, vertical = spacing.x0),
+                modifier = Modifier.height(30.dp)
+            ) {
+                Text("<", color = colors.textSecondary)
+            }
+            OutlinedButton(
+                onClick = onToday,
+                enabled = !isTodaySelected,
+                modifier = Modifier
+                    .height(30.dp)
+                    .graphicsLayer(alpha = if (isTodaySelected) 0.55f else 1f),
+                shape = RoundedCornerShape(radius.full),
+                contentPadding = PaddingValues(horizontal = spacing.x1, vertical = spacing.x0),
+                border = BorderStroke(stroke.thin, colors.borderSubtle),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = Color.Transparent,
+                    contentColor = colors.textSecondary,
+                    disabledContainerColor = Color.Transparent,
+                    disabledContentColor = colors.textSecondary
+                )
+            ) {
+                Text(t("Today"), style = MaterialTheme.typography.labelMedium)
+            }
+            TextButton(
+                onClick = onNext,
+                contentPadding = PaddingValues(horizontal = spacing.x0_5, vertical = spacing.x0),
+                modifier = Modifier.height(30.dp)
+            ) {
+                Text(">", color = colors.textSecondary)
             }
         }
     }

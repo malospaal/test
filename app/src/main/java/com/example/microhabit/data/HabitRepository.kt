@@ -206,6 +206,8 @@ class HabitRepository(private val context: Context) {
             .filter { it.startsWith("done_${taskId}_") }
             .forEach { key -> prefs.edit().remove(key).apply() }
         prefs.edit().remove(noteKey(taskId)).apply()
+        prefs.edit().remove(streakSaverKey(taskId)).apply()
+        prefs.edit().remove(savedMissedDatesKey(taskId)).apply()
 
         if (getSelectedTaskId() == taskId) {
             prefs.edit().putString(KEY_SELECTED_TASK, updated.firstOrNull()?.id).apply()
@@ -378,6 +380,31 @@ class HabitRepository(private val context: Context) {
         }
     }
 
+    fun getStreakSaverCount(taskId: String): Int {
+        return prefs.getInt(streakSaverKey(taskId), 0).coerceAtLeast(0)
+    }
+
+    fun addStreakSavers(taskId: String, amount: Int) {
+        if (amount <= 0) return
+        val updated = (getStreakSaverCount(taskId) + amount).coerceAtLeast(0)
+        prefs.edit().putInt(streakSaverKey(taskId), updated).apply()
+    }
+
+    fun consumeStreakSaver(taskId: String, missedDate: LocalDate): Boolean {
+        val current = getStreakSaverCount(taskId)
+        if (current <= 0) return false
+        val saved = getSavedMissedDates(taskId)
+        if (missedDate in saved) return false
+        val updated = saved.toMutableSet().apply { add(missedDate) }
+        setSavedMissedDates(taskId, updated)
+        prefs.edit().putInt(streakSaverKey(taskId), (current - 1).coerceAtLeast(0)).apply()
+        return true
+    }
+
+    fun isMissedDaySaved(taskId: String, date: LocalDate): Boolean {
+        return date in getSavedMissedDates(taskId)
+    }
+
     fun calculateStreak(task: HabitTask, fromDate: LocalDate = LocalDate.now()): Int {
         if (task.frequency == TaskFrequency.TIMES_PER_WEEK) {
             return calculateWeeklyStreak(task, fromDate)
@@ -393,7 +420,7 @@ class HabitRepository(private val context: Context) {
         repeat(3650) {
             val scheduled = isScheduledOn(task, cursor)
             if (scheduled) {
-                if (isDone(task.id, cursor)) {
+                if (isDone(task.id, cursor) || isMissedDaySaved(task.id, cursor)) {
                     streak++
                 } else if (cursor != today) {
                     return streak
@@ -484,6 +511,9 @@ class HabitRepository(private val context: Context) {
             }
 
             if (isDone(task.id, cursor)) {
+                current += 1
+                if (current > best) best = current
+            } else if (isMissedDaySaved(task.id, cursor)) {
                 current += 1
                 if (current > best) best = current
             } else {
@@ -632,12 +662,12 @@ class HabitRepository(private val context: Context) {
         var currentRun = 0
         while (!cursor.isAfter(upToDate)) {
             if (isScheduledOn(task, cursor)) {
-                if (isDone(task.id, cursor)) {
-                    currentRun += 1
-                } else if (currentRun > 0) {
-                    segments += StreakSegment(currentRun)
-                    currentRun = 0
-                }
+            if (isDone(task.id, cursor) || isMissedDaySaved(task.id, cursor)) {
+                currentRun += 1
+            } else if (currentRun > 0) {
+                segments += StreakSegment(currentRun)
+                currentRun = 0
+            }
             }
             cursor = cursor.plusDays(1)
         }
@@ -678,6 +708,29 @@ class HabitRepository(private val context: Context) {
     }
 
     private fun noteKey(taskId: String): String = "${KEY_NOTE_PREFIX}${taskId}"
+    private fun streakSaverKey(taskId: String): String = "${KEY_STREAK_SAVER_PREFIX}${taskId}"
+    private fun savedMissedDatesKey(taskId: String): String = "${KEY_SAVED_MISSED_DATES_PREFIX}${taskId}"
+
+    private fun getSavedMissedDates(taskId: String): Set<LocalDate> {
+        val raw = prefs.getString(savedMissedDatesKey(taskId), null) ?: return emptySet()
+        return runCatching {
+            val array = JSONArray(raw)
+            (0 until array.length()).mapNotNull { index ->
+                val value = array.optString(index)
+                runCatching { LocalDate.parse(value, formatter) }.getOrNull()
+            }.toSet()
+        }.getOrDefault(emptySet())
+    }
+
+    private fun setSavedMissedDates(taskId: String, dates: Set<LocalDate>) {
+        if (dates.isEmpty()) {
+            prefs.edit().remove(savedMissedDatesKey(taskId)).apply()
+            return
+        }
+        val array = JSONArray()
+        dates.sorted().forEach { date -> array.put(date.format(formatter)) }
+        prefs.edit().putString(savedMissedDatesKey(taskId), array.toString()).apply()
+    }
 
     companion object {
         private const val KEY_TASKS_JSON = "tasks_json"
@@ -690,6 +743,8 @@ class HabitRepository(private val context: Context) {
         private const val KEY_DEFAULT_REMINDER_MINUTE = "default_reminder_minute"
         private const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"
         private const val KEY_NOTE_PREFIX = "habit_note_"
+        private const val KEY_STREAK_SAVER_PREFIX = "streak_saver_"
+        private const val KEY_SAVED_MISSED_DATES_PREFIX = "saved_missed_dates_"
         private const val MAX_HABIT_NOTE_LENGTH = 180
     }
 }

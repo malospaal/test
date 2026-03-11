@@ -21,6 +21,7 @@ private fun v(de: String, fr: String, es: String, it: String, ru: String): Map<A
 
 private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "Tracker" to v("Tracker", "Suivi", "Seguimiento", "Monitoraggio", "Трекер"),
+    "Habit details" to v("Gewohnheitsdetails", "Details de l'habitude", "Detalles del habito", "Dettagli abitudine", "Детали привычки"),
     "Habits" to v("Gewohnheiten", "Habitudes", "Habitos", "Abitudini", "Привычки"),
     "Analytics" to v("Analysen", "Analyses", "Analitica", "Analisi", "Аналитика"),
     "Calendar" to v("Kalender", "Calendrier", "Calendario", "Calendario", "Календарь"),
@@ -404,10 +405,21 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "Future dates cannot be marked" to v("Zukunftige Daten konnen nicht markiert werden", "Les dates futures ne peuvent pas etre cochees", "No se pueden marcar fechas futuras", "Le date future non possono essere segnate", "Нельзя отмечать будущие даты"),
     "Not scheduled for this date" to v("Nicht fur dieses Datum geplant", "Non prevu pour cette date", "No programado para esta fecha", "Non previsto per questa data", "Не запланировано на эту дату"),
     "Mark as done" to v("Als erledigt markieren", "Marquer comme fait", "Marcar como hecho", "Segna come completata", "Отметить как выполнено"),
+    "More details →" to v("Mehr Details ->", "Plus de details ->", "Mas detalles ->", "Piu dettagli ->", "Подробнее →"),
     "Great job, your streak is safe." to v("Super, deine Serie ist gesichert.", "Bravo, votre serie est preservee.", "Buen trabajo, tu racha esta a salvo.", "Ottimo lavoro, la tua serie e salva.", "Отлично, ваша серия сохранена."),
     "Great job" to v("Sehr gut", "Bravo", "Gran trabajo", "Ottimo lavoro", "Отлично"),
     "Keep it going" to v("Bleib dran", "Continuez", "Sigue asi", "Continua cosi", "Так держать"),
     "Streak milestone" to v("Serien-Meilenstein", "Palier de serie", "Hito de racha", "Traguardo serie", "Рубеж серии"),
+    "Streak Saver" to v("Serienretter", "Sauve-serie", "Salva racha", "Salva serie", "Сохранение серии"),
+    "You missed yesterday.\nSave your streak?" to v(
+        "Du hast gestern verpasst.\nSerie retten?",
+        "Vous avez manque hier.\nSauver votre serie ?",
+        "Ayer fallaste.\nGuardar tu racha?",
+        "Hai saltato ieri.\nSalvare la tua serie?",
+        "Вы пропустили вчера.\nСохранить серию?"
+    ),
+    "Use saver" to v("Retter nutzen", "Utiliser un sauveur", "Usar salvavidas", "Usa salva-serie", "Использовать сохранение"),
+    "Streak savers: %d" to v("Serienretter: %d", "Sauve-series : %d", "Salvavidas de racha: %d", "Salva-serie: %d", "Сохранений серии: %d"),
     "Amazing consistency" to v("Beeindruckende Konstanz", "Constante impressionnante", "Consistencia increible", "Costanza incredibile", "Впечатляющая стабильность"),
     "You're building momentum" to v("Du baust Momentum auf", "Vous prenez de l'elan", "Estas creando impulso", "Stai costruendo slancio", "Вы набираете темп"),
     "Continue" to v("Weiter", "Continuer", "Continuar", "Continua", "Продолжить"),

@@ -2,6 +2,7 @@ package com.example.microhabit.i18n
 
 internal val ukTranslations: Map<String, String> = mapOf(
     "Tracker" to "Трекер",
+    "Habit details" to "Деталі звички",
     "Habits" to "Звички",
     "Analytics" to "Аналітика",
     "Calendar" to "Календар",
@@ -187,10 +188,15 @@ internal val ukTranslations: Map<String, String> = mapOf(
     "Future dates cannot be marked" to "Майбутні дати не можна позначати",
     "Not scheduled for this date" to "Не заплановано на цю дату",
     "Mark as done" to "Позначити як виконане",
+    "More details →" to "Докладніше →",
     "Great job, your streak is safe." to "Чудово, ваша серія збережена.",
     "Great job" to "Чудова робота",
     "Keep it going" to "Продовжуйте в тому ж дусі",
     "Streak milestone" to "Рубеж серії",
+    "Streak Saver" to "Збереження серії",
+    "You missed yesterday.\nSave your streak?" to "Ви пропустили вчора.\nЗберегти серію?",
+    "Use saver" to "Використати збереження",
+    "Streak savers: %d" to "Збережень серії: %d",
     "Amazing consistency" to "Вражаюча стабільність",
     "You're building momentum" to "Ви набираєте темп",
     "Continue" to "Продовжити",

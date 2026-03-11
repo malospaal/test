@@ -54,6 +54,9 @@ data class HabitUiState(
     val selectedDateInFuture: Boolean = false,
     val todayDone: Boolean = false,
     val todayScheduled: Boolean = false,
+    val streakSaverCount: Int = 0,
+    val showStreakSaverDialog: Boolean = false,
+    val streakSaverMissedDate: LocalDate? = null,
     val streak: Int = 0,
     val bestStreak: Int = 0,
     val completionRate7Day: Int = 0,
@@ -108,6 +111,8 @@ class MainViewModel(
 ) : ViewModel() {
     private val _state = MutableStateFlow(HabitUiState())
     val state: StateFlow<HabitUiState> = _state.asStateFlow()
+    private val dismissedStreakSaverPromptDates = mutableMapOf<String, LocalDate>()
+    private val saverRewardedCompletionDates = mutableSetOf<String>()
 
     init {
         refresh()
@@ -258,11 +263,15 @@ class MainViewModel(
         if (!repository.isScheduledOn(task, selectedDate) && !shouldShiftStartDate) return
 
         viewModelScope.launch {
+            val previousStreak = repository.calculateStreak(task)
             if (shouldShiftStartDate) {
                 repository.updateTaskStartDate(task.id, selectedDate)
             }
             val alreadyDone = repository.isDone(task.id, selectedDate)
             repository.setDone(task.id, selectedDate, !alreadyDone)
+            if (!alreadyDone && selectedDate == LocalDate.now()) {
+                maybeAwardStreakSaver(task.id, previousStreak)
+            }
             repository.refreshWidget()
             refresh()
         }
@@ -279,13 +288,38 @@ class MainViewModel(
                 return@launch
             }
             if (!repository.isDone(task.id, today)) {
+                val previousStreak = repository.calculateStreak(task)
                 if (today.isBefore(task.startDate) && repository.isScheduledByFrequency(task, today)) {
                     repository.updateTaskStartDate(task.id, today)
                 }
                 repository.setDone(task.id, today, true)
+                maybeAwardStreakSaver(task.id, previousStreak)
                 repository.refreshWidget()
             }
             _state.update { it.copy(selectedDate = today, currentMonth = YearMonth.from(today)) }
+            refresh()
+        }
+    }
+
+    fun dismissStreakSaverDialog() {
+        val current = _state.value
+        val taskId = current.selectedTaskId ?: return
+        val missedDate = current.streakSaverMissedDate ?: return
+        dismissedStreakSaverPromptDates[taskId] = missedDate
+        _state.update { it.copy(showStreakSaverDialog = false) }
+    }
+
+    fun useStreakSaverForYesterday() {
+        val current = _state.value
+        val task = current.tasks.firstOrNull { it.id == current.selectedTaskId } ?: return
+        val missedDate = current.streakSaverMissedDate ?: return
+        val yesterday = LocalDate.now().minusDays(1)
+        if (missedDate != yesterday) return
+
+        viewModelScope.launch {
+            val consumed = repository.consumeStreakSaver(task.id, missedDate)
+            if (!consumed) return@launch
+            dismissedStreakSaverPromptDates.remove(task.id)
             refresh()
         }
     }
@@ -552,8 +586,10 @@ class MainViewModel(
             val selectedTask = tasks.firstOrNull { it.id == selectedId }
             val date = _state.value.selectedDate
             val today = LocalDate.now()
+            val metricsAnchorDate = today
+            val yesterday = today.minusDays(1)
             val isFutureDate = date.isAfter(LocalDate.now())
-            val weekdayConsistency = selectedTask?.let { repository.weekdayConsistency(it, 84, date) } ?: List(7) { 0 }
+            val weekdayConsistency = selectedTask?.let { repository.weekdayConsistency(it, 84, metricsAnchorDate) } ?: List(7) { 0 }
             val consistencyNonZero = weekdayConsistency
                 .mapIndexed { index, value -> index to value }
                 .filter { (_, value) -> value > 0 }
@@ -564,6 +600,24 @@ class MainViewModel(
             } else {
                 consistencyNonZero.sumOf { it.second } / consistencyNonZero.size
             }
+            val streakSaverCount = selectedTask?.let { repository.getStreakSaverCount(it.id) } ?: 0
+            val streakSaverMissedDate = selectedTask?.let { task ->
+                if (
+                    task.frequency != TaskFrequency.TIMES_PER_WEEK &&
+                    repository.isScheduledOn(task, yesterday) &&
+                    !repository.isDone(task.id, yesterday) &&
+                    !repository.isMissedDaySaved(task.id, yesterday)
+                ) {
+                    yesterday
+                } else {
+                    null
+                }
+            }
+            val showStreakSaverDialog = selectedTask?.let { task ->
+                streakSaverMissedDate != null &&
+                    streakSaverCount > 0 &&
+                    dismissedStreakSaverPromptDates[task.id] != streakSaverMissedDate
+            } ?: false
             _state.update { state ->
                 state.copy(
                     tasks = tasks,
@@ -594,6 +648,9 @@ class MainViewModel(
                         repository.isScheduledOn(task, today) ||
                             (today.isBefore(task.startDate) && repository.isScheduledByFrequency(task, today))
                     } ?: false,
+                    streakSaverCount = streakSaverCount,
+                    showStreakSaverDialog = showStreakSaverDialog,
+                    streakSaverMissedDate = streakSaverMissedDate,
                     selectedDateScheduled = selectedTask?.let { task ->
                         repository.isScheduledOn(task, date) ||
                             (date.isBefore(task.startDate) && repository.isScheduledByFrequency(task, date))
@@ -608,14 +665,14 @@ class MainViewModel(
                     hardestWeekday = hardestWeekday,
                     completionConsistency = completionConsistency,
                     selectedTaskNote = selectedTask?.let { repository.getTaskNote(it.id) }.orEmpty(),
-                    completionRate7Day = selectedTask?.let { repository.completionRate(it, 7, date) } ?: 0,
-                    completionRate30Day = selectedTask?.let { repository.completionRate(it, 30, date) } ?: 0,
+                    completionRate7Day = selectedTask?.let { repository.completionRate(it, 7, metricsAnchorDate) } ?: 0,
+                    completionRate30Day = selectedTask?.let { repository.completionRate(it, 30, metricsAnchorDate) } ?: 0,
                     totalCompletions = selectedTask?.let { repository.totalCompletions(it) } ?: 0,
-                    progressPercent = selectedTask?.let { repository.progressForLast30Days(it, date) } ?: 0,
-                    last7Days = selectedTask?.let { repository.last7Days(it, date) } ?: List(7) { 0 },
+                    progressPercent = selectedTask?.let { repository.progressForLast30Days(it, metricsAnchorDate) } ?: 0,
+                    last7Days = selectedTask?.let { repository.last7Days(it, metricsAnchorDate) } ?: List(7) { 0 },
                     last7DaysScheduled = selectedTask?.let { task ->
                         (6L downTo 0L).map { offset ->
-                            val day = date.minusDays(offset)
+                            val day = metricsAnchorDate.minusDays(offset)
                             repository.isScheduledOn(task, day)
                         }
                     } ?: List(7) { false },
@@ -646,8 +703,10 @@ class MainViewModel(
         val date = current.selectedDate
         val month = current.currentMonth
         val today = LocalDate.now()
+        val metricsAnchorDate = today
+        val yesterday = today.minusDays(1)
         val isFutureDate = date.isAfter(LocalDate.now())
-        val weekdayConsistency = selectedTask?.let { repository.weekdayConsistency(it, 84, date) } ?: List(7) { 0 }
+        val weekdayConsistency = selectedTask?.let { repository.weekdayConsistency(it, 84, metricsAnchorDate) } ?: List(7) { 0 }
         val consistencyNonZero = weekdayConsistency
             .mapIndexed { index, value -> index to value }
             .filter { (_, value) -> value > 0 }
@@ -658,6 +717,24 @@ class MainViewModel(
         } else {
             consistencyNonZero.sumOf { it.second } / consistencyNonZero.size
         }
+        val streakSaverCount = selectedTask?.let { repository.getStreakSaverCount(it.id) } ?: 0
+        val streakSaverMissedDate = selectedTask?.let { task ->
+            if (
+                task.frequency != TaskFrequency.TIMES_PER_WEEK &&
+                repository.isScheduledOn(task, yesterday) &&
+                !repository.isDone(task.id, yesterday) &&
+                !repository.isMissedDaySaved(task.id, yesterday)
+            ) {
+                yesterday
+            } else {
+                null
+            }
+        }
+        val showStreakSaverDialog = selectedTask?.let { task ->
+            streakSaverMissedDate != null &&
+                streakSaverCount > 0 &&
+                dismissedStreakSaverPromptDates[task.id] != streakSaverMissedDate
+        } ?: false
         _state.update {
             it.copy(
                 selectedDateInFuture = isFutureDate,
@@ -666,6 +743,9 @@ class MainViewModel(
                     repository.isScheduledOn(task, today) ||
                         (today.isBefore(task.startDate) && repository.isScheduledByFrequency(task, today))
                 } ?: false,
+                streakSaverCount = streakSaverCount,
+                showStreakSaverDialog = showStreakSaverDialog,
+                streakSaverMissedDate = streakSaverMissedDate,
                 selectedDateScheduled = selectedTask?.let { task ->
                     repository.isScheduledOn(task, date) ||
                         (date.isBefore(task.startDate) && repository.isScheduledByFrequency(task, date))
@@ -679,14 +759,14 @@ class MainViewModel(
                 mostConsistentWeekday = mostConsistentWeekday,
                 hardestWeekday = hardestWeekday,
                 completionConsistency = completionConsistency,
-                completionRate7Day = selectedTask?.let { repository.completionRate(it, 7, date) } ?: 0,
-                completionRate30Day = selectedTask?.let { repository.completionRate(it, 30, date) } ?: 0,
+                completionRate7Day = selectedTask?.let { repository.completionRate(it, 7, metricsAnchorDate) } ?: 0,
+                completionRate30Day = selectedTask?.let { repository.completionRate(it, 30, metricsAnchorDate) } ?: 0,
                 totalCompletions = selectedTask?.let { repository.totalCompletions(it) } ?: 0,
-                progressPercent = selectedTask?.let { repository.progressForLast30Days(it, date) } ?: 0,
-                last7Days = selectedTask?.let { repository.last7Days(it, date) } ?: List(7) { 0 },
+                progressPercent = selectedTask?.let { repository.progressForLast30Days(it, metricsAnchorDate) } ?: 0,
+                last7Days = selectedTask?.let { repository.last7Days(it, metricsAnchorDate) } ?: List(7) { 0 },
                 last7DaysScheduled = selectedTask?.let { task ->
                     (6L downTo 0L).map { offset ->
-                        val day = date.minusDays(offset)
+                        val day = metricsAnchorDate.minusDays(offset)
                         repository.isScheduledOn(task, day)
                     }
                 } ?: List(7) { false },
@@ -722,6 +802,21 @@ class MainViewModel(
 
     private fun canCreateTask(taskCount: Int, plan: SubscriptionPlan): Boolean {
         return plan == SubscriptionPlan.PRO || taskCount < 1
+    }
+
+    private fun maybeAwardStreakSaver(taskId: String, previousStreak: Int) {
+        val today = LocalDate.now()
+        val guardKey = "$taskId|$today"
+        if (guardKey in saverRewardedCompletionDates) return
+        val task = repository.getTasks().firstOrNull { it.id == taskId } ?: return
+        val currentStreak = repository.calculateStreak(task)
+        val previousMilestones = previousStreak / 7
+        val currentMilestones = currentStreak / 7
+        val earned = (currentMilestones - previousMilestones).coerceAtLeast(0)
+        if (earned > 0) {
+            repository.addStreakSavers(taskId, earned)
+            saverRewardedCompletionDates += guardKey
+        }
     }
 
     private fun frequencyLabel(task: HabitTask, language: AppLanguage): String {

@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.microhabit.data.AppLanguage
 import com.example.microhabit.data.AppThemeMode
 import com.example.microhabit.data.HabitCategory
+import com.example.microhabit.data.HabitLifecycleState
 import com.example.microhabit.data.MAX_HABIT_TITLE_LENGTH
 import com.example.microhabit.data.HabitRepository
 import com.example.microhabit.data.HabitTask
@@ -43,6 +44,7 @@ data class HabitListItem(
     val reminderEnabled: Boolean,
     val reminderHour: Int,
     val reminderMinute: Int,
+    val isCompleted: Boolean,
     val isArchived: Boolean
 )
 
@@ -101,6 +103,7 @@ data class HabitUiState(
     val editorReminderMinute: Int = 0,
     val editorReminderEnabled: Boolean = false,
     val editorStartDate: LocalDate = LocalDate.now(),
+    val editorEndDate: LocalDate? = null,
     val editorShowAdvanced: Boolean = false,
     val plan: SubscriptionPlan = SubscriptionPlan.FREE,
     val themeMode: AppThemeMode = AppThemeMode.SYSTEM,
@@ -112,7 +115,10 @@ data class HabitUiState(
     val durationTimerRunning: Boolean = false,
     val durationTimerElapsedSeconds: Int = 0,
     val onboardingCompleted: Boolean = false,
-    val isLoaded: Boolean = false
+    val isLoaded: Boolean = false,
+    val completedPromptTaskId: String? = null,
+    val completedPromptTaskTitle: String = "",
+    val completedPromptTaskEndDate: LocalDate? = null
 )
 
 private data class EditorSavePayload(
@@ -260,6 +266,7 @@ class MainViewModel(
                 editorReminderHour = reminderHour.coerceIn(0, 23),
                 editorReminderMinute = reminderMinute.coerceIn(0, 59),
                 editorStartDate = LocalDate.now(),
+                editorEndDate = null,
                 editorShowAdvanced = false
             )
         }
@@ -316,7 +323,7 @@ class MainViewModel(
         val taskId = _state.value.selectedTaskId ?: return
         viewModelScope.launch {
             val task = repository.getTasks()
-                .firstOrNull { it.id == taskId && !it.isArchived }
+                .firstOrNull { it.id == taskId && repository.isHabitActive(it) }
                 ?: return@launch
             val today = LocalDate.now()
             if (!repository.isScheduledOn(task, today) && !(today.isBefore(task.startDate) && repository.isScheduledByFrequency(task, today))) {
@@ -379,6 +386,7 @@ class MainViewModel(
                 editorReminderMinute = reminderMinute,
                 editorReminderEnabled = false,
                 editorStartDate = LocalDate.now(),
+                editorEndDate = null,
                 editorShowAdvanced = false
             )
         }
@@ -405,6 +413,7 @@ class MainViewModel(
                 editorReminderMinute = task.reminderMinute,
                 editorReminderEnabled = task.reminderEnabled,
                 editorStartDate = task.startDate,
+                editorEndDate = task.endDate,
                 editorShowAdvanced = false
             )
         }
@@ -604,7 +613,31 @@ class MainViewModel(
     }
 
     fun setEditorStartDate(value: LocalDate) {
-        _state.update { it.copy(editorStartDate = value) }
+        _state.update {
+            val adjustedEndDate = it.editorEndDate?.takeIf { end -> !end.isBefore(value) }
+            it.copy(
+                editorStartDate = value,
+                editorEndDate = adjustedEndDate
+            )
+        }
+    }
+
+    fun setEditorEndDate(value: LocalDate) {
+        _state.update {
+            it.copy(editorEndDate = value.takeIf { date -> !date.isBefore(it.editorStartDate) })
+        }
+    }
+
+    fun setEditorEndDateEnabled(enabled: Boolean) {
+        _state.update {
+            it.copy(
+                editorEndDate = if (enabled) {
+                    it.editorEndDate ?: it.editorStartDate
+                } else {
+                    null
+                }
+            )
+        }
     }
 
     fun setEditorShowAdvanced(value: Boolean) {
@@ -667,7 +700,8 @@ class MainViewModel(
                     reminderHour = current.editorReminderHour,
                     reminderMinute = current.editorReminderMinute,
                     reminderEnabled = current.editorReminderEnabled,
-                    startDate = current.editorStartDate
+                    startDate = current.editorStartDate,
+                    endDate = current.editorEndDate
                 )
                 repository.setSelectedTask(task.id)
                 task.id
@@ -686,7 +720,8 @@ class MainViewModel(
                     reminderHour = current.editorReminderHour,
                     reminderMinute = current.editorReminderMinute,
                     reminderEnabled = current.editorReminderEnabled,
-                    startDate = current.editorStartDate
+                    startDate = current.editorStartDate,
+                    endDate = current.editorEndDate
                 )
                 current.editingTaskId
         }
@@ -714,13 +749,64 @@ class MainViewModel(
         }
     }
 
-    fun unarchiveTask(taskId: String) {
+    fun unarchiveTask(taskId: String): Boolean {
+        val current = _state.value
+        val task = current.allTasks.firstOrNull { it.id == taskId } ?: return false
+        val willBeActive = repository.lifecycleState(task.copy(isArchived = false)) == HabitLifecycleState.ACTIVE
+        if (current.plan != SubscriptionPlan.PRO && willBeActive) {
+            val activeCount = current.allTasks.count { repository.lifecycleState(it) == HabitLifecycleState.ACTIVE }
+            if (activeCount >= FREE_ACTIVE_HABIT_LIMIT) {
+                return false
+            }
+        }
         viewModelScope.launch {
             repository.archiveTask(taskId, archived = false)
             reminderScheduler.syncReminderForTask(taskId)
             repository.refreshWidget()
             refresh()
         }
+        return true
+    }
+
+    fun dismissCompletedHabitDialog() {
+        val current = _state.value
+        val taskId = current.completedPromptTaskId ?: return
+        val endDate = current.completedPromptTaskEndDate ?: return
+        repository.markCompletedPromptShown(taskId, endDate)
+        refresh()
+    }
+
+    fun continueCompletedHabitIndefinite() {
+        val taskId = _state.value.completedPromptTaskId ?: return
+        viewModelScope.launch {
+            repository.updateTaskEndDate(taskId, null)
+            reminderScheduler.syncReminderForTask(taskId)
+            repository.refreshWidget()
+            refresh()
+        }
+    }
+
+    fun continueCompletedHabitWithEndDate(newEndDate: LocalDate) {
+        val current = _state.value
+        val taskId = current.completedPromptTaskId ?: return
+        val task = current.allTasks.firstOrNull { it.id == taskId } ?: return
+        if (newEndDate.isBefore(task.startDate) || newEndDate.isBefore(LocalDate.now())) return
+        viewModelScope.launch {
+            repository.updateTaskEndDate(taskId, newEndDate)
+            reminderScheduler.syncReminderForTask(taskId)
+            repository.refreshWidget()
+            refresh()
+        }
+    }
+
+    fun archiveCompletedHabitFromDialog() {
+        val taskId = _state.value.completedPromptTaskId ?: return
+        archiveTask(taskId)
+    }
+
+    fun deleteCompletedHabitFromDialog() {
+        val taskId = _state.value.completedPromptTaskId ?: return
+        deleteTask(taskId)
     }
 
     fun canCreateTask(): Boolean {
@@ -733,6 +819,7 @@ class MainViewModel(
         if (s.editorTitle.trim().isEmpty()) return false
         if (s.editorTitle.trim().length > MAX_HABIT_TITLE_LENGTH) return false
         if (s.editorDailyTarget <= 0) return false
+        if (s.editorEndDate != null && s.editorEndDate.isBefore(s.editorStartDate)) return false
         if (s.editorEmoji.trim().isEmpty()) return false
         if (s.editorColorHex.trim().isEmpty()) return false
         if (s.editorFrequency == TaskFrequency.SELECTED_DAYS && s.editorCustomDays.isEmpty()) return false
@@ -743,7 +830,7 @@ class MainViewModel(
     private fun refresh() {
         viewModelScope.launch {
             val allTasks = repository.getTasks()
-            val tasks = allTasks.filterNot { it.isArchived }
+            val tasks = allTasks.filter { repository.lifecycleState(it) == HabitLifecycleState.ACTIVE }
             val plan = repository.getPlan()
             val themeMode = repository.getThemeMode()
             val language = repository.getLanguage()
@@ -800,6 +887,7 @@ class MainViewModel(
                     streakSaverCount > 0 &&
                     dismissedStreakSaverPromptDates[task.id] != streakSaverMissedDate
             } ?: false
+            val completedPromptTask = allTasks.firstOrNull { repository.shouldShowCompletedPrompt(it, today) }
             _state.update { state ->
                 state.copy(
                     tasks = tasks,
@@ -818,6 +906,7 @@ class MainViewModel(
                                 reminderEnabled = task.reminderEnabled,
                                 reminderHour = task.reminderHour,
                                 reminderMinute = task.reminderMinute,
+                                isCompleted = repository.lifecycleState(task) == HabitLifecycleState.COMPLETED,
                                 isArchived = task.isArchived
                             )
                         }
@@ -884,7 +973,10 @@ class MainViewModel(
                     defaultReminderHour = defaultReminderHour,
                     defaultReminderMinute = defaultReminderMinute,
                     onboardingCompleted = onboardingCompleted,
-                    isLoaded = true
+                    isLoaded = true,
+                    completedPromptTaskId = completedPromptTask?.id,
+                    completedPromptTaskTitle = completedPromptTask?.title.orEmpty(),
+                    completedPromptTaskEndDate = completedPromptTask?.endDate
                 )
             }
         }
@@ -1021,7 +1113,7 @@ class MainViewModel(
     }
 
     private fun canCreateTask(taskCount: Int, plan: SubscriptionPlan): Boolean {
-        return plan == SubscriptionPlan.PRO || taskCount < 1
+        return plan == SubscriptionPlan.PRO || taskCount < FREE_ACTIVE_HABIT_LIMIT
     }
 
     private fun maybeAwardStreakSaver(taskId: String, previousStreak: Int) {
@@ -1069,5 +1161,9 @@ class MainViewModel(
             @Suppress("UNCHECKED_CAST")
             return MainViewModel(repository, reminderScheduler) as T
         }
+    }
+
+    companion object {
+        private const val FREE_ACTIVE_HABIT_LIMIT = 1
     }
 }

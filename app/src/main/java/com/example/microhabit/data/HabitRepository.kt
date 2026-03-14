@@ -32,6 +32,12 @@ enum class SubscriptionPlan {
     PRO
 }
 
+enum class HabitLifecycleState {
+    ACTIVE,
+    COMPLETED,
+    ARCHIVED
+}
+
 enum class AppThemeMode {
     SYSTEM,
     LIGHT,
@@ -63,6 +69,7 @@ data class HabitTask(
     val reminderMinute: Int = 0,
     val reminderEnabled: Boolean = true,
     val startDate: LocalDate = LocalDate.now(),
+    val endDate: LocalDate? = null,
     val customDays: Set<Int> = emptySet(),
     val isArchived: Boolean = false
 )
@@ -119,6 +126,9 @@ class HabitRepository(private val context: Context) {
                     taskId = id,
                     rawValue = obj.optString("startDate", "")
                 )
+                val endDate = obj.optString("endDate", "")
+                    .takeIf { it.isNotBlank() && it != "null" }
+                    ?.let { parseLocalDateLenient(it) }
 
                 HabitTask(
                     id = id,
@@ -134,6 +144,7 @@ class HabitRepository(private val context: Context) {
                     reminderMinute = obj.optInt("reminderMinute", 0).coerceIn(0, 59),
                     reminderEnabled = obj.optBoolean("reminderEnabled", true),
                     startDate = startDate,
+                    endDate = endDate?.takeIf { !it.isBefore(startDate) },
                     customDays = custom,
                     isArchived = obj.optBoolean("isArchived", false)
                 )
@@ -154,8 +165,10 @@ class HabitRepository(private val context: Context) {
         reminderHour: Int,
         reminderMinute: Int,
         reminderEnabled: Boolean,
-        startDate: LocalDate
+        startDate: LocalDate,
+        endDate: LocalDate?
     ): HabitTask {
+        val normalizedEndDate = endDate?.takeIf { !it.isBefore(startDate) }
         val task = HabitTask(
             id = UUID.randomUUID().toString(),
             title = sanitizeTitle(title),
@@ -170,6 +183,7 @@ class HabitRepository(private val context: Context) {
             reminderMinute = reminderMinute.coerceIn(0, 59),
             reminderEnabled = reminderEnabled,
             startDate = startDate,
+            endDate = normalizedEndDate,
             customDays = sanitizeCustomDays(customDays),
             isArchived = false
         )
@@ -193,10 +207,12 @@ class HabitRepository(private val context: Context) {
         reminderHour: Int,
         reminderMinute: Int,
         reminderEnabled: Boolean,
-        startDate: LocalDate
+        startDate: LocalDate,
+        endDate: LocalDate?
     ) {
         val updated = getTasks().map { task ->
             if (task.id == taskId) {
+                val normalizedEndDate = endDate?.takeIf { !it.isBefore(startDate) }
                 task.copy(
                     title = sanitizeTitle(title),
                     emoji = emoji.ifBlank { "✨" },
@@ -210,11 +226,15 @@ class HabitRepository(private val context: Context) {
                     reminderMinute = reminderMinute.coerceIn(0, 59),
                     reminderEnabled = reminderEnabled,
                     startDate = startDate,
+                    endDate = normalizedEndDate,
                     customDays = sanitizeCustomDays(customDays)
                 )
             } else {
                 task
             }
+        }
+        if (updated.any { it.id == taskId }) {
+            clearCompletionPromptMarker(taskId)
         }
         saveTasks(updated)
     }
@@ -232,6 +252,7 @@ class HabitRepository(private val context: Context) {
         prefs.edit().remove(noteKey(taskId)).apply()
         prefs.edit().remove(streakSaverKey(taskId)).apply()
         prefs.edit().remove(savedMissedDatesKey(taskId)).apply()
+        prefs.edit().remove(completedPromptKey(taskId)).apply()
 
         if (getSelectedTaskId() == taskId) {
             prefs.edit().putString(KEY_SELECTED_TASK, updated.firstOrNull()?.id).apply()
@@ -246,10 +267,10 @@ class HabitRepository(private val context: Context) {
 
         val selectedId = getSelectedTaskId()
         if (selectedId == taskId && archived) {
-            val nextActive = updated.firstOrNull { !it.isArchived }?.id
+            val nextActive = updated.firstOrNull { isHabitActive(it) }?.id
             setSelectedTask(nextActive)
         } else if (!archived) {
-            val hasSelectedActive = updated.any { it.id == selectedId && !it.isArchived }
+            val hasSelectedActive = updated.any { it.id == selectedId && isHabitActive(it) }
             if (!hasSelectedActive) {
                 setSelectedTask(taskId)
             }
@@ -375,7 +396,28 @@ class HabitRepository(private val context: Context) {
 
     fun isScheduledOn(task: HabitTask, date: LocalDate): Boolean {
         if (date.isBefore(task.startDate)) return false
+        val endDate = task.endDate
+        if (endDate != null && date.isAfter(endDate)) return false
         return isScheduledByFrequency(task, date)
+    }
+
+    fun isHabitCompleted(task: HabitTask, today: LocalDate = LocalDate.now()): Boolean {
+        if (task.isArchived) return false
+        val endDate = task.endDate ?: return false
+        return today.isAfter(endDate)
+    }
+
+    fun isHabitActive(task: HabitTask, today: LocalDate = LocalDate.now()): Boolean {
+        if (task.isArchived) return false
+        return !isHabitCompleted(task, today)
+    }
+
+    fun lifecycleState(task: HabitTask, today: LocalDate = LocalDate.now()): HabitLifecycleState {
+        return when {
+            task.isArchived -> HabitLifecycleState.ARCHIVED
+            isHabitCompleted(task, today) -> HabitLifecycleState.COMPLETED
+            else -> HabitLifecycleState.ACTIVE
+        }
     }
 
     fun isScheduledByFrequency(task: HabitTask, date: LocalDate): Boolean {
@@ -431,10 +473,12 @@ class HabitRepository(private val context: Context) {
     }
 
     fun completionPercent(task: HabitTask, date: LocalDate): Int {
+        if (!isScheduledOn(task, date)) return 0
         return completionPercentByValue(task, getDayValue(task, date))
     }
 
     fun progressPercentForWidget(task: HabitTask, date: LocalDate): Int {
+        if (!isScheduledOn(task, date)) return 0
         val value = getDayValue(task, date)
         if (task.trackingType == TrackingType.YES_NO) {
             return if (value >= 1) 100 else 0
@@ -474,8 +518,22 @@ class HabitRepository(private val context: Context) {
 
     fun updateTaskStartDate(taskId: String, startDate: LocalDate) {
         val updated = getTasks().map { task ->
-            if (task.id == taskId) task.copy(startDate = startDate) else task
+            if (task.id == taskId) {
+                val adjustedEndDate = task.endDate?.takeIf { !it.isBefore(startDate) }
+                task.copy(startDate = startDate, endDate = adjustedEndDate)
+            } else task
         }
+        clearCompletionPromptMarker(taskId)
+        saveTasks(updated)
+    }
+
+    fun updateTaskEndDate(taskId: String, endDate: LocalDate?) {
+        val updated = getTasks().map { task ->
+            if (task.id == taskId) {
+                task.copy(endDate = endDate?.takeIf { !it.isBefore(task.startDate) })
+            } else task
+        }
+        clearCompletionPromptMarker(taskId)
         saveTasks(updated)
     }
 
@@ -585,11 +643,15 @@ class HabitRepository(private val context: Context) {
         if (days <= 0) return 0
         if (task.frequency == TaskFrequency.TIMES_PER_WEEK) {
             var completed = 0
+            var effectiveDays = 0
             for (offset in 0L until days.toLong()) {
                 val day = anchorDate.minusDays(offset)
+                if (!isScheduledOn(task, day)) continue
+                effectiveDays += 1
                 if (isCompletedOn(task, day)) completed += 1
             }
-            val target = ceil((task.timesPerWeek / 7f) * days).toInt().coerceAtLeast(1)
+            if (effectiveDays == 0) return 0
+            val target = ceil((task.timesPerWeek / 7f) * effectiveDays).toInt().coerceAtLeast(1)
             return (completed * 100 / target).coerceIn(0, 100)
         }
 
@@ -597,7 +659,7 @@ class HabitRepository(private val context: Context) {
         var completed = 0
         for (offset in 0L until days.toLong()) {
             val day = anchorDate.minusDays(offset)
-            if (isScheduledByFrequency(task, day)) {
+            if (isScheduledOn(task, day)) {
                 scheduled += 1
                 if (isCompletedOn(task, day)) completed += 1
             }
@@ -652,9 +714,11 @@ class HabitRepository(private val context: Context) {
 
     fun totalCompletions(task: HabitTask): Int {
         val today = LocalDate.now()
+        val lastDate = minOf(today, task.endDate ?: today)
+        if (lastDate.isBefore(task.startDate)) return 0
         var completed = 0
         var cursor = task.startDate
-        while (!cursor.isAfter(today)) {
+        while (!cursor.isAfter(lastDate)) {
             if (isCompletedOn(task, cursor)) {
                 completed += 1
             }
@@ -728,7 +792,7 @@ class HabitRepository(private val context: Context) {
     }
 
     fun selectedTaskWidgetSummary(): Triple<String, Int, Int> {
-        val tasks = getTasks().filterNot { it.isArchived }
+        val tasks = getTasks().filter { isHabitActive(it) }
         val selected = tasks.firstOrNull { it.id == getSelectedTaskId() } ?: tasks.firstOrNull()
         if (selected == null) return Triple("Create a habit", 0, 0)
 
@@ -790,6 +854,7 @@ class HabitRepository(private val context: Context) {
                 .put("reminderEnabled", task.reminderEnabled)
                 .put("startDate", task.startDate.format(formatter))
                 .put("isArchived", task.isArchived)
+            task.endDate?.let { obj.put("endDate", it.format(formatter)) }
             val custom = JSONArray()
             task.customDays.sorted().forEach { custom.put(it) }
             obj.put("customDays", custom)
@@ -914,6 +979,22 @@ class HabitRepository(private val context: Context) {
     private fun noteKey(taskId: String): String = "${KEY_NOTE_PREFIX}${taskId}"
     private fun streakSaverKey(taskId: String): String = "${KEY_STREAK_SAVER_PREFIX}${taskId}"
     private fun savedMissedDatesKey(taskId: String): String = "${KEY_SAVED_MISSED_DATES_PREFIX}${taskId}"
+    private fun completedPromptKey(taskId: String): String = "${KEY_COMPLETED_PROMPT_PREFIX}${taskId}"
+
+    fun shouldShowCompletedPrompt(task: HabitTask, today: LocalDate = LocalDate.now()): Boolean {
+        if (!isHabitCompleted(task, today)) return false
+        val endDate = task.endDate ?: return false
+        val marker = prefs.getString(completedPromptKey(task.id), null)
+        return marker != endDate.format(formatter)
+    }
+
+    fun markCompletedPromptShown(taskId: String, endDate: LocalDate) {
+        prefs.edit().putString(completedPromptKey(taskId), endDate.format(formatter)).apply()
+    }
+
+    fun clearCompletionPromptMarker(taskId: String) {
+        prefs.edit().remove(completedPromptKey(taskId)).apply()
+    }
 
     private fun getSavedMissedDates(taskId: String): Set<LocalDate> {
         val raw = prefs.getString(savedMissedDatesKey(taskId), null) ?: return emptySet()
@@ -951,6 +1032,7 @@ class HabitRepository(private val context: Context) {
         private const val KEY_NOTE_PREFIX = "habit_note_"
         private const val KEY_STREAK_SAVER_PREFIX = "streak_saver_"
         private const val KEY_SAVED_MISSED_DATES_PREFIX = "saved_missed_dates_"
+        private const val KEY_COMPLETED_PROMPT_PREFIX = "completed_prompt_"
         private const val DEFAULT_MINIMUM_COMPLETION_PERCENT = 80
         private const val MAX_HABIT_NOTE_LENGTH = 180
     }

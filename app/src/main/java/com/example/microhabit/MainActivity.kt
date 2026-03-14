@@ -22,6 +22,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -101,6 +102,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
@@ -112,6 +114,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -145,6 +148,7 @@ import androidx.compose.ui.window.PopupProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -205,6 +209,7 @@ import java.time.format.TextStyle
 import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.ceil
 
 private enum class AppPage {
     TRACKER,
@@ -225,6 +230,17 @@ private enum class BillingCycle {
 private enum class NotificationPermissionAction {
     ENABLE_REMINDERS,
     SAVE_EDITOR_REMINDER
+}
+
+private enum class DurationSheetMode {
+    MANUAL,
+    TIMER
+}
+
+private enum class TimerUiState {
+    IDLE,
+    RUNNING,
+    PAUSED
 }
 
 private enum class OnboardingStep {
@@ -305,6 +321,8 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
     var highlightCompletionButton by rememberSaveable { mutableStateOf(false) }
     var showOnboardingWizard by rememberSaveable { mutableStateOf(false) }
     var onboardingDismissedSession by rememberSaveable { mutableStateOf(false) }
+    var showContinueCompletedHabitDialog by rememberSaveable { mutableStateOf(false) }
+    var showDeleteCompletedHabitConfirm by rememberSaveable { mutableStateOf(false) }
     val semantic = AppTheme.colors
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -386,6 +404,13 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
             !onboardingDismissedSession
         ) {
             showOnboardingWizard = true
+        }
+    }
+
+    LaunchedEffect(state.completedPromptTaskId) {
+        if (state.completedPromptTaskId == null) {
+            showContinueCompletedHabitDialog = false
+            showDeleteCompletedHabitConfirm = false
         }
     }
 
@@ -506,10 +531,6 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                                 state = state,
                                 vm = vm,
                                 onOpenDetails = { page = AppPage.HABIT_DETAIL },
-                                onOpenPaywall = {
-                                    previousPage = AppPage.TRACKER
-                                    page = AppPage.PAYWALL
-                                },
                                 highlightCompletionButton = highlightCompletionButton,
                                 onHighlightConsumed = { highlightCompletionButton = false }
                             )
@@ -672,6 +693,98 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                 }
             )
         }
+
+        if (state.completedPromptTaskId != null && !showContinueCompletedHabitDialog && !showDeleteCompletedHabitConfirm) {
+            AlertDialog(
+                onDismissRequest = vm::dismissCompletedHabitDialog,
+                title = { Text(t("Congratulations! Habit completed.")) },
+                text = { Text(state.completedPromptTaskTitle) },
+                confirmButton = {
+                    Button(onClick = { showContinueCompletedHabitDialog = true }) {
+                        Text(t("Continue habit"))
+                    }
+                },
+                dismissButton = {
+                    Row(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.x0_5)) {
+                        TextButton(onClick = vm::archiveCompletedHabitFromDialog) {
+                            Text(t("Archive"))
+                        }
+                        TextButton(onClick = { showDeleteCompletedHabitConfirm = true }) {
+                            Text(t("Delete"), color = AppTheme.colors.danger)
+                        }
+                    }
+                }
+            )
+        }
+
+        if (state.completedPromptTaskId != null && showContinueCompletedHabitDialog) {
+            AlertDialog(
+                onDismissRequest = { showContinueCompletedHabitDialog = false },
+                title = { Text(t("Continue habit")) },
+                text = { Text(t("Choose how to continue this habit.")) },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            val initialDate = maxOf(
+                                LocalDate.now(),
+                                (state.completedPromptTaskEndDate ?: LocalDate.now()).plusDays(1)
+                            )
+                            showThemedDatePicker(
+                                context = context,
+                                themeResId = R.style.ThemeOverlay_MicroHabit_Picker,
+                                initialDate = initialDate,
+                                actionColorArgb = semantic.primary.toArgb(),
+                                onDateSet = { year, month, day ->
+                                    vm.continueCompletedHabitWithEndDate(LocalDate.of(year, month + 1, day))
+                                }
+                            )
+                            showContinueCompletedHabitDialog = false
+                        }
+                    ) {
+                        Text(t("Choose a new end date"))
+                    }
+                },
+                dismissButton = {
+                    Row(horizontalArrangement = Arrangement.spacedBy(AppTheme.spacing.x0_5)) {
+                        TextButton(
+                            onClick = {
+                                vm.continueCompletedHabitIndefinite()
+                                showContinueCompletedHabitDialog = false
+                            }
+                        ) {
+                            Text(t("Make habit indefinite"))
+                        }
+                        TextButton(onClick = { showContinueCompletedHabitDialog = false }) {
+                            Text(t("Cancel"))
+                        }
+                    }
+                }
+            )
+        }
+
+        if (state.completedPromptTaskId != null && showDeleteCompletedHabitConfirm) {
+            AlertDialog(
+                onDismissRequest = { showDeleteCompletedHabitConfirm = false },
+                title = { Text(t("Delete habit?")) },
+                text = { Text(t("This will permanently delete this habit and its completion history.")) },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showDeleteCompletedHabitConfirm = false
+                            vm.deleteCompletedHabitFromDialog()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Text(t("Delete"))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteCompletedHabitConfirm = false }) {
+                        Text(t("Cancel"))
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -750,7 +863,6 @@ private fun TrackerPage(
     state: HabitUiState,
     vm: MainViewModel,
     onOpenDetails: () -> Unit,
-    onOpenPaywall: () -> Unit,
     highlightCompletionButton: Boolean,
     onHighlightConsumed: () -> Unit
 ) {
@@ -870,20 +982,28 @@ private fun TrackerPage(
                                 selectedUnit = state.selectedDateUnit,
                                 selectedCompletionPercent = state.selectedDateCompletionPercent,
                                 minimumCompletionPercent = state.minimumCompletionPercent,
-                                plan = state.plan,
-                                durationTimerRunning = state.durationTimerRunning,
-                                durationTimerElapsedSeconds = state.durationTimerElapsedSeconds,
                                 onDone = vm::toggleSelectedDateDone,
+                                onSetValue = vm::setSelectedDateValue,
                                 onIncrementValue = vm::incrementSelectedDateValue,
-                                onStartDurationTimer = vm::startDurationTimer,
-                                onStopDurationTimerAndApply = vm::stopDurationTimerAndApply,
-                                onOpenPaywall = onOpenPaywall,
                                 highlightMarkButton = highlightCompletionButton,
                                 onHighlightConsumed = onHighlightConsumed,
                                 appThemeMode = state.themeMode,
                                 swipeEnabled = state.tasks.size > 1,
                                 onSwipeNext = { switchHabitBy(1) },
                                 onSwipePrevious = { switchHabitBy(-1) }
+                            )
+                        }
+                        TextButton(
+                            onClick = onOpenDetails,
+                            modifier = Modifier
+                                .align(Alignment.End)
+                                .padding(top = spacing.x0_5),
+                            contentPadding = PaddingValues(horizontal = spacing.x0_5, vertical = spacing.x0)
+                        ) {
+                            Text(
+                                text = t("More details →"),
+                                style = MaterialTheme.typography.titleSmall,
+                                color = AppTheme.colors.primary
                             )
                         }
                         Crossfade(
@@ -923,17 +1043,6 @@ private fun TrackerPage(
                                 onMoveMonth = vm::moveMonth,
                                 onToday = vm::jumpToToday,
                                 onDateSelect = vm::selectDate
-                            )
-                        }
-                        TextButton(
-                            onClick = onOpenDetails,
-                            modifier = Modifier.align(Alignment.End),
-                            contentPadding = PaddingValues(horizontal = spacing.x0_5, vertical = spacing.x0)
-                        ) {
-                            Text(
-                                text = t("More details →"),
-                                style = MaterialTheme.typography.titleSmall,
-                                color = AppTheme.colors.primary
                             )
                         }
                     }
@@ -1014,7 +1123,8 @@ private fun HabitsPage(
                 }
             }
         } else {
-            val activeHabits = state.habits.filterNot { it.isArchived }
+            val activeHabits = state.habits.filter { !it.isArchived && !it.isCompleted }
+            val completedHabits = state.habits.filter { !it.isArchived && it.isCompleted }
             val archivedHabits = state.habits.filter { it.isArchived }
 
             if (activeHabits.isNotEmpty()) {
@@ -1042,6 +1152,7 @@ private fun HabitsPage(
                             frequency = habit.frequency,
                             reminderStatus = reminderStatus,
                             completionRate = habit.completionRate,
+                            isCompleted = habit.isCompleted,
                             isArchived = habit.isArchived
                         ),
                         onOpen = {
@@ -1050,7 +1161,52 @@ private fun HabitsPage(
                         },
                         onEdit = { vm.openEditTask(habit.id) },
                         onArchive = { vm.archiveTask(habit.id) },
-                        onUnarchive = { vm.unarchiveTask(habit.id) },
+                        onUnarchive = {
+                            if (!vm.unarchiveTask(habit.id)) {
+                                onUpgrade()
+                            }
+                        },
+                        onDelete = { pendingDeleteTaskId = habit.id }
+                    )
+                }
+            }
+
+            if (completedHabits.isNotEmpty()) {
+                item {
+                    Text(
+                        text = t("Completed habits"),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.textPrimary
+                    )
+                }
+                items(items = completedHabits, key = { it.id }) { habit ->
+                    val reminderStatus = if (habit.reminderEnabled) {
+                        tf("Reminder: %s", formatTimeForDevice(context, habit.reminderHour, habit.reminderMinute))
+                    } else {
+                        t("Reminder off")
+                    }
+                    HabitCard(
+                        habit = HabitCardModel(
+                            emoji = habit.emoji,
+                            name = habit.name,
+                            colorHex = habit.colorHex,
+                            trackingType = habit.trackingType,
+                            streak = habit.streak,
+                            frequency = habit.frequency,
+                            reminderStatus = reminderStatus,
+                            completionRate = habit.completionRate,
+                            isCompleted = habit.isCompleted,
+                            isArchived = habit.isArchived
+                        ),
+                        onOpen = { vm.openEditTask(habit.id) },
+                        onEdit = { vm.openEditTask(habit.id) },
+                        onArchive = { vm.archiveTask(habit.id) },
+                        onUnarchive = {
+                            if (!vm.unarchiveTask(habit.id)) {
+                                onUpgrade()
+                            }
+                        },
                         onDelete = { pendingDeleteTaskId = habit.id }
                     )
                 }
@@ -1081,12 +1237,17 @@ private fun HabitsPage(
                             frequency = habit.frequency,
                             reminderStatus = reminderStatus,
                             completionRate = habit.completionRate,
+                            isCompleted = habit.isCompleted,
                             isArchived = habit.isArchived
                         ),
                         onOpen = { vm.openEditTask(habit.id) },
                         onEdit = { vm.openEditTask(habit.id) },
                         onArchive = { vm.archiveTask(habit.id) },
-                        onUnarchive = { vm.unarchiveTask(habit.id) },
+                        onUnarchive = {
+                            if (!vm.unarchiveTask(habit.id)) {
+                                onUpgrade()
+                            }
+                        },
                         onDelete = { pendingDeleteTaskId = habit.id }
                     )
                 }
@@ -1184,35 +1345,13 @@ private fun HabitDetailPage(
                     HabitDepthHero(
                         task = selectedTask,
                         streak = state.streak,
-                        weeklyCompletion = state.completionRate7Day,
-                        todayDone = state.todayDone,
-                        todayScheduled = state.todayScheduled,
-                        onCompleteToday = vm::completeSelectedHabitToday
+                        weeklyCompletion = state.completionRate7Day
                     )
                 }
                 item {
                     HabitLevelProgressCard(
                         streak = state.streak,
                         bestStreak = state.bestStreak
-                    )
-                }
-                item {
-                    HabitMiniCalendarCard(
-                        month = state.currentMonth,
-                        selectedDate = state.selectedDate,
-                        doneDates = state.doneDatesInCurrentMonth,
-                        partialDates = state.partialDatesInCurrentMonth,
-                        scheduledDates = state.scheduledDatesInCurrentMonth,
-                        onMoveMonth = vm::moveMonth,
-                        onToday = vm::jumpToToday,
-                        onDateSelect = vm::selectDate
-                    )
-                }
-                item {
-                    SevenDayChart(
-                        points = state.last7Days,
-                        scheduled = state.last7DaysScheduled,
-                        anchorDate = LocalDate.now()
                     )
                 }
                 item {
@@ -1307,14 +1446,10 @@ private fun levelInfoForStreak(streak: Int): HabitLevelInfo {
 private fun HabitDepthHero(
     task: HabitTask,
     streak: Int,
-    weeklyCompletion: Int,
-    todayDone: Boolean,
-    todayScheduled: Boolean,
-    onCompleteToday: () -> Unit
+    weeklyCompletion: Int
 ) {
     val spacing = AppTheme.spacing
     val semantic = AppTheme.colors
-    val radius = AppTheme.radius
     val animatedRing by animateFloatAsState(
         targetValue = (weeklyCompletion / 100f).coerceIn(0f, 1f),
         animationSpec = tween(durationMillis = 380, easing = FastOutSlowInEasing),
@@ -1335,7 +1470,7 @@ private fun HabitDepthHero(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
-                    modifier = Modifier.size(spacing.x6 + spacing.x6),
+                    modifier = Modifier.size(132.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator(
@@ -1348,21 +1483,14 @@ private fun HabitDepthHero(
                         progress = { animatedRing },
                         modifier = Modifier.fillMaxSize(),
                         color = semantic.success,
-                        strokeWidth = 8.dp
+                        strokeWidth = 9.dp
                     )
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        AnimatedContent(targetState = streak, label = "habitsDepthStreakValue") { value ->
-                            Text(
-                                text = "🔥 $value",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = semantic.textPrimary
-                            )
-                        }
+                    AnimatedContent(targetState = streak, label = "habitsDepthStreakValue") { value ->
                         Text(
-                            text = t("Current streak"),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = semantic.textSecondary
+                            text = "🔥 $value",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = semantic.textPrimary
                         )
                     }
                 }
@@ -1381,23 +1509,6 @@ private fun HabitDepthHero(
                         style = MaterialTheme.typography.bodyMedium,
                         color = semantic.textSecondary
                     )
-                    Button(
-                        onClick = onCompleteToday,
-                        enabled = todayScheduled && !todayDone,
-                        shape = RoundedCornerShape(radius.md),
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (todayDone) semantic.success else semantic.primary
-                        )
-                    ) {
-                        Text(
-                            text = when {
-                                todayDone -> t("Completed today")
-                                todayScheduled -> t("Complete today")
-                                else -> t("Not scheduled today")
-                            }
-                        )
-                    }
                 }
             }
         }
@@ -2245,6 +2356,7 @@ private fun SettingsPage(
     onDeleteAccount: () -> Unit
 ) {
     val spacing = AppTheme.spacing
+    val colors = AppTheme.colors
     val context = LocalContext.current
     val language = LocalAppLanguage.current
     var showThemeDialog by rememberSaveable { mutableStateOf(false) }
@@ -2252,8 +2364,8 @@ private fun SettingsPage(
     var showResetConfirm by rememberSaveable { mutableStateOf(false) }
     var showDeleteConfirm by rememberSaveable { mutableStateOf(false) }
     var showCompletionThresholdDialog by rememberSaveable { mutableStateOf(false) }
-    var completionPercentDraft by rememberSaveable(state.minimumCompletionPercent) {
-        mutableStateOf(state.minimumCompletionPercent.coerceIn(50, 100))
+    var completionPercentInput by rememberSaveable(state.minimumCompletionPercent) {
+        mutableStateOf(state.minimumCompletionPercent.coerceIn(1, 100).toString())
     }
     val selectedHabit = state.tasks.firstOrNull { it.id == state.selectedTaskId }
     val supportedLanguages = listOf(
@@ -2357,7 +2469,7 @@ private fun SettingsPage(
                     subtitle = t("Used for count and duration habits"),
                     value = "${state.minimumCompletionPercent}%",
                     onClick = {
-                        completionPercentDraft = state.minimumCompletionPercent.coerceIn(50, 100)
+                        completionPercentInput = state.minimumCompletionPercent.coerceIn(1, 100).toString()
                         showCompletionThresholdDialog = true
                     }
                 )
@@ -2535,6 +2647,9 @@ private fun SettingsPage(
     }
 
     if (showCompletionThresholdDialog) {
+        val parsedThreshold = completionPercentInput.toIntOrNull()
+        val isValidThreshold = parsedThreshold != null && parsedThreshold in 1..100
+        val showError = completionPercentInput.isNotBlank() && !isValidThreshold
         AlertDialog(
             onDismissRequest = { showCompletionThresholdDialog = false },
             title = { Text(t("Minimum completion percent")) },
@@ -2544,21 +2659,56 @@ private fun SettingsPage(
                         text = t("Used for count and duration habits"),
                         style = MaterialTheme.typography.bodySmall
                     )
-                    Stepper(
-                        label = t("Completion threshold"),
-                        value = completionPercentDraft,
-                        min = 50,
-                        max = 100,
-                        onValueChange = { completionPercentDraft = it }
+                    Text(
+                        text = t("Completion threshold"),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.textPrimary
                     )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+                    ) {
+                        OutlinedTextField(
+                            value = completionPercentInput,
+                            onValueChange = { value ->
+                                completionPercentInput = value.filter { it.isDigit() }.take(3)
+                            },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            isError = showError
+                        )
+                        Text(
+                            text = "%",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = colors.textSecondary
+                        )
+                    }
+                    Text(
+                        text = t("For example: 80%"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.textSecondary
+                    )
+                    if (showError) {
+                        Text(
+                            text = t("Value must be between 1 and 100"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.danger
+                        )
+                    }
                 }
             },
             confirmButton = {
                 Button(
                     onClick = {
+                        if (!isValidThreshold) return@Button
+                        val threshold = parsedThreshold ?: return@Button
                         showCompletionThresholdDialog = false
-                        onSetMinimumCompletionPercent(completionPercentDraft.coerceIn(50, 100))
-                    }
+                        onSetMinimumCompletionPercent(threshold.coerceIn(1, 100))
+                    },
+                    enabled = isValidThreshold
                 ) {
                     Text(t("Save changes"))
                 }
@@ -3843,6 +3993,7 @@ private fun TrackerHabitContextHeader(
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HeroCard(
     task: HabitTask?,
@@ -3855,14 +4006,9 @@ private fun HeroCard(
     selectedUnit: String,
     selectedCompletionPercent: Int,
     minimumCompletionPercent: Int,
-    plan: SubscriptionPlan,
-    durationTimerRunning: Boolean,
-    durationTimerElapsedSeconds: Int,
     onDone: () -> Unit,
+    onSetValue: (Int) -> Unit,
     onIncrementValue: (Int) -> Unit,
-    onStartDurationTimer: () -> Boolean,
-    onStopDurationTimerAndApply: () -> Int,
-    onOpenPaywall: () -> Unit,
     highlightMarkButton: Boolean,
     onHighlightConsumed: () -> Unit,
     appThemeMode: AppThemeMode,
@@ -3880,7 +4026,6 @@ private fun HeroCard(
     val isValueTracking = trackingType != TrackingType.YES_NO
     val isDurationTracking = trackingType == TrackingType.DURATION
     val isCountTracking = trackingType == TrackingType.COUNT
-    val isPro = plan == SubscriptionPlan.PRO
     val canMarkForSelectedDate = scheduled
     val highlightActive = highlightMarkButton && !done && canMarkForSelectedDate
     val pressScaleTarget = 0.985f
@@ -3977,20 +4122,25 @@ private fun HeroCard(
         ),
         label = "heroHighlightPulseScale"
     )
-    var durationManualInput by remember(task?.id, selectedDate) { mutableStateOf("") }
+    val durationSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var durationSheetMode by remember(task?.id, selectedDate) { mutableStateOf<DurationSheetMode?>(null) }
+    var manualMinutesInput by remember(task?.id, selectedDate) { mutableStateOf(selectedValue.coerceAtLeast(0).toString()) }
+    var timerUiState by remember(task?.id, selectedDate) { mutableStateOf(TimerUiState.IDLE) }
+    var timerElapsedSeconds by remember(task?.id, selectedDate) { mutableStateOf(0) }
+    var pendingTimerAddMinutes by remember(task?.id, selectedDate) { mutableStateOf<Int?>(null) }
     val unitLabel = when {
         trackingType == TrackingType.DURATION -> t("min")
         trackingType == TrackingType.COUNT && selectedUnit.isNotBlank() -> selectedUnit
         trackingType == TrackingType.COUNT -> t("times")
         else -> ""
     }
-    val timerLabel = remember(durationTimerElapsedSeconds) {
-        val totalSeconds = durationTimerElapsedSeconds.coerceAtLeast(0)
+    val timerLabel = remember(timerElapsedSeconds) {
+        val totalSeconds = timerElapsedSeconds.coerceAtLeast(0)
         val minutes = totalSeconds / 60
         val seconds = totalSeconds % 60
         String.format("%02d:%02d", minutes, seconds)
     }
-    val addedMinutesTemplate = t("Added %d min")
+    val addMinutesQuestionTemplate = t("Add %d minutes?")
     val progressLabel = when (trackingType) {
         TrackingType.YES_NO -> ""
         TrackingType.COUNT -> "$selectedValue / $selectedTarget $unitLabel"
@@ -4000,6 +4150,12 @@ private fun HeroCard(
         done -> t("Completed")
         partial -> tf("%d%% of %d%% threshold", selectedCompletionPercent, minimumCompletionPercent)
         else -> t("In progress")
+    }
+    LaunchedEffect(durationSheetMode, timerUiState, task?.id, selectedDate) {
+        while (durationSheetMode == DurationSheetMode.TIMER && timerUiState == TimerUiState.RUNNING) {
+            delay(1000)
+            timerElapsedSeconds += 1
+        }
     }
 
     Column(
@@ -4190,12 +4346,38 @@ private fun HeroCard(
                         verticalArrangement = Arrangement.spacedBy(spacing.x1),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text(
-                            text = progressLabel,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = semantic.textPrimary
-                        )
+                        if (isDurationTracking) {
+                            AnimatedContent(
+                                targetState = selectedValue,
+                                transitionSpec = {
+                                    (fadeIn(animationSpec = tween(170, easing = FastOutSlowInEasing)) +
+                                        slideInVertically(
+                                            initialOffsetY = { it / 3 },
+                                            animationSpec = tween(170, easing = FastOutSlowInEasing)
+                                        )) togetherWith
+                                        (fadeOut(animationSpec = tween(120, easing = FastOutSlowInEasing)) +
+                                            slideOutVertically(
+                                                targetOffsetY = { -it / 4 },
+                                                animationSpec = tween(120, easing = FastOutSlowInEasing)
+                                            ))
+                                },
+                                label = "durationProgressValue"
+                            ) { animatedValue ->
+                                Text(
+                                    text = "$animatedValue / $selectedTarget ${t("min")}",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = semantic.textPrimary
+                                )
+                            }
+                        } else {
+                            Text(
+                                text = progressLabel,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = semantic.textPrimary
+                            )
+                        }
                         Text(
                             text = completionStatusText,
                             style = MaterialTheme.typography.bodySmall,
@@ -4246,7 +4428,7 @@ private fun HeroCard(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(spacing.x1)
                             ) {
-                                listOf(5, 10, 15).forEach { delta ->
+                                listOf(5, 10, 20).forEach { delta ->
                                     OutlinedButton(
                                         onClick = { onIncrementValue(delta) },
                                         modifier = Modifier.weight(1f),
@@ -4258,82 +4440,28 @@ private fun HeroCard(
                             }
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(spacing.x1),
-                                verticalAlignment = Alignment.CenterVertically
+                                horizontalArrangement = Arrangement.spacedBy(spacing.x1)
                             ) {
-                                OutlinedTextField(
-                                    value = durationManualInput,
-                                    onValueChange = { value ->
-                                        durationManualInput = value.filter { it.isDigit() }.take(4)
+                                OutlinedButton(
+                                    onClick = {
+                                        manualMinutesInput = selectedValue.coerceAtLeast(0).toString()
+                                        durationSheetMode = DurationSheetMode.MANUAL
                                     },
                                     modifier = Modifier.weight(1f),
-                                    singleLine = true,
-                                    label = { Text(t("Manual minutes")) },
-                                    placeholder = { Text("20") }
-                                )
-                                Button(
-                                    onClick = {
-                                        val minutes = durationManualInput.toIntOrNull()?.coerceAtLeast(0) ?: 0
-                                        if (minutes > 0) {
-                                            onIncrementValue(minutes)
-                                            durationManualInput = ""
-                                        }
-                                    },
                                     shape = RoundedCornerShape(radius.md)
                                 ) {
-                                    Text(t("Add"))
+                                    Text(t("Enter manually"))
                                 }
-                            }
-
-                            if (isPro) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(spacing.x1),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    OutlinedButton(
-                                        onClick = {
-                                            if (durationTimerRunning) {
-                                                val addedMinutes = onStopDurationTimerAndApply()
-                                                if (addedMinutes > 0) {
-                                                    Toast.makeText(
-                                                        context,
-                                                        String.format(locale, addedMinutesTemplate, addedMinutes),
-                                                        Toast.LENGTH_SHORT
-                                                    ).show()
-                                                }
-                                            } else {
-                                                onStartDurationTimer()
-                                            }
-                                        },
-                                        modifier = Modifier.weight(1f),
-                                        shape = RoundedCornerShape(radius.full)
-                                    ) {
-                                        Text(if (durationTimerRunning) t("Stop timer") else t("Start timer"))
-                                    }
-                                    Surface(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .height(44.dp),
-                                        shape = RoundedCornerShape(radius.md),
-                                        color = semantic.backgroundSurfaceMuted
-                                    ) {
-                                        Box(contentAlignment = Alignment.Center) {
-                                            Text(
-                                                text = timerLabel,
-                                                style = MaterialTheme.typography.titleMedium,
-                                                fontWeight = FontWeight.SemiBold
-                                            )
-                                        }
-                                    }
-                                }
-                            } else {
                                 OutlinedButton(
-                                    onClick = onOpenPaywall,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(radius.full)
+                                    onClick = {
+                                        timerElapsedSeconds = 0
+                                        timerUiState = TimerUiState.IDLE
+                                        durationSheetMode = DurationSheetMode.TIMER
+                                    },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(radius.md)
                                 ) {
-                                    Text(t("Timer (Premium)"))
+                                    Text(t("Timer"))
                                 }
                             }
                         }
@@ -4367,6 +4495,191 @@ private fun HeroCard(
                 }
             }
 
+    }
+
+    if (durationSheetMode == DurationSheetMode.MANUAL && isDurationTracking) {
+        val manualParsed = manualMinutesInput.toIntOrNull()
+        val manualValid = manualParsed != null && manualParsed >= 0
+        ModalBottomSheet(
+            onDismissRequest = { durationSheetMode = null },
+            sheetState = durationSheetState,
+            containerColor = semantic.backgroundSurface
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = spacing.x2, vertical = spacing.x1_5)
+                    .navigationBarsPadding(),
+                verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
+            ) {
+                Text(
+                    text = t("Enter minutes manually"),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = semantic.textPrimary
+                )
+                OutlinedTextField(
+                    value = manualMinutesInput,
+                    onValueChange = { value ->
+                        manualMinutesInput = value.filter { it.isDigit() }.take(4)
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    label = { Text(t("Manual minutes")) },
+                    placeholder = { Text("20") }
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+                ) {
+                    OutlinedButton(
+                        onClick = { durationSheetMode = null },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(radius.md)
+                    ) {
+                        Text(t("Cancel"))
+                    }
+                    Button(
+                        onClick = {
+                            val value = manualParsed ?: return@Button
+                            onSetValue(value.coerceAtLeast(0))
+                            durationSheetMode = null
+                        },
+                        enabled = manualValid,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(radius.md)
+                    ) {
+                        Text(t("Save changes"))
+                    }
+                }
+            }
+        }
+    }
+
+    if (durationSheetMode == DurationSheetMode.TIMER && isDurationTracking) {
+        ModalBottomSheet(
+            onDismissRequest = { durationSheetMode = null },
+            sheetState = durationSheetState,
+            containerColor = semantic.backgroundSurface
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = spacing.x2, vertical = spacing.x1_5)
+                    .navigationBarsPadding(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
+            ) {
+                Text(
+                    text = t("Timer"),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = semantic.textPrimary
+                )
+                Text(
+                    text = timerLabel,
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = semantic.textPrimary
+                )
+
+                when (timerUiState) {
+                    TimerUiState.IDLE -> {
+                        Button(
+                            onClick = { timerUiState = TimerUiState.RUNNING },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(radius.md)
+                        ) {
+                            Text(t("Start"))
+                        }
+                    }
+                    TimerUiState.RUNNING -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+                        ) {
+                            OutlinedButton(
+                                onClick = { timerUiState = TimerUiState.PAUSED },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(radius.md)
+                            ) {
+                                Text(t("Pause"))
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    timerUiState = TimerUiState.PAUSED
+                                    if (timerElapsedSeconds > 0) {
+                                        val minutesToAdd = ceil(timerElapsedSeconds / 60.0).toInt().coerceAtLeast(1)
+                                        pendingTimerAddMinutes = minutesToAdd
+                                    } else {
+                                        durationSheetMode = null
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(radius.md)
+                            ) {
+                                Text(t("Stop"))
+                            }
+                        }
+                    }
+                    TimerUiState.PAUSED -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+                        ) {
+                            OutlinedButton(
+                                onClick = { timerUiState = TimerUiState.RUNNING },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(radius.md)
+                            ) {
+                                Text(t("Resume"))
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    if (timerElapsedSeconds > 0) {
+                                        val minutesToAdd = ceil(timerElapsedSeconds / 60.0).toInt().coerceAtLeast(1)
+                                        pendingTimerAddMinutes = minutesToAdd
+                                    } else {
+                                        durationSheetMode = null
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(radius.md)
+                            ) {
+                                Text(t("Stop"))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    pendingTimerAddMinutes?.let { minutes ->
+        AlertDialog(
+            onDismissRequest = { pendingTimerAddMinutes = null },
+            title = { Text(t("Timer")) },
+            text = { Text(tf(addMinutesQuestionTemplate, minutes)) },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onIncrementValue(minutes)
+                        pendingTimerAddMinutes = null
+                        timerUiState = TimerUiState.IDLE
+                        timerElapsedSeconds = 0
+                        durationSheetMode = null
+                    }
+                ) {
+                    Text(t("Add"))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingTimerAddMinutes = null }) {
+                    Text(t("Cancel"))
+                }
+            }
+        )
     }
 }
 
@@ -5633,6 +5946,44 @@ private fun TaskEditorDialog(
                                             state.editorStartDate.format(DateTimeFormatter.ofPattern(t("dd MMM yyyy"), locale))
                                         )
                                     )
+                                }
+
+                                SettingsSwitchRow(
+                                    title = t("End date"),
+                                    subtitle = t("Optional challenge finish date"),
+                                    checked = state.editorEndDate != null,
+                                    onCheckedChange = vm::setEditorEndDateEnabled
+                                )
+
+                                AnimatedVisibility(visible = state.editorEndDate != null) {
+                                    OutlinedButton(
+                                        onClick = {
+                                            showThemedDatePicker(
+                                                context = context,
+                                                themeResId = pickerTheme,
+                                                initialDate = state.editorEndDate ?: state.editorStartDate,
+                                                actionColorArgb = pickerActionColor,
+                                                onDateSet = { year, month, day ->
+                                                    vm.setEditorEndDate(LocalDate.of(year, month + 1, day))
+                                                }
+                                            )
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(AppTheme.radius.md),
+                                        border = BorderStroke(stroke.thin, colors.primary),
+                                        colors = ButtonDefaults.outlinedButtonColors(
+                                            containerColor = Color.Transparent,
+                                            contentColor = colors.primary
+                                        )
+                                    ) {
+                                        Text(
+                                            tf(
+                                                "End date: %s",
+                                                (state.editorEndDate ?: state.editorStartDate)
+                                                    .format(DateTimeFormatter.ofPattern(t("dd MMM yyyy"), locale))
+                                            )
+                                        )
+                                    }
                                 }
                             }
                         }

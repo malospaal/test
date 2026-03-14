@@ -48,7 +48,7 @@ class HabitReminderScheduler(
             return
         }
         tasks.forEach { task ->
-            if (task.isArchived || !task.reminderEnabled) {
+            if (!repository.isHabitActive(task) || !task.reminderEnabled) {
                 cancelReminder(task.id)
             } else {
                 scheduleReminder(task)
@@ -58,7 +58,7 @@ class HabitReminderScheduler(
 
     fun syncReminderForTask(taskId: String) {
         val task = repository.getTasks().firstOrNull { it.id == taskId }
-        if (task == null || task.isArchived || !task.reminderEnabled || !repository.getNotificationsEnabled()) {
+        if (task == null || !repository.isHabitActive(task) || !task.reminderEnabled || !repository.getNotificationsEnabled()) {
             cancelReminder(taskId)
             return
         }
@@ -74,7 +74,7 @@ class HabitReminderScheduler(
 
     fun onReminderTriggered(taskId: String) {
         val task = repository.getTasks().firstOrNull { it.id == taskId }
-        if (task == null || task.isArchived || !task.reminderEnabled || !repository.getNotificationsEnabled()) {
+        if (task == null || !repository.isHabitActive(task) || !task.reminderEnabled || !repository.getNotificationsEnabled()) {
             cancelReminder(taskId)
             return
         }
@@ -87,6 +87,14 @@ class HabitReminderScheduler(
         if (task.frequency == TaskFrequency.SELECTED_DAYS && task.customDays.isEmpty()) {
             cancelReminder(task.id)
             return
+        }
+        val now = LocalDateTime.now(ZoneId.systemDefault())
+        task.endDate?.let { endDate ->
+            val lastReminderAt = endDate.atTime(task.reminderHour, task.reminderMinute)
+            if (!lastReminderAt.isAfter(now)) {
+                cancelReminder(task.id)
+                return
+            }
         }
         ensureNotificationChannel()
         val triggerAtMillis = nextTriggerAtMillis(task)
@@ -113,15 +121,20 @@ class HabitReminderScheduler(
         var targetDate = maxOf(now.toLocalDate(), task.startDate)
 
         var candidate = targetDate.atTime(task.reminderHour, task.reminderMinute)
-        while (!candidate.isAfter(now) || !shouldRemindOn(task, targetDate)) {
+        var attempts = 0
+        while ((!candidate.isAfter(now) || !shouldRemindOn(task, targetDate)) && attempts < 3660) {
             targetDate = targetDate.plusDays(1)
             candidate = targetDate.atTime(task.reminderHour, task.reminderMinute)
+            attempts += 1
         }
 
         return candidate.atZone(zone).toInstant().toEpochMilli()
     }
 
     private fun shouldRemindOn(task: HabitTask, date: LocalDate): Boolean {
+        if (date.isBefore(task.startDate)) return false
+        val endDate = task.endDate
+        if (endDate != null && date.isAfter(endDate)) return false
         return when (task.frequency) {
             TaskFrequency.DAILY -> true
             TaskFrequency.TIMES_PER_WEEK -> true

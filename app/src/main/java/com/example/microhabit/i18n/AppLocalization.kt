@@ -87,6 +87,7 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "Create habit" to v("Gewohnheit erstellen", "Creer une habitude", "Crear habito", "Crea abitudine", "Создать привычку"),
     "Upgrade to PRO" to v("Auf PRO upgraden", "Passer a PRO", "Mejorar a PRO", "Passa a PRO", "Обновиться до PRO"),
     "Active habits" to v("Aktive Gewohnheiten", "Habitudes actives", "Habitos activos", "Abitudini attive", "Активные привычки"),
+    "Completed habits" to v("Abgeschlossene Gewohnheiten", "Habitudes terminees", "Habitos completados", "Abitudini completate", "Завершенные привычки"),
     "Archived habits" to v("Archivierte Gewohnheiten", "Habitudes archivees", "Habitos archivados", "Abitudini archiviate", "Архивные привычки"),
     "Create and select a habit to view analytics." to v(
         "Erstelle und wahle eine Gewohnheit, um Analysen zu sehen.",
@@ -269,6 +270,35 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "Cancel" to v("Abbrechen", "Annuler", "Cancelar", "Annulla", "Отмена"),
     "Delete account?" to v("Konto loschen?", "Supprimer le compte ?", "Eliminar cuenta?", "Eliminare account?", "Удалить аккаунт?"),
     "Delete habit?" to v("Gewohnheit loschen?", "Supprimer l'habitude ?", "Eliminar habito?", "Eliminare abitudine?", "Удалить привычку?"),
+    "Congratulations! Habit completed." to v(
+        "Gluckwunsch! Gewohnheit abgeschlossen.",
+        "Felicitations ! L'habitude est terminee.",
+        "Felicidades! Habito completado.",
+        "Complimenti! Abitudine completata.",
+        "Поздравляем! Привычка завершена."
+    ),
+    "Continue habit" to v("Gewohnheit fortsetzen", "Continuer l'habitude", "Continuar habito", "Continua abitudine", "Продолжить привычку"),
+    "Choose how to continue this habit." to v(
+        "Wahle, wie du diese Gewohnheit fortsetzen mochtest.",
+        "Choisissez comment continuer cette habitude.",
+        "Elige como continuar este habito.",
+        "Scegli come continuare questa abitudine.",
+        "Выберите, как продолжить эту привычку."
+    ),
+    "Choose a new end date" to v(
+        "Neues Enddatum wahlen",
+        "Choisir une nouvelle date de fin",
+        "Elegir una nueva fecha de finalizacion",
+        "Scegli una nuova data di fine",
+        "Выбрать новую дату завершения"
+    ),
+    "Make habit indefinite" to v(
+        "Gewohnheit unbegrenzt machen",
+        "Rendre l'habitude illimitee",
+        "Hacer el habito indefinido",
+        "Rendi l'abitudine senza scadenza",
+        "Сделать привычку бессрочной"
+    ),
     "This will permanently delete this habit and its completion history." to v(
         "Diese Gewohnheit und ihr Verlauf werden dauerhaft geloscht.",
         "Cette habitude et son historique seront supprimes definitivement.",
@@ -446,6 +476,15 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "Advanced settings" to v("Erweiterte Einstellungen", "Parametres avances", "Ajustes avanzados", "Impostazioni avanzate", "Расширенные настройки"),
     "Reminder: %s" to v("Erinnerung: %s", "Rappel : %s", "Recordatorio: %s", "Promemoria: %s", "Напоминание: %s"),
     "Start date: %s" to v("Startdatum: %s", "Date de debut : %s", "Fecha de inicio: %s", "Data di inizio: %s", "Дата начала: %s"),
+    "End date" to v("Enddatum", "Date de fin", "Fecha de finalizacion", "Data di fine", "Дата завершения"),
+    "End date: %s" to v("Enddatum: %s", "Date de fin : %s", "Fecha de finalizacion: %s", "Data di fine: %s", "Дата завершения: %s"),
+    "Optional challenge finish date" to v(
+        "Optionales Enddatum der Challenge",
+        "Date de fin optionnelle du defi",
+        "Fecha opcional de finalizacion del reto",
+        "Data di fine opzionale della sfida",
+        "Необязательная дата завершения челленджа"
+    ),
     "Fill required fields to continue." to v("Fulle die erforderlichen Felder aus.", "Remplissez les champs obligatoires.", "Completa los campos requeridos.", "Compila i campi richiesti.", "Заполните обязательные поля."),
     "Save habit" to v("Gewohnheit speichern", "Enregistrer l'habitude", "Guardar habito", "Salva abitudine", "Сохранить привычку"),
     "Save changes" to v("Anderungen speichern", "Enregistrer les modifications", "Guardar cambios", "Salva modifiche", "Сохранить изменения"),
@@ -510,6 +549,14 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
         "Используется для привычек по количеству и времени"
     ),
     "Completion threshold" to v("Erfullungsschwelle", "Seuil de completion", "Umbral de cumplimiento", "Soglia di completamento", "Порог выполнения"),
+    "For example: 80%" to v("Zum Beispiel: 80%", "Par exemple : 80%", "Por ejemplo: 80%", "Per esempio: 80%", "Например: 80%"),
+    "Value must be between 1 and 100" to v(
+        "Der Wert muss zwischen 1 und 100 liegen",
+        "La valeur doit etre comprise entre 1 et 100",
+        "El valor debe estar entre 1 y 100",
+        "Il valore deve essere compreso tra 1 e 100",
+        "Значение должно быть от 1 до 100"
+    ),
     "In progress" to v("In Arbeit", "En cours", "En progreso", "In corso", "В процессе"),
     "%d%% of %d%% threshold" to v(
         "%d%% von %d%% Schwelle",
@@ -521,6 +568,22 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "times" to v("Mal", "fois", "veces", "volte", "раз"),
     "min" to v("Min", "min", "min", "min", "мин"),
     "Manual minutes" to v("Minuten manuell", "Minutes manuelles", "Minutos manuales", "Minuti manuali", "Минуты вручную"),
+    "Edit minutes" to v("Minuten bearbeiten", "Modifier les minutes", "Editar minutos", "Modifica minuti", "Изменить минуты"),
+    "Enter minutes manually" to v("Minuten manuell eingeben", "Saisir les minutes manuellement", "Ingresar minutos manualmente", "Inserisci minuti manualmente", "Ввести минуты вручную"),
+    "Enter manually" to v("Manuell eingeben", "Saisir manuellement", "Introducir manualmente", "Inserisci manualmente", "Ввести вручную"),
+    "Timer" to v("Timer", "Minuteur", "Temporizador", "Timer", "Таймер"),
+    "Pause" to v("Pause", "Pause", "Pausa", "Pausa", "Пауза"),
+    "Resume" to v("Fortsetzen", "Reprendre", "Reanudar", "Riprendi", "Продолжить"),
+    "Stop" to v("Stopp", "Arreter", "Detener", "Ferma", "Стоп"),
+    "Add %d minutes?" to v(
+        "%d Minuten hinzufugen?",
+        "Ajouter %d minutes ?",
+        "Agregar %d minutos?",
+        "Aggiungere %d minuti?",
+        "Добавить %d минут?"
+    ),
+    "Apply manual value" to v("Manuellen Wert anwenden", "Appliquer la valeur manuelle", "Aplicar valor manual", "Applica valore manuale", "Применить ручное значение"),
+    "Confirm" to v("Bestatigen", "Confirmer", "Confirmar", "Conferma", "Подтвердить"),
     "Added %d min" to v("%d Min hinzugefugt", "%d min ajoutees", "%d min agregados", "%d min aggiunti", "Добавлено %d мин"),
     "Stop timer" to v("Timer stoppen", "Arreter le minuteur", "Detener temporizador", "Ferma timer", "Остановить таймер"),
     "Start timer" to v("Timer starten", "Demarrer le minuteur", "Iniciar temporizador", "Avvia timer", "Запустить таймер"),

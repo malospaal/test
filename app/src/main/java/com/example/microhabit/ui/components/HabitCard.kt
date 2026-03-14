@@ -39,6 +39,7 @@ data class HabitCardModel(
     val frequency: String,
     val reminderStatus: String,
     val completionRate: Int,
+    val isCompleted: Boolean,
     val isArchived: Boolean
 )
 
@@ -129,13 +130,27 @@ fun HabitCard(
                 Box(
                     modifier = Modifier
                         .clip(CircleShape)
-                        .background(if (habit.isArchived) colors.neutralMuted else colors.successMuted)
+                        .background(
+                            when {
+                                habit.isArchived -> colors.neutralMuted
+                                habit.isCompleted -> colors.primary.copy(alpha = 0.16f)
+                                else -> colors.successMuted
+                            }
+                        )
                         .padding(horizontal = spacing.x1, vertical = spacing.x0_5)
                 ) {
                     Text(
-                        text = if (habit.isArchived) t("Archived") else t("Active"),
+                        text = when {
+                            habit.isArchived -> t("Archived")
+                            habit.isCompleted -> t("Completed")
+                            else -> t("Active")
+                        },
                         style = MaterialTheme.typography.labelMedium,
-                        color = if (habit.isArchived) colors.textSecondary else colors.success
+                        color = when {
+                            habit.isArchived -> colors.textSecondary
+                            habit.isCompleted -> colors.primary
+                            else -> colors.success
+                        }
                     )
                 }
             }

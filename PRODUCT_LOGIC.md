@@ -97,6 +97,8 @@
 - Используется для `COUNT` и `DURATION` как условие completed.
 - Применяется единообразно в completion-логике, partial-состоянии, виджетах и аналитике.
 - Для `YES_NO` порог не применяется.
+- Каноническое значение по умолчанию в Repository и стартовое UI-состояние должны быть согласованы (`100`).
+- Значение хранится в `SharedPreferences` и сохраняется между обычными рестартами приложения и app updates; не гарантируется после `clear data` / uninstall / `delete account`.
 
 ## 7. Streak Logic
 Источник: `calculateStreak`, `bestStreak`, `streakHistory`.
@@ -192,10 +194,14 @@ Future scope (не часть текущего канонического пов
   - для blocked сценария UI открывает paywall.
 - Если привычка после unarchive останется `COMPLETED`, лимит активных не нарушается.
 - Продление completed привычки (`endDate` update) не считается созданием новой привычки.
+- Continue completed habit (через completed-prompt) и edit completed habit с изменением `endDate` следуют тому же правилу:
+  - это не трактуется как create/unarchive операция;
+  - может реактивировать привычку в `ACTIVE` без применения create-style лимитного guard;
+  - это текущая намеренная продуктовая семантика, а не accidental bypass create/unarchive flow.
 
 Навигация paywall в этом сценарии:
 - из Habits при blocked unarchive вызывается `onUpgrade`;
-- возврат из paywall остаётся в контексте Habits.
+- закрытие/возврат из paywall возвращает пользователя в сохранённый `previousPage`; для blocked unarchive это контекст Habits.
 
 ## 12. Screen Responsibilities
 Источник: `MainActivity.kt`.
@@ -304,6 +310,38 @@ Start date отображается облегчённой строкой в о�
 - Scheduled-дата = сегодня и не завершена отображается как отдельный today-pending UX слой (не как `MISSED`).
 
 ## 15. Data Persistence and Deletion Rules
+### 15.1 Primary Runtime Storage
+- Runtime-данные приложения хранятся локально в `SharedPreferences` (файл `habit_prefs`).
+- Привычки хранятся в ключе `tasks_json` как JSON-массив задач.
+- Прогресс по дням хранится ключами `done_...` и `value_...`.
+- Связанные данные привычки (notes, streak saver, saved missed dates, completed prompt marker) хранятся отдельными pref-ключами с префиксами.
+- Пользовательские настройки (plan, theme, language, notifications, default reminder, onboarding, minimum completion percent, selected task) также хранятся в тех же `SharedPreferences`.
+
+### 15.2 Derived Analytics
+- Аналитика и статистики не хранятся отдельной БД/таблицей.
+- Метрики вычисляются on-demand из сырых сохранённых данных (задачи + day values/completions).
+
+### 15.3 Export Storage
+- Export данных формирует отдельный JSON-файл во внутреннем `filesDir` приложения.
+- Export-файл хранится отдельно от runtime `SharedPreferences` и не заменяет основное runtime-хранилище.
+
+### 15.4 Update Safety (Current Scope)
+- При обычном in-place app update локальные `SharedPreferences` обычно сохраняются; соответственно, привычки, настройки и прогресс ожидаемо сохраняются.
+- После package update напоминания пересинхронизируются через обработку `MY_PACKAGE_REPLACED` и при старте приложения.
+- Гарантия в этом разделе относится к обычным app update-сценариям и не распространяется на `clear data`, uninstall или ручное удаление данных приложения.
+
+### 15.5 Backup / Restore Reality
+- В манифесте включено `android:allowBackup="true"`.
+- Явные правила `fullBackupContent` / `dataExtractionRules` в текущей реализации не заданы.
+- При backup/restore форма восстановленных локальных данных зависит от системного механизма Android; точный контроль restore-семантики кодом приложения сейчас ограничен.
+
+### 15.6 Migration Strategy (Current Reality)
+- Формального versioned migration framework (со schema version key и пошаговыми миграциями) в текущей реализации нет.
+- Совместимость обеспечивается ad-hoc на уровне парсинга/нормализации в `HabitRepository` (например, legacy frequency значения, lenient date parsing, sane defaults).
+- При невалидном/непарсируемом `tasks_json` чтение задач может fallback-нуться к пустому списку.
+- Неизвестные поля task-объектов не гарантированно сохраняются после следующей перезаписи `tasks_json` текущим сериализатором.
+
+### 15.7 Deletion Rules
 При удалении привычки удаляются:
 - сама запись задачи;
 - day progress keys (`done_...`, `value_...`);
@@ -313,11 +351,20 @@ Start date отображается облегчённой строкой в о�
 - completed prompt marker.
 
 ## 16. Localization
-Поддерживаемые языки:
+Языки в модели приложения (`AppLanguage`):
 - EN, CS, DE, FR, ES, IT, RU, UK.
+
+Текущий scope выбора в Settings (language selector):
+- EN, RU, UK, DE, CS.
+- Selector отображает названия языков в native форме (`languageNativeLabel`).
+
+Покрытие переводов:
+- наличие языка в модели не означает 100% покрытие всех строк;
+- для части локалей (включая CS) покрытие может быть частичным, и отсутствующие ключи fallback-ятся в source string.
 
 Требование:
 - новые user-facing строки должны быть добавлены минимум в `AppLocalization.kt` + `UkTranslations.kt` (и не оставаться хардкодом).
+- это правило относится и к user-visible notification strings (включая channel name/description).
 
 ## 17. Critical Invariants (Must Not Break)
 - Единственный источник расписания: `isScheduledOn`.

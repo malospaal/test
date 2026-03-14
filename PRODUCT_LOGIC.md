@@ -112,7 +112,9 @@
 - Неделя streak-valid, если completions в неделе `>= timesPerWeek`.
 
 ### 7.3 Best Streak / History
-- Best streak считается по тем же правилам scheduled/completed/saver.
+- Best streak = исторический максимум серии:
+  - для daily-like: максимум по дням;
+  - для `TIMES_PER_WEEK`: максимум по непрерывным валидным неделям.
 - История streak — сегменты завершённых серий.
 
 ## 8. Streak Saver
@@ -253,6 +255,9 @@ Start date отображается облегчённой строкой в о�
 
 Базовое правило:
 - `not scheduled` после `endDate` обязательно.
+- В календарном UI `FUTURE` имеет визуальный приоритет над `NOT_SCHEDULED` для будущих дат.
+- `MISSED` применяется только к scheduled-датам **до** сегодня, которые не были завершены.
+- Scheduled-дата = сегодня и не завершена отображается как отдельный today-pending UX слой (не как `MISSED`).
 
 ## 15. Data Persistence and Deletion Rules
 При удалении привычки удаляются:

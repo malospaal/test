@@ -669,8 +669,9 @@ class HabitRepository(private val context: Context) {
 
     fun bestStreak(task: HabitTask, upToDate: LocalDate = LocalDate.now()): Int {
         if (task.frequency == TaskFrequency.TIMES_PER_WEEK) {
-             // Simplified for times per week: just return current if we don't have historical best logic yet
-             return calculateWeeklyStreak(task, upToDate)
+            return weeklyStreakSegments(task, upToDate)
+                .maxOfOrNull { it.length }
+                ?: 0
         }
         var best = 0
         var current = 0

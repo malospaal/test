@@ -129,10 +129,70 @@ class HabitRepositoryTrackingLogicTest {
         assertFalse(repository.isPartialOn(task, pastDay))
     }
 
+    @Test
+    fun weeklyBestStreak_isHistoricalMaximum_notJustCurrentStreak() {
+        val today = LocalDate.now()
+        val currentWeekStart = today.minusDays((today.dayOfWeek.value - 1).toLong())
+        val task = createTask(
+            trackingType = TrackingType.YES_NO,
+            target = 1,
+            frequency = TaskFrequency.TIMES_PER_WEEK,
+            timesPerWeek = 2,
+            startDate = currentWeekStart.minusWeeks(8)
+        )
+
+        markWeekAsCompleted(task, currentWeekStart) // current run = 1
+        markWeekAsCompleted(task, currentWeekStart.minusWeeks(2))
+        markWeekAsCompleted(task, currentWeekStart.minusWeeks(3))
+        markWeekAsCompleted(task, currentWeekStart.minusWeeks(4)) // historical run = 3
+
+        assertEquals(1, repository.calculateStreak(task))
+        assertEquals(3, repository.bestStreak(task))
+        assertTrue(repository.streakHistory(task, limit = 4).contains(3))
+    }
+
+    @Test
+    fun datesAfterEndDate_areNotScheduled_evenIfDateIsInFuture() {
+        val today = LocalDate.now()
+        val endDate = today.plusDays(2)
+        val task = createTask(
+            trackingType = TrackingType.YES_NO,
+            target = 1,
+            startDate = today.minusDays(14),
+            endDate = endDate
+        )
+        val futureDateAfterEnd = endDate.plusDays(1)
+
+        assertTrue(futureDateAfterEnd.isAfter(today))
+        assertFalse(repository.isScheduledOn(task, futureDateAfterEnd))
+    }
+
+    @Test
+    fun dailyStreak_todayIncomplete_doesNotResetCurrentStreakImmediately() {
+        val today = LocalDate.now()
+        val task = createTask(
+            trackingType = TrackingType.YES_NO,
+            target = 1,
+            startDate = today.minusDays(7)
+        )
+        val yesterday = today.minusDays(1)
+
+        repository.setDayValue(task, yesterday, 1)
+        repository.setDayValue(task, today, 0)
+
+        assertTrue(repository.isScheduledOn(task, today))
+        assertFalse(repository.isCompletedOn(task, today))
+        assertEquals(1, repository.calculateStreak(task))
+    }
+
     private fun createTask(
         trackingType: TrackingType,
         target: Int,
-        unitLabel: String = ""
+        unitLabel: String = "",
+        frequency: TaskFrequency = TaskFrequency.DAILY,
+        timesPerWeek: Int = 3,
+        startDate: LocalDate = LocalDate.now().minusDays(30),
+        endDate: LocalDate? = null
     ): HabitTask {
         return repository.createTask(
             title = "Test ${trackingType.name}",
@@ -141,14 +201,19 @@ class HabitRepositoryTrackingLogicTest {
             trackingType = trackingType,
             dailyTarget = target,
             unitLabel = unitLabel,
-            frequency = TaskFrequency.DAILY,
+            frequency = frequency,
             customDays = emptySet(),
-            timesPerWeek = 3,
+            timesPerWeek = timesPerWeek,
             reminderHour = 8,
             reminderMinute = 0,
             reminderEnabled = false,
-            startDate = LocalDate.now().minusDays(30),
-            endDate = null
+            startDate = startDate,
+            endDate = endDate
         )
+    }
+
+    private fun markWeekAsCompleted(task: HabitTask, weekStart: LocalDate) {
+        repository.setDayValue(task, weekStart, 1)
+        repository.setDayValue(task, weekStart.plusDays(1), 1)
     }
 }

@@ -475,7 +475,14 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "Show advanced settings" to v("Erweiterte Einstellungen anzeigen", "Afficher les options avancees", "Mostrar ajustes avanzados", "Mostra impostazioni avanzate", "Показать расширенные настройки"),
     "Advanced settings" to v("Erweiterte Einstellungen", "Parametres avances", "Ajustes avanzados", "Impostazioni avanzate", "Расширенные настройки"),
     "Reminder: %s" to v("Erinnerung: %s", "Rappel : %s", "Recordatorio: %s", "Promemoria: %s", "Напоминание: %s"),
-    "Start date: %s" to v("Startdatum: %s", "Date de debut : %s", "Fecha de inicio: %s", "Data di inizio: %s", "Дата начала: %s"),
+    "Start date" to (
+        v("Startdatum", "Date de debut", "Fecha de inicio", "Data di inizio", "Дата начала") +
+            mapOf(AppLanguage.CS to "Datum zahájení")
+        ),
+    "Start date: %s" to (
+        v("Startdatum: %s", "Date de debut : %s", "Fecha de inicio: %s", "Data di inizio: %s", "Дата начала: %s") +
+            mapOf(AppLanguage.CS to "Datum zahájení: %s")
+        ),
     "End date" to v("Enddatum", "Date de fin", "Fecha de finalizacion", "Data di fine", "Дата завершения"),
     "End date: %s" to v("Enddatum: %s", "Date de fin : %s", "Fecha de finalizacion: %s", "Data di fine: %s", "Дата завершения: %s"),
     "Optional challenge finish date" to v(
@@ -548,8 +555,15 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
         "Usato per abitudini di conteggio e durata",
         "Используется для привычек по количеству и времени"
     ),
+    "Applies to count and duration habits" to v(
+        "Gilt fur Gewohnheiten mit Anzahl und Dauer",
+        "S'applique aux habitudes de quantite et de duree",
+        "Se aplica a habitos de cantidad y duracion",
+        "Si applica alle abitudini di conteggio e durata",
+        "Применяется к привычкам по количеству и времени"
+    ),
     "Completion threshold" to v("Erfullungsschwelle", "Seuil de completion", "Umbral de cumplimiento", "Soglia di completamento", "Порог выполнения"),
-    "For example: 80%" to v("Zum Beispiel: 80%", "Par exemple : 80%", "Por ejemplo: 80%", "Per esempio: 80%", "Например: 80%"),
+    "For example: 100%" to v("Zum Beispiel: 100%", "Par exemple : 100%", "Por ejemplo: 100%", "Per esempio: 100%", "Например: 100%"),
     "Value must be between 1 and 100" to v(
         "Der Wert muss zwischen 1 und 100 liegen",
         "La valeur doit etre comprise entre 1 et 100",

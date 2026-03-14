@@ -335,11 +335,11 @@ class HabitRepository(private val context: Context) {
 
     fun getMinimumCompletionPercent(): Int {
         return prefs.getInt(KEY_MIN_COMPLETION_PERCENT, DEFAULT_MINIMUM_COMPLETION_PERCENT)
-            .coerceIn(50, 100)
+            .coerceIn(1, 100)
     }
 
     fun setMinimumCompletionPercent(value: Int) {
-        prefs.edit().putInt(KEY_MIN_COMPLETION_PERCENT, value.coerceIn(50, 100)).apply()
+        prefs.edit().putInt(KEY_MIN_COMPLETION_PERCENT, value.coerceIn(1, 100)).apply()
     }
 
     fun isOnboardingCompleted(): Boolean = prefs.getBoolean(KEY_ONBOARDING_COMPLETED, false)
@@ -486,8 +486,7 @@ class HabitRepository(private val context: Context) {
         if (value <= 0) return 0
         if (isCompletedByValue(task, value)) return 100
         val threshold = when (task.trackingType) {
-            TrackingType.COUNT -> 100
-            TrackingType.DURATION -> getMinimumCompletionPercent().coerceAtLeast(1)
+            TrackingType.COUNT, TrackingType.DURATION -> getMinimumCompletionPercent().coerceAtLeast(1)
             TrackingType.YES_NO -> 100
         }
         val raw = completionPercentByValue(task, value).coerceAtLeast(0)
@@ -904,8 +903,8 @@ class HabitRepository(private val context: Context) {
     private fun isCompletedByValue(task: HabitTask, value: Int): Boolean {
         return when (task.trackingType) {
             TrackingType.YES_NO -> value >= 1
-            TrackingType.COUNT -> completionPercentByValue(task, value) >= 100
-            TrackingType.DURATION -> completionPercentByValue(task, value) >= getMinimumCompletionPercent()
+            TrackingType.COUNT, TrackingType.DURATION ->
+                completionPercentByValue(task, value) >= getMinimumCompletionPercent()
         }
     }
 
@@ -1033,7 +1032,7 @@ class HabitRepository(private val context: Context) {
         private const val KEY_STREAK_SAVER_PREFIX = "streak_saver_"
         private const val KEY_SAVED_MISSED_DATES_PREFIX = "saved_missed_dates_"
         private const val KEY_COMPLETED_PROMPT_PREFIX = "completed_prompt_"
-        private const val DEFAULT_MINIMUM_COMPLETION_PERCENT = 80
+        private const val DEFAULT_MINIMUM_COMPLETION_PERCENT = 100
         private const val MAX_HABIT_NOTE_LENGTH = 180
     }
 }

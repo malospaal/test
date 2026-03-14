@@ -76,7 +76,7 @@
 - Завершено: `value >= 1`.
 
 ### 5.2 COUNT
-- Завершено: `completionPercent >= 100`.
+- Завершено по порогу `minimumCompletionPercent` (из Settings).
 - `completionPercent = value / target * 100`.
 - Может превышать цель (`value > target`).
 
@@ -92,9 +92,10 @@
 ## 6. Completion Threshold
 Источник: `HabitRepository.getMinimumCompletionPercent`, `setMinimumCompletionPercent`.
 
-- Диапазон хранения: `50..100`.
-- Используется только для `DURATION` как условие completed.
-- Для `COUNT` текущая логика требует 100%.
+- Диапазон хранения: `1..100`.
+- Значение по умолчанию: `100`.
+- Используется для `COUNT` и `DURATION` как условие completed.
+- Применяется единообразно в completion-логике, partial-состоянии, виджетах и аналитике.
 - Для `YES_NO` порог не применяется.
 
 ## 7. Streak Logic
@@ -133,6 +134,7 @@
 - `completionRate(days)`:
   - для `TIMES_PER_WEEK`: target масштабируется по effective days.
   - для остальных: completed/scheduled.
+- Для `COUNT` и `DURATION` completed-дни в аналитике определяются через `minimumCompletionPercent`.
 - `progressPercentForWidget` возвращает 0 для not scheduled.
 - `totalCompletions` считает до `min(today, endDate)` для конечных привычек.
 
@@ -220,6 +222,12 @@
 5. Reminders
 
 Advanced settings блок удалён, поля перенесены в основной поток формы.
+Start date отображается облегчённой строкой в одну линию:
+- label (локализованный `Start date`);
+- текущее значение даты;
+- действие `Edit`.
+На узких экранах строка может корректно переноситься в компактный двухстрочный вариант.
+Формат даты должен использовать текущую locale приложения (`localized medium date`), без хардкода формата под один язык.
 
 ## 13. Reminder System
 Источник: `notifications/HabitReminderScheduler.kt`.

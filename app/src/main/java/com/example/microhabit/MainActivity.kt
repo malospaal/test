@@ -30,6 +30,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -205,6 +206,7 @@ import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.time.format.TextStyle
 import java.util.Locale
 import kotlinx.coroutines.delay
@@ -2466,7 +2468,7 @@ private fun SettingsPage(
             ) {
                 SettingsRow(
                     title = t("Minimum completion percent"),
-                    subtitle = t("Used for count and duration habits"),
+                    subtitle = t("Applies to count and duration habits"),
                     value = "${state.minimumCompletionPercent}%",
                     onClick = {
                         completionPercentInput = state.minimumCompletionPercent.coerceIn(1, 100).toString()
@@ -2656,7 +2658,7 @@ private fun SettingsPage(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
                     Text(
-                        text = t("Used for count and duration habits"),
+                        text = t("Applies to count and duration habits"),
                         style = MaterialTheme.typography.bodySmall
                     )
                     Text(
@@ -2687,7 +2689,7 @@ private fun SettingsPage(
                         )
                     }
                     Text(
-                        text = t("For example: 80%"),
+                        text = t("For example: 100%"),
                         style = MaterialTheme.typography.bodySmall,
                         color = colors.textSecondary
                     )
@@ -5868,33 +5870,78 @@ private fun TaskEditorDialog(
                     }
                 }
 
-                FormSection(title = t("Start date")) {
-                    OutlinedButton(
-                        onClick = {
-                            showThemedDatePicker(
-                                context = context,
-                                themeResId = pickerTheme,
-                                initialDate = state.editorStartDate,
-                                actionColorArgb = pickerActionColor,
-                                onDateSet = { year, month, day ->
-                                    vm.setEditorStartDate(LocalDate.of(year, month + 1, day))
-                                }
+                val startDateLabel = t("Start date")
+                val startDateValue = state.editorStartDate.format(
+                    DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)
+                )
+                val onEditStartDate = {
+                    showThemedDatePicker(
+                        context = context,
+                        themeResId = pickerTheme,
+                        initialDate = state.editorStartDate,
+                        actionColorArgb = pickerActionColor,
+                        onDateSet = { year, month, day ->
+                            vm.setEditorStartDate(LocalDate.of(year, month + 1, day))
+                        }
+                    )
+                }
+
+                BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                    val compactLayout = maxWidth < 360.dp
+                    if (compactLayout) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(spacing.x0_5)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = startDateLabel,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = colors.textSecondary
+                                )
+                                Text(
+                                    text = startDateValue,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = colors.textPrimary
+                                )
+                            }
+                            TextButton(
+                                onClick = onEditStartDate,
+                                modifier = Modifier.align(Alignment.End),
+                                contentPadding = PaddingValues(horizontal = spacing.x0_5, vertical = spacing.x0)
+                            ) {
+                                Text(t("Edit"))
+                            }
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = startDateLabel,
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = colors.textSecondary
                             )
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(AppTheme.radius.md),
-                        border = BorderStroke(stroke.thin, colors.primary),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = Color.Transparent,
-                            contentColor = colors.primary
-                        )
-                    ) {
-                        Text(
-                            tf(
-                                "Start date: %s",
-                                state.editorStartDate.format(DateTimeFormatter.ofPattern(t("dd MMM yyyy"), locale))
+                            Text(
+                                text = startDateValue,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = colors.textPrimary
                             )
-                        )
+                            TextButton(
+                                onClick = onEditStartDate,
+                                contentPadding = PaddingValues(horizontal = spacing.x0_5, vertical = spacing.x0)
+                            ) {
+                                Text(t("Edit"))
+                            }
+                        }
                     }
                 }
 

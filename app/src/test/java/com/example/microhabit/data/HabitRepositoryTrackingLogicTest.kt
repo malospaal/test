@@ -1,0 +1,154 @@
+package com.example.microhabit.data
+
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import java.time.LocalDate
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
+class HabitRepositoryTrackingLogicTest {
+
+    private lateinit var context: Context
+    private lateinit var repository: HabitRepository
+
+    @Before
+    fun setUp() {
+        context = ApplicationProvider.getApplicationContext()
+        context.getSharedPreferences("habit_prefs", Context.MODE_PRIVATE).edit().clear().commit()
+        repository = HabitRepository(context)
+    }
+
+    @Test
+    fun threshold_defaultsTo100_andClampsToRange_1_to_100() {
+        assertEquals(100, repository.getMinimumCompletionPercent())
+
+        repository.setMinimumCompletionPercent(1)
+        assertEquals(1, repository.getMinimumCompletionPercent())
+
+        repository.setMinimumCompletionPercent(100)
+        assertEquals(100, repository.getMinimumCompletionPercent())
+
+        repository.setMinimumCompletionPercent(0)
+        assertEquals(1, repository.getMinimumCompletionPercent())
+
+        repository.setMinimumCompletionPercent(101)
+        assertEquals(100, repository.getMinimumCompletionPercent())
+    }
+
+    @Test
+    fun yesNo_isBinary_andHasNoPartial() {
+        val task = createTask(trackingType = TrackingType.YES_NO, target = 1)
+        val day = LocalDate.now().minusDays(1)
+
+        repository.setDayValue(task, day, 0)
+        assertFalse(repository.isCompletedOn(task, day))
+        assertFalse(repository.isPartialOn(task, day))
+
+        repository.setDayValue(task, day, 1)
+        assertTrue(repository.isCompletedOn(task, day))
+        assertFalse(repository.isPartialOn(task, day))
+    }
+
+    @Test
+    fun count_usesThreshold_supportsPartial_andAllowsValueAboveTarget() {
+        repository.setMinimumCompletionPercent(75)
+        val task = createTask(
+            trackingType = TrackingType.COUNT,
+            target = 8,
+            unitLabel = "glasses"
+        )
+        val day = LocalDate.now().minusDays(2)
+
+        repository.setDayValue(task, day, 5)
+        assertFalse(repository.isCompletedOn(task, day))
+        assertTrue(repository.isPartialOn(task, day))
+
+        repository.setDayValue(task, day, 6)
+        assertTrue(repository.isCompletedOn(task, day))
+        assertFalse(repository.isPartialOn(task, day))
+
+        repository.setDayValue(task, day, 10)
+        assertEquals(10, repository.getDayValue(task, day))
+        assertTrue(repository.isCompletedOn(task, day))
+        assertFalse(repository.isPartialOn(task, day))
+    }
+
+    @Test
+    fun duration_usesThreshold_supportsPartial_andAllowsValueAboveTarget() {
+        repository.setMinimumCompletionPercent(80)
+        val task = createTask(trackingType = TrackingType.DURATION, target = 20)
+        val day = LocalDate.now().minusDays(3)
+
+        repository.setDayValue(task, day, 15)
+        assertFalse(repository.isCompletedOn(task, day))
+        assertTrue(repository.isPartialOn(task, day))
+
+        repository.setDayValue(task, day, 16)
+        assertTrue(repository.isCompletedOn(task, day))
+        assertFalse(repository.isPartialOn(task, day))
+
+        repository.setDayValue(task, day, 25)
+        assertEquals(25, repository.getDayValue(task, day))
+        assertTrue(repository.isCompletedOn(task, day))
+    }
+
+    @Test
+    fun threshold_isSharedForCountAndDuration() {
+        repository.setMinimumCompletionPercent(60)
+        val countTask = createTask(trackingType = TrackingType.COUNT, target = 10, unitLabel = "pages")
+        val durationTask = createTask(trackingType = TrackingType.DURATION, target = 20)
+        val day = LocalDate.now().minusDays(4)
+
+        repository.setDayValue(countTask, day, 6)
+        repository.setDayValue(durationTask, day, 12)
+
+        assertTrue(repository.isCompletedOn(countTask, day))
+        assertTrue(repository.isCompletedOn(durationTask, day))
+    }
+
+    @Test
+    fun pastDateValueEditing_updatesCompletedAndPartialStates() {
+        repository.setMinimumCompletionPercent(80)
+        val task = createTask(trackingType = TrackingType.COUNT, target = 10, unitLabel = "reps")
+        val pastDay = LocalDate.now().minusDays(10)
+
+        repository.setDayValue(task, pastDay, 7)
+        assertFalse(repository.isCompletedOn(task, pastDay))
+        assertTrue(repository.isPartialOn(task, pastDay))
+
+        repository.setDayValue(task, pastDay, 8)
+        assertTrue(repository.isCompletedOn(task, pastDay))
+        assertFalse(repository.isPartialOn(task, pastDay))
+    }
+
+    private fun createTask(
+        trackingType: TrackingType,
+        target: Int,
+        unitLabel: String = ""
+    ): HabitTask {
+        return repository.createTask(
+            title = "Test ${trackingType.name}",
+            emoji = "✨",
+            colorHex = "#1F6F64",
+            trackingType = trackingType,
+            dailyTarget = target,
+            unitLabel = unitLabel,
+            frequency = TaskFrequency.DAILY,
+            customDays = emptySet(),
+            timesPerWeek = 3,
+            reminderHour = 8,
+            reminderMinute = 0,
+            reminderEnabled = false,
+            startDate = LocalDate.now().minusDays(30),
+            endDate = null
+        )
+    }
+}

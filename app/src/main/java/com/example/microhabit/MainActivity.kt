@@ -5868,6 +5868,78 @@ private fun TaskEditorDialog(
                     }
                 }
 
+                FormSection(title = t("Start date")) {
+                    OutlinedButton(
+                        onClick = {
+                            showThemedDatePicker(
+                                context = context,
+                                themeResId = pickerTheme,
+                                initialDate = state.editorStartDate,
+                                actionColorArgb = pickerActionColor,
+                                onDateSet = { year, month, day ->
+                                    vm.setEditorStartDate(LocalDate.of(year, month + 1, day))
+                                }
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(AppTheme.radius.md),
+                        border = BorderStroke(stroke.thin, colors.primary),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = Color.Transparent,
+                            contentColor = colors.primary
+                        )
+                    ) {
+                        Text(
+                            tf(
+                                "Start date: %s",
+                                state.editorStartDate.format(DateTimeFormatter.ofPattern(t("dd MMM yyyy"), locale))
+                            )
+                        )
+                    }
+                }
+
+                FormSection(title = t("End date")) {
+                    Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+                        SettingsSwitchRow(
+                            title = t("End date"),
+                            subtitle = t("Optional challenge finish date"),
+                            checked = state.editorEndDate != null,
+                            onCheckedChange = vm::setEditorEndDateEnabled
+                        )
+
+                        AnimatedVisibility(visible = state.editorEndDate != null) {
+                            OutlinedButton(
+                                onClick = {
+                                    showThemedDatePicker(
+                                        context = context,
+                                        themeResId = pickerTheme,
+                                        initialDate = state.editorEndDate ?: state.editorStartDate,
+                                        actionColorArgb = pickerActionColor,
+                                        onDateSet = { year, month, day ->
+                                            vm.setEditorEndDate(LocalDate.of(year, month + 1, day))
+                                        }
+                                    )
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(AppTheme.radius.md),
+                                border = BorderStroke(stroke.thin, colors.primary),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    containerColor = Color.Transparent,
+                                    contentColor = colors.primary
+                                )
+                            ) {
+                                Text(
+                                    tf(
+                                        "End date: %s",
+                                        (state.editorEndDate ?: state.editorStartDate)
+                                            .format(DateTimeFormatter.ofPattern(t("dd MMM yyyy"), locale))
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+
                 FormSection(title = t("Reminders")) {
                     Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
                         SettingsSwitchRow(
@@ -5907,84 +5979,6 @@ private fun TaskEditorDialog(
                                         )
                                     )
                                 )
-                            }
-                        }
-                    }
-                }
-
-                TextButton(onClick = { vm.setEditorShowAdvanced(!state.editorShowAdvanced) }) {
-                    Text(if (state.editorShowAdvanced) t("Hide advanced settings") else t("Show advanced settings"))
-                }
-
-                AnimatedVisibility(visible = state.editorShowAdvanced) {
-                    Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
-                        FormSection(title = t("Advanced settings")) {
-                            Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
-                                OutlinedButton(
-                                    onClick = {
-                                        showThemedDatePicker(
-                                            context = context,
-                                            themeResId = pickerTheme,
-                                            initialDate = state.editorStartDate,
-                                            actionColorArgb = pickerActionColor,
-                                            onDateSet = { year, month, day ->
-                                                vm.setEditorStartDate(LocalDate.of(year, month + 1, day))
-                                            }
-                                        )
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(AppTheme.radius.md),
-                                    border = BorderStroke(stroke.thin, colors.primary),
-                                    colors = ButtonDefaults.outlinedButtonColors(
-                                        containerColor = Color.Transparent,
-                                        contentColor = colors.primary
-                                    )
-                                ) {
-                                    Text(
-                                        tf(
-                                            "Start date: %s",
-                                            state.editorStartDate.format(DateTimeFormatter.ofPattern(t("dd MMM yyyy"), locale))
-                                        )
-                                    )
-                                }
-
-                                SettingsSwitchRow(
-                                    title = t("End date"),
-                                    subtitle = t("Optional challenge finish date"),
-                                    checked = state.editorEndDate != null,
-                                    onCheckedChange = vm::setEditorEndDateEnabled
-                                )
-
-                                AnimatedVisibility(visible = state.editorEndDate != null) {
-                                    OutlinedButton(
-                                        onClick = {
-                                            showThemedDatePicker(
-                                                context = context,
-                                                themeResId = pickerTheme,
-                                                initialDate = state.editorEndDate ?: state.editorStartDate,
-                                                actionColorArgb = pickerActionColor,
-                                                onDateSet = { year, month, day ->
-                                                    vm.setEditorEndDate(LocalDate.of(year, month + 1, day))
-                                                }
-                                            )
-                                        },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        shape = RoundedCornerShape(AppTheme.radius.md),
-                                        border = BorderStroke(stroke.thin, colors.primary),
-                                        colors = ButtonDefaults.outlinedButtonColors(
-                                            containerColor = Color.Transparent,
-                                            contentColor = colors.primary
-                                        )
-                                    ) {
-                                        Text(
-                                            tf(
-                                                "End date: %s",
-                                                (state.editorEndDate ?: state.editorStartDate)
-                                                    .format(DateTimeFormatter.ofPattern(t("dd MMM yyyy"), locale))
-                                            )
-                                        )
-                                    }
-                                }
                             }
                         }
                     }

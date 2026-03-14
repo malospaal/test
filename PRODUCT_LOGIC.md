@@ -157,6 +157,11 @@
   - архивировать;
   - удалить.
 
+Текущая реализованная UI-форма prompt:
+- Базовый action-dialog (без отдельного rich-celebration экрана).
+- Контент: заголовок + название привычки + действия Continue / Archive / Delete.
+- Диалог продолжения открывается отдельным шагом (выбор новой endDate или перевод в бессрочную привычку).
+
 Поведение:
 - Продолжить привычку:
   - задать новую `endDate` (дата не раньше today и не раньше startDate),
@@ -167,6 +172,12 @@
 Ограничение показа:
 - Хранится маркер `completed_prompt_{taskId}` со значением endDate.
 - Prompt показывается пока marker не соответствует текущему `endDate`.
+- На практике prompt появляется при следующем refresh состояния (обычно при следующем входе/возврате в приложение после наступления completed-состояния).
+
+Future scope (не часть текущего канонического поведения):
+- richer motivational celebration content;
+- отображение дополнительных stats в prompt/celebration UI;
+- share CTA / share flow.
 
 ## 11. Subscription and Free Plan Limits
 Источник: `MainViewModel.canCreateTask`, `unarchiveTask`.
@@ -202,6 +213,7 @@
 ### 12.2 Habit Detail (Progress Screen)
 - Без daily action-кнопок.
 - Без mini weekly widget.
+- Без календаря.
 - Содержит:
   - большой progress ring,
   - streak + weekly completion,
@@ -216,12 +228,21 @@
 - Карточка показывает статус (`Active/Completed/Archived`) и reminder state.
 
 ### 12.4 Create/Edit Habit
-Текущий порядок ключевых полей:
+Create/Edit открывается отдельным dialog-flow (`TaskEditorDialog`) и не является частью `HabitDetail`.
+
+Визуальный top-to-bottom порядок формы может включать служебные блоки перед ядром конфигурации (например `Basic setup`, `Color`).
+
+Порядок **ключевого блока конфигурации привычки**:
 1. Tracking type
 2. Frequency
 3. Start date (mandatory, prefilled today)
 4. End date (toggle optional)
 5. Reminders
+
+Дополнительно по поведению:
+- Start date обязательна и по умолчанию = today при создании.
+- End date опциональна и управляется toggle (`OFF` = `null`, `ON` = дата доступна для выбора).
+- Reminders опциональны; запрос notification permission в Create/Edit инициируется только при сохранении, если reminder включён.
 
 Advanced settings блок удалён, поля перенесены в основной поток формы.
 Start date отображается облегчённой строкой в одну линию:
@@ -230,6 +251,16 @@ Start date отображается облегчённой строкой в о�
 - действие `Edit`.
 На узких экранах строка может корректно переноситься в компактный двухстрочный вариант.
 Формат даты должен использовать текущую locale приложения (`localized medium date`), без хардкода формата под один язык.
+
+### 12.5 Onboarding
+- Onboarding реализован отдельным wizard-flow и активируется для нового пользователя (когда onboarding не завершён и привычек ещё нет).
+- Структура шагов: `WELCOME` → `CATEGORY` → `TEMPLATE` → `SETUP` → `READY`.
+- В onboarding присутствуют выбор категории и выбор шаблона.
+- В `SETUP` onboarding доступны только 2 tracking type:
+  - `YES_NO` (`Do once`);
+  - `DURATION` (`Do N minutes`).
+- `COUNT` в onboarding не показывается.
+- Напоминания в onboarding опциональны; notification permission запрашивается только при создании привычки, если reminder включён.
 
 ## 13. Reminder System
 Источник: `notifications/HabitReminderScheduler.kt`.
@@ -240,10 +271,23 @@ Start date отображается облегчённой строкой в о�
   - notifications enabled;
   - task active (`isHabitActive`);
   - reminderEnabled.
+- Permission / delivery gate:
+  - перед выполнением reminder-действий (включение reminders в Settings, сохранение Create/Edit с reminder, создание из onboarding с reminder) UI проверяет доступность доставки (`canDeliverNotifications`) и runtime permission (`POST_NOTIFICATIONS`, где применимо);
+  - если доставка уже доступна, действие выполняется сразу.
+- Denied / blocked flow:
+  - при отказе в permission или системной блокировке уведомлений показывается диалог с предложением перейти в Settings (`Open Settings`);
+  - используется redirect в notification settings, с fallback в app details settings.
+- Resume / retry:
+  - при возврате из Settings и восстановлении доступности доставки pending reminder-action автоматически повторяется.
+- Consistency safeguard:
+  - если app state хранит `notifications enabled = true`, но OS больше не разрешает доставку (`canDeliverNotifications = false`), глобальный флаг уведомлений сбрасывается в `false`.
 - Для задач с `endDate`:
   - после последнего допустимого reminder-времени напоминание отменяется;
   - `shouldRemindOn` учитывает start/end date.
 - При изменении/архиве/удалении sync/cancel выполняется через ViewModel.
+- UI:
+  - в Habits list карточки показывают статус напоминания (`Reminder: time` / `Reminder off`);
+  - отображение времени напоминания использует формат устройства (12h/24h).
 
 ## 14. Calendar States (Semantic)
 Состояния дня:

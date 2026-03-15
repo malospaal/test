@@ -185,6 +185,115 @@ class HabitRepositoryTrackingLogicTest {
         assertEquals(1, repository.calculateStreak(task))
     }
 
+    @Test
+    fun weeklyCompletionRate_handlesExactExceededAndNotReachedGoals() {
+        val anchor = LocalDate.now().minusDays(1)
+        val exact = createTask(
+            trackingType = TrackingType.YES_NO,
+            target = 1,
+            frequency = TaskFrequency.TIMES_PER_WEEK,
+            timesPerWeek = 2,
+            startDate = anchor.minusDays(30)
+        )
+        val exceeded = createTask(
+            trackingType = TrackingType.YES_NO,
+            target = 1,
+            frequency = TaskFrequency.TIMES_PER_WEEK,
+            timesPerWeek = 2,
+            startDate = anchor.minusDays(30)
+        )
+        val notReached = createTask(
+            trackingType = TrackingType.YES_NO,
+            target = 1,
+            frequency = TaskFrequency.TIMES_PER_WEEK,
+            timesPerWeek = 2,
+            startDate = anchor.minusDays(30)
+        )
+
+        listOf(0L, 1L, 7L, 8L).forEach { offset ->
+            repository.setDayValue(exact, anchor.minusDays(offset), 1)
+        }
+        listOf(0L, 1L, 2L, 7L, 8L, 9L).forEach { offset ->
+            repository.setDayValue(exceeded, anchor.minusDays(offset), 1)
+        }
+        listOf(0L, 7L, 8L).forEach { offset ->
+            repository.setDayValue(notReached, anchor.minusDays(offset), 1)
+        }
+
+        assertEquals(100, repository.completionRate(exact, 14, anchor))
+        assertEquals(100, repository.completionRate(exceeded, 14, anchor))
+        assertEquals(75, repository.completionRate(notReached, 14, anchor))
+    }
+
+    @Test
+    fun weeklyStreak_respectsWeekBoundaries_andHistorySegments() {
+        val today = LocalDate.now()
+        val currentWeekStart = today.minusDays((today.dayOfWeek.value - 1).toLong())
+        val task = createTask(
+            trackingType = TrackingType.YES_NO,
+            target = 1,
+            frequency = TaskFrequency.TIMES_PER_WEEK,
+            timesPerWeek = 2,
+            startDate = currentWeekStart.minusWeeks(6)
+        )
+
+        repository.setDayValue(task, currentWeekStart, 1)
+        repository.setDayValue(task, currentWeekStart.plusDays(1), 1)
+        repository.setDayValue(task, currentWeekStart.minusWeeks(1), 1)
+        repository.setDayValue(task, currentWeekStart.minusWeeks(1).plusDays(6), 1)
+        repository.setDayValue(task, currentWeekStart.minusWeeks(2), 1) // break week
+        repository.setDayValue(task, currentWeekStart.minusWeeks(3), 1)
+        repository.setDayValue(task, currentWeekStart.minusWeeks(3).plusDays(1), 1)
+        repository.setDayValue(task, currentWeekStart.minusWeeks(4), 1)
+        repository.setDayValue(task, currentWeekStart.minusWeeks(4).plusDays(1), 1)
+
+        val history = repository.streakHistory(task, limit = 5)
+        assertEquals(2, repository.calculateStreak(task))
+        assertEquals(2, repository.bestStreak(task))
+        assertTrue(history.count { it == 2 } >= 2)
+    }
+
+    @Test
+    fun streakSaver_yesterdayMiss_withoutSaverBreaks_andWithSaverKeepsRun() {
+        val today = LocalDate.now()
+        val task = createTask(
+            trackingType = TrackingType.YES_NO,
+            target = 1,
+            frequency = TaskFrequency.DAILY,
+            startDate = today.minusDays(7)
+        )
+        val yesterday = today.minusDays(1)
+        val dayBeforeYesterday = today.minusDays(2)
+
+        repository.setDayValue(task, dayBeforeYesterday, 1)
+        repository.setDayValue(task, yesterday, 0)
+        repository.setDayValue(task, today, 0)
+
+        assertEquals(0, repository.calculateStreak(task))
+
+        repository.addStreakSavers(task.id, 1)
+        assertTrue(repository.consumeStreakSaver(task.id, yesterday))
+        assertEquals(2, repository.calculateStreak(task))
+    }
+
+    @Test
+    fun streakSaver_sameDateCannotBeAppliedTwice() {
+        val today = LocalDate.now()
+        val missedDate = today.minusDays(1)
+        val task = createTask(
+            trackingType = TrackingType.YES_NO,
+            target = 1,
+            frequency = TaskFrequency.DAILY,
+            startDate = today.minusDays(10)
+        )
+        repository.addStreakSavers(task.id, 2)
+
+        assertTrue(repository.consumeStreakSaver(task.id, missedDate))
+        assertEquals(1, repository.getStreakSaverCount(task.id))
+        assertFalse(repository.consumeStreakSaver(task.id, missedDate))
+        assertEquals(1, repository.getStreakSaverCount(task.id))
+    }
+
     private fun createTask(
         trackingType: TrackingType,
         target: Int,

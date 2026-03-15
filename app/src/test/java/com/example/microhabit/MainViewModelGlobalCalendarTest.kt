@@ -259,6 +259,55 @@ class MainViewModelGlobalCalendarTest {
         assertFalse(state.calendarBreakdownItems.any { it.status == CalendarBreakdownStatus.MISSED })
     }
 
+    @Test
+    fun scheduledWithoutCompletion_hasZeroCompletedAndMissedStatuses() {
+        val targetDate = LocalDate.now().minusDays(6)
+        createTask("First", startDate = targetDate.minusDays(10))
+        createTask("Second", startDate = targetDate.minusDays(8))
+
+        val vm = createViewModel()
+        vm.selectDate(targetDate)
+
+        val state = vm.state.value
+        assertEquals(2, state.calendarScheduledCountByDate[targetDate] ?: 0)
+        assertEquals(0, state.calendarCompletedCountByDate[targetDate] ?: 0)
+        assertTrue(state.calendarBreakdownItems.all { it.status == CalendarBreakdownStatus.MISSED })
+    }
+
+    @Test
+    fun futureDate_breakdownUsesFutureStatus_notMissed() {
+        val targetDate = LocalDate.now().plusDays(2)
+        createTask("Future first", startDate = LocalDate.now().minusDays(10))
+        createTask("Future second", startDate = LocalDate.now().minusDays(10))
+
+        val vm = createViewModel()
+        vm.selectDate(targetDate)
+
+        val state = vm.state.value
+        assertEquals(2, state.calendarScheduledCountByDate[targetDate] ?: 0)
+        assertTrue(state.calendarBreakdownItems.all { it.status == CalendarBreakdownStatus.FUTURE })
+        assertFalse(state.calendarBreakdownItems.any { it.status == CalendarBreakdownStatus.MISSED })
+    }
+
+    @Test
+    fun invalidFilterTaskId_resetsToAllHabitsScope() {
+        val targetDate = LocalDate.now().minusDays(1)
+        val first = createTask("First", startDate = targetDate.minusDays(7))
+        val second = createTask("Second", startDate = targetDate.minusDays(7))
+        repository.setDayValue(first.id, targetDate, 1)
+        repository.setDayValue(second.id, targetDate, 0)
+
+        val vm = createViewModel()
+        vm.selectDate(targetDate)
+        vm.setCalendarFilterTask("unknown-task-id")
+
+        val state = vm.state.value
+        assertEquals(null, state.calendarFilterTaskId)
+        assertEquals(2, state.calendarBreakdownItems.size)
+        assertEquals(2, state.calendarScheduledCountByDate[targetDate] ?: 0)
+        assertEquals(1, state.calendarCompletedCountByDate[targetDate] ?: 0)
+    }
+
     private fun createViewModel(): MainViewModel {
         val vm = MainViewModel(repository, reminderScheduler)
         waitForLoaded(vm)

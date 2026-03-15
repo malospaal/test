@@ -82,6 +82,8 @@ internal val ukTranslations: Map<String, String> = mapOf(
     "Unable to open app settings." to "Не вдалося відкрити налаштування застосунку.",
     "Habit reminder" to "Нагадування про звичку",
     "Time to complete: %s" to "Час виконати: %s",
+    "Habit reminders channel" to "Нагадування про звички",
+    "Daily reminders channel description" to "Щоденні нагадування для задач Micro Habit",
     "Notification permission denied. Reminders are disabled." to "Дозвіл на сповіщення відхилено. Нагадування вимкнено.",
     "Subscription" to "Підписка",
     "Manage Free and PRO plans." to "Керуйте тарифами Безкоштовний і PRO.",

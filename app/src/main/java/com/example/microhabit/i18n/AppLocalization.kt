@@ -191,6 +191,20 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     ),
     "Habit reminder" to v("Gewohnheits-Erinnerung", "Rappel d'habitude", "Recordatorio de habito", "Promemoria abitudine", "Напоминание о привычке"),
     "Time to complete: %s" to v("Zeit fur: %s", "Il est temps de faire : %s", "Hora de completar: %s", "E ora di completare: %s", "Пора выполнить: %s"),
+    "Habit reminders channel" to v(
+        "Gewohnheits-Erinnerungen",
+        "Rappels d'habitude",
+        "Recordatorios de habitos",
+        "Promemoria abitudini",
+        "Напоминания о привычках"
+    ),
+    "Daily reminders channel description" to v(
+        "Tagliche Erinnerungen fur Micro Habit Aufgaben",
+        "Rappels quotidiens pour les taches Micro Habit",
+        "Recordatorios diarios para tareas de Micro Habit",
+        "Promemoria giornalieri per le attivita Micro Habit",
+        "Ежедневные напоминания для задач Micro Habit"
+    ),
     "Notification permission denied. Reminders are disabled." to v(
         "Benachrichtigungsberechtigung verweigert. Erinnerungen sind deaktiviert.",
         "Autorisation de notification refusee. Les rappels sont desactives.",

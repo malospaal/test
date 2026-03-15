@@ -31,12 +31,13 @@ class HabitReminderScheduler(
 
     fun ensureNotificationChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val language = repository.getLanguage()
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Habit reminders",
+            translate(language, "Habit reminders channel"),
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
-            description = "Daily reminders for Micro Habit tasks"
+            description = translate(language, "Daily reminders channel description")
         }
         notificationManager.createNotificationChannel(channel)
     }

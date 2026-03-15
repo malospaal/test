@@ -109,7 +109,7 @@ data class HabitUiState(
     val themeMode: AppThemeMode = AppThemeMode.SYSTEM,
     val language: AppLanguage = AppLanguage.RU,
     val notificationsEnabled: Boolean = true,
-    val minimumCompletionPercent: Int = 80,
+    val minimumCompletionPercent: Int = 100,
     val defaultReminderHour: Int = 8,
     val defaultReminderMinute: Int = 0,
     val durationTimerRunning: Boolean = false,

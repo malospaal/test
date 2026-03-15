@@ -9,4 +9,12 @@
         <item name="android:colorAccent">@color/microhabit_primary</item>
         <item name="android:colorControlActivated">@color/microhabit_primary</item>
     </style>
+
+    <style name="ThemeOverlay.MicroHabit.DatePicker" parent="Theme.Material3.DayNight.Dialog.Alert">
+        <item name="colorPrimary">@color/microhabit_primary</item>
+        <item name="colorAccent">@color/microhabit_primary</item>
+        <item name="colorControlActivated">@color/microhabit_primary</item>
+        <item name="android:colorAccent">@color/microhabit_primary</item>
+        <item name="android:colorControlActivated">@color/microhabit_primary</item>
+    </style>
 </resources>

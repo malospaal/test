@@ -428,6 +428,19 @@ class HabitRepository(private val context: Context) {
         }
     }
 
+    fun nextScheduledDate(task: HabitTask, fromDate: LocalDate): LocalDate? {
+        val startCursor = maxOf(fromDate.plusDays(1), task.startDate)
+        val searchEnd = task.endDate ?: startCursor.plusDays(3660)
+        if (startCursor.isAfter(searchEnd)) return null
+
+        var cursor = startCursor
+        while (!cursor.isAfter(searchEnd)) {
+            if (isScheduledOn(task, cursor)) return cursor
+            cursor = cursor.plusDays(1)
+        }
+        return null
+    }
+
     fun dailyTarget(task: HabitTask): Int = sanitizeDailyTarget(task.trackingType, task.dailyTarget)
 
     fun unitLabel(task: HabitTask): String = sanitizeUnitLabel(task.trackingType, task.unitLabel)

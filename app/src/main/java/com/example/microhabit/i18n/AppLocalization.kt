@@ -23,6 +23,7 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "Tracker" to v("Tracker", "Suivi", "Seguimiento", "Monitoraggio", "Трекер"),
     "Habit details" to v("Gewohnheitsdetails", "Details de l'habitude", "Detalles del habito", "Dettagli abitudine", "Детали привычки"),
     "Habits" to v("Gewohnheiten", "Habitudes", "Habitos", "Abitudini", "Привычки"),
+    "My habits" to v("Meine Gewohnheiten", "Mes habitudes", "Mis habitos", "Le mie abitudini", "Мои привычки"),
     "Analytics" to v("Analysen", "Analyses", "Analitica", "Analisi", "Аналитика"),
     "Calendar" to v("Kalender", "Calendrier", "Calendario", "Calendario", "Календарь"),
     "Premium" to v("Premium", "Premium", "Premium", "Premium", "Премиум"),
@@ -449,6 +450,29 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "Completed ✓" to v("Erledigt ✓", "Termine ✓", "Completado ✓", "Completato ✓", "Выполнено ✓"),
     "Future dates cannot be marked" to v("Zukunftige Daten konnen nicht markiert werden", "Les dates futures ne peuvent pas etre cochees", "No se pueden marcar fechas futuras", "Le date future non possono essere segnate", "Нельзя отмечать будущие даты"),
     "Not scheduled for this date" to v("Nicht fur dieses Datum geplant", "Non prevu pour cette date", "No programado para esta fecha", "Non previsto per questa data", "Не запланировано на эту дату"),
+    "Rest day" to v("Ruhetag", "Jour de repos", "Dia de descanso", "Giorno di riposo", "День отдыха"),
+    "This habit is not scheduled for this date." to v(
+        "Diese Gewohnheit ist fur dieses Datum nicht geplant.",
+        "Cette habitude n'est pas prevue a cette date.",
+        "Este habito no esta programado para esta fecha.",
+        "Questa abitudine non e prevista per questa data.",
+        "Эта привычка не запланирована на эту дату."
+    ),
+    "Next scheduled date: %s" to v(
+        "Nächstes geplantes Datum: %s",
+        "Prochaine date prevue : %s",
+        "Proxima fecha programada: %s",
+        "Prossima data pianificata: %s",
+        "Следующая запланированная дата: %s"
+    ),
+    "Manual log saved for this date." to v(
+        "Manueller Eintrag fur dieses Datum gespeichert.",
+        "Saisie manuelle enregistree pour cette date.",
+        "Registro manual guardado para esta fecha.",
+        "Registrazione manuale salvata per questa data.",
+        "Ручная отметка сохранена для этой даты."
+    ),
+    "Mark anyway" to v("Trotzdem markieren", "Marquer quand meme", "Marcar de todos modos", "Segna comunque", "Отметить всё равно"),
     "Mark as done" to v("Als erledigt markieren", "Marquer comme fait", "Marcar como hecho", "Segna come completata", "Отметить как выполнено"),
     "More details →" to v("Mehr Details ->", "Plus de details ->", "Mas detalles ->", "Piu dettagli ->", "Подробнее →"),
     "Great job, your streak is safe." to v("Super, deine Serie ist gesichert.", "Bravo, votre serie est preservee.", "Buen trabajo, tu racha esta a salvo.", "Ottimo lavoro, la tua serie e salva.", "Отлично, ваша серия сохранена."),
@@ -624,6 +648,25 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "Archived" to v("Archiviert", "Archive", "Archivado", "Archiviata", "В архиве"),
     "Active" to v("Aktiv", "Active", "Activo", "Attiva", "Активна"),
     "All habits" to v("Alle Gewohnheiten", "Toutes les habitudes", "Todos los habitos", "Tutte le abitudini", "Все привычки"),
+    "Global overview" to v("Globaler Uberblick", "Vue d'ensemble globale", "Resumen global", "Panoramica globale", "Глобальный обзор"),
+    "No active or completed habits yet." to v(
+        "Noch keine aktiven oder abgeschlossenen Gewohnheiten.",
+        "Aucune habitude active ou terminee pour le moment.",
+        "Aun no hay habitos activos o completados.",
+        "Nessuna abitudine attiva o completata al momento.",
+        "Пока нет активных или завершённых привычек."
+    ),
+    "Day breakdown" to v("Tagesaufschlusselung", "Detail du jour", "Desglose del dia", "Dettaglio del giorno", "Разбор дня"),
+    "Completed %d of %d scheduled" to v(
+        "Erledigt %d von %d geplant",
+        "Terminees %d sur %d prevues",
+        "Completadas %d de %d programadas",
+        "Completate %d su %d pianificate",
+        "Выполнено %d из %d запланированных"
+    ),
+    "Today pending" to v("Heute ausstehend", "Aujourd'hui en attente", "Pendiente de hoy", "In attesa oggi", "Ожидается сегодня"),
+    "Value %d / %d" to v("Wert %d / %d", "Valeur %d / %d", "Valor %d / %d", "Valore %d / %d", "Значение %d / %d"),
+    "Value %d / %d %s" to v("Wert %d / %d %s", "Valeur %d / %d %s", "Valor %d / %d %s", "Valore %d / %d %s", "Значение %d / %d %s"),
     "Streak" to v("Serie", "Serie", "Racha", "Serie", "Серия"),
     "Completion" to v("Erfullung", "Realisation", "Cumplimiento", "Completamento", "Выполнение"),
     "Unarchive" to v("Wiederherstellen", "Restaurer", "Desarchivar", "Ripristina", "Разархивировать"),

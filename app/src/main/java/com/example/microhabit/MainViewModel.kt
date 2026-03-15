@@ -48,6 +48,33 @@ data class HabitListItem(
     val isArchived: Boolean
 )
 
+data class CalendarFilterOption(
+    val taskId: String,
+    val title: String,
+    val emoji: String
+)
+
+enum class CalendarBreakdownStatus {
+    COMPLETED,
+    PARTIAL,
+    MISSED,
+    NOT_SCHEDULED,
+    TODAY_PENDING,
+    FUTURE
+}
+
+data class CalendarBreakdownItem(
+    val taskId: String,
+    val title: String,
+    val emoji: String,
+    val trackingType: TrackingType,
+    val scheduled: Boolean,
+    val status: CalendarBreakdownStatus,
+    val value: Int,
+    val target: Int,
+    val unitLabel: String
+)
+
 data class HabitUiState(
     val tasks: List<HabitTask> = emptyList(),
     val allTasks: List<HabitTask> = emptyList(),
@@ -58,6 +85,7 @@ data class HabitUiState(
     val selectedDateDone: Boolean = false,
     val selectedDatePartial: Boolean = false,
     val selectedDateScheduled: Boolean = false,
+    val selectedDateNextScheduled: LocalDate? = null,
     val selectedDateInFuture: Boolean = false,
     val selectedDateValue: Int = 0,
     val selectedDateTarget: Int = 1,
@@ -88,6 +116,13 @@ data class HabitUiState(
     val doneDatesInCurrentMonth: Set<LocalDate> = emptySet(),
     val partialDatesInCurrentMonth: Set<LocalDate> = emptySet(),
     val scheduledDatesInCurrentMonth: Set<LocalDate> = emptySet(),
+    val calendarFilterTaskId: String? = null,
+    val calendarFilterOptions: List<CalendarFilterOption> = emptyList(),
+    val calendarCompletedCountByDate: Map<LocalDate, Int> = emptyMap(),
+    val calendarScheduledCountByDate: Map<LocalDate, Int> = emptyMap(),
+    val calendarBreakdownCompletedCount: Int = 0,
+    val calendarBreakdownScheduledCount: Int = 0,
+    val calendarBreakdownItems: List<CalendarBreakdownItem> = emptyList(),
     val showEditor: Boolean = false,
     val editingTaskId: String? = null,
     val editorTitle: String = "",
@@ -148,6 +183,7 @@ class MainViewModel(
 
     fun selectTask(taskId: String) {
         viewModelScope.launch {
+            _state.update { it.copy(selectedTaskId = taskId) }
             repository.setSelectedTask(taskId)
             refresh()
         }
@@ -170,6 +206,11 @@ class MainViewModel(
                 currentMonth = YearMonth.now()
             )
         }
+        refreshDerivedOnly()
+    }
+
+    fun setCalendarFilterTask(taskId: String?) {
+        _state.update { it.copy(calendarFilterTaskId = taskId) }
         refreshDerivedOnly()
     }
 
@@ -559,6 +600,17 @@ class MainViewModel(
         }
     }
 
+    fun markSelectedDateAnyway() {
+        val current = _state.value
+        val task = current.tasks.firstOrNull { it.id == current.selectedTaskId } ?: return
+        val selectedDate = current.selectedDate
+        viewModelScope.launch {
+            repository.setDone(task.id, selectedDate, true)
+            repository.refreshWidget()
+            refresh()
+        }
+    }
+
     fun startDurationTimer(): Boolean {
         val current = _state.value
         val task = current.tasks.firstOrNull { it.id == current.selectedTaskId } ?: return false
@@ -704,6 +756,7 @@ class MainViewModel(
                     endDate = current.editorEndDate
                 )
                 repository.setSelectedTask(task.id)
+                _state.update { it.copy(selectedTaskId = task.id) }
                 task.id
             } else {
                 repository.updateTask(
@@ -840,24 +893,51 @@ class MainViewModel(
             val defaultReminderMinute = repository.getDefaultReminderMinute()
             val onboardingCompleted = repository.isOnboardingCompleted()
 
-            var selectedId = repository.getSelectedTaskId()
-            if (selectedId == null || tasks.none { it.id == selectedId }) {
-                selectedId = tasks.firstOrNull()?.id
+            val selectedId = _state.value.selectedTaskId
+                ?.takeIf { candidate -> tasks.any { it.id == candidate } }
+                ?: tasks.firstOrNull()?.id
+            if (repository.getSelectedTaskId() != selectedId) {
                 repository.setSelectedTask(selectedId)
             }
 
             val selectedTask = tasks.firstOrNull { it.id == selectedId }
             val date = _state.value.selectedDate
+            val currentMonth = _state.value.currentMonth
             val today = LocalDate.now()
             val metricsAnchorDate = today
             val yesterday = today.minusDays(1)
             val isFutureDate = date.isAfter(LocalDate.now())
+            val calendarScopeTasks = allTasks.filter {
+                repository.lifecycleState(it, today) != HabitLifecycleState.ARCHIVED
+            }
+            val calendarFilterOptions = calendarScopeTasks.map { task ->
+                CalendarFilterOption(
+                    taskId = task.id,
+                    title = task.title,
+                    emoji = task.emoji
+                )
+            }
+            val resolvedCalendarFilterId = _state.value.calendarFilterTaskId
+                ?.takeIf { candidate -> calendarFilterOptions.any { it.taskId == candidate } }
+            val filteredCalendarTasks = resolvedCalendarFilterId?.let { filterId ->
+                calendarScopeTasks.filter { it.id == filterId }
+            } ?: calendarScopeTasks
+            val (calendarCompletedCountByDate, calendarScheduledCountByDate) =
+                buildCalendarMonthCounts(filteredCalendarTasks, currentMonth)
+            val (
+                calendarBreakdownCompletedCount,
+                calendarBreakdownScheduledCount,
+                calendarBreakdownItems
+            ) = buildCalendarBreakdown(filteredCalendarTasks, date, today)
             val selectedDateValue = selectedTask?.let { repository.getDayValue(it, date) } ?: 0
             val selectedDateTarget = selectedTask?.let { repository.dailyTarget(it) } ?: 1
             val selectedDateUnit = selectedTask?.let { repository.unitLabel(it) }.orEmpty()
             val selectedDateCompletionPercent = selectedTask?.let { repository.completionPercent(it, date) } ?: 0
             val selectedDateDone = selectedTask?.let { repository.isCompletedOn(it, date) } ?: false
             val selectedDatePartial = selectedTask?.let { repository.isPartialOn(it, date) } ?: false
+            val selectedDateNextScheduled = selectedTask?.let { task ->
+                if (repository.isScheduledOn(task, date)) null else repository.nextScheduledDate(task, date)
+            }
             val weekdayConsistency = selectedTask?.let { repository.weekdayConsistency(it, 84, metricsAnchorDate) } ?: List(7) { 0 }
             val consistencyNonZero = weekdayConsistency
                 .mapIndexed { index, value -> index to value }
@@ -930,6 +1010,7 @@ class MainViewModel(
                         repository.isScheduledOn(task, date) ||
                             (date.isBefore(task.startDate) && repository.isScheduledByFrequency(task, date))
                     } ?: false,
+                    selectedDateNextScheduled = selectedDateNextScheduled,
                     selectedDateDone = selectedDateDone,
                     selectedDatePartial = selectedDatePartial,
                     streak = selectedTask?.let { repository.calculateStreak(it) } ?: 0,
@@ -965,6 +1046,13 @@ class MainViewModel(
                     scheduledDatesInCurrentMonth = selectedTask?.let { task ->
                         scheduledDatesForMonth(task, state.currentMonth)
                     } ?: emptySet(),
+                    calendarFilterTaskId = resolvedCalendarFilterId,
+                    calendarFilterOptions = calendarFilterOptions,
+                    calendarCompletedCountByDate = calendarCompletedCountByDate,
+                    calendarScheduledCountByDate = calendarScheduledCountByDate,
+                    calendarBreakdownCompletedCount = calendarBreakdownCompletedCount,
+                    calendarBreakdownScheduledCount = calendarBreakdownScheduledCount,
+                    calendarBreakdownItems = calendarBreakdownItems,
                     plan = plan,
                     themeMode = themeMode,
                     language = language,
@@ -992,12 +1080,37 @@ class MainViewModel(
         val minimumCompletionPercent = repository.getMinimumCompletionPercent()
         val yesterday = today.minusDays(1)
         val isFutureDate = date.isAfter(LocalDate.now())
+        val calendarScopeTasks = current.allTasks.filter {
+            repository.lifecycleState(it, today) != HabitLifecycleState.ARCHIVED
+        }
+        val calendarFilterOptions = calendarScopeTasks.map { task ->
+            CalendarFilterOption(
+                taskId = task.id,
+                title = task.title,
+                emoji = task.emoji
+            )
+        }
+        val resolvedCalendarFilterId = current.calendarFilterTaskId
+            ?.takeIf { candidate -> calendarFilterOptions.any { it.taskId == candidate } }
+        val filteredCalendarTasks = resolvedCalendarFilterId?.let { filterId ->
+            calendarScopeTasks.filter { it.id == filterId }
+        } ?: calendarScopeTasks
+        val (calendarCompletedCountByDate, calendarScheduledCountByDate) =
+            buildCalendarMonthCounts(filteredCalendarTasks, month)
+        val (
+            calendarBreakdownCompletedCount,
+            calendarBreakdownScheduledCount,
+            calendarBreakdownItems
+        ) = buildCalendarBreakdown(filteredCalendarTasks, date, today)
         val selectedDateValue = selectedTask?.let { repository.getDayValue(it, date) } ?: 0
         val selectedDateTarget = selectedTask?.let { repository.dailyTarget(it) } ?: 1
         val selectedDateUnit = selectedTask?.let { repository.unitLabel(it) }.orEmpty()
         val selectedDateCompletionPercent = selectedTask?.let { repository.completionPercent(it, date) } ?: 0
         val selectedDateDone = selectedTask?.let { repository.isCompletedOn(it, date) } ?: false
         val selectedDatePartial = selectedTask?.let { repository.isPartialOn(it, date) } ?: false
+        val selectedDateNextScheduled = selectedTask?.let { task ->
+            if (repository.isScheduledOn(task, date)) null else repository.nextScheduledDate(task, date)
+        }
         val weekdayConsistency = selectedTask?.let { repository.weekdayConsistency(it, 84, metricsAnchorDate) } ?: List(7) { 0 }
         val consistencyNonZero = weekdayConsistency
             .mapIndexed { index, value -> index to value }
@@ -1046,6 +1159,7 @@ class MainViewModel(
                     repository.isScheduledOn(task, date) ||
                         (date.isBefore(task.startDate) && repository.isScheduledByFrequency(task, date))
                 } ?: false,
+                selectedDateNextScheduled = selectedDateNextScheduled,
                 selectedDateDone = selectedDateDone,
                 selectedDatePartial = selectedDatePartial,
                 streak = selectedTask?.let { repository.calculateStreak(it) } ?: 0,
@@ -1080,6 +1194,13 @@ class MainViewModel(
                 scheduledDatesInCurrentMonth = selectedTask?.let { task ->
                     scheduledDatesForMonth(task, it.currentMonth)
                 } ?: emptySet(),
+                calendarFilterTaskId = resolvedCalendarFilterId,
+                calendarFilterOptions = calendarFilterOptions,
+                calendarCompletedCountByDate = calendarCompletedCountByDate,
+                calendarScheduledCountByDate = calendarScheduledCountByDate,
+                calendarBreakdownCompletedCount = calendarBreakdownCompletedCount,
+                calendarBreakdownScheduledCount = calendarBreakdownScheduledCount,
+                calendarBreakdownItems = calendarBreakdownItems,
                 minimumCompletionPercent = minimumCompletionPercent
             )
         }
@@ -1110,6 +1231,66 @@ class MainViewModel(
             if (repository.isScheduledOn(task, date)) scheduled += date
         }
         return scheduled
+    }
+
+    private fun buildCalendarMonthCounts(
+        tasks: List<HabitTask>,
+        month: YearMonth
+    ): Pair<Map<LocalDate, Int>, Map<LocalDate, Int>> {
+        if (tasks.isEmpty()) return emptyMap<LocalDate, Int>() to emptyMap()
+        val completedByDate = mutableMapOf<LocalDate, Int>()
+        val scheduledByDate = mutableMapOf<LocalDate, Int>()
+        for (day in 1..month.lengthOfMonth()) {
+            val date = month.atDay(day)
+            var completed = 0
+            var scheduled = 0
+            tasks.forEach { task ->
+                if (repository.isScheduledOn(task, date)) {
+                    scheduled += 1
+                    if (repository.isCompletedOn(task, date)) {
+                        completed += 1
+                    }
+                }
+            }
+            completedByDate[date] = completed
+            scheduledByDate[date] = scheduled
+        }
+        return completedByDate to scheduledByDate
+    }
+
+    private fun buildCalendarBreakdown(
+        tasks: List<HabitTask>,
+        date: LocalDate,
+        today: LocalDate
+    ): Triple<Int, Int, List<CalendarBreakdownItem>> {
+        if (tasks.isEmpty()) return Triple(0, 0, emptyList())
+        val items = tasks.map { task ->
+            val scheduled = repository.isScheduledOn(task, date)
+            val completed = repository.isCompletedOn(task, date)
+            val partial = repository.isPartialOn(task, date)
+            val status = when {
+                date.isAfter(today) -> CalendarBreakdownStatus.FUTURE
+                completed -> CalendarBreakdownStatus.COMPLETED
+                partial -> CalendarBreakdownStatus.PARTIAL
+                !scheduled -> CalendarBreakdownStatus.NOT_SCHEDULED
+                date.isBefore(today) -> CalendarBreakdownStatus.MISSED
+                else -> CalendarBreakdownStatus.TODAY_PENDING
+            }
+            CalendarBreakdownItem(
+                taskId = task.id,
+                title = task.title,
+                emoji = task.emoji,
+                trackingType = task.trackingType,
+                scheduled = scheduled,
+                status = status,
+                value = repository.getDayValue(task, date),
+                target = repository.dailyTarget(task),
+                unitLabel = repository.unitLabel(task)
+            )
+        }
+        val completedCount = items.count { it.status == CalendarBreakdownStatus.COMPLETED }
+        val scheduledCount = items.count { it.scheduled }
+        return Triple(completedCount, scheduledCount, items)
     }
 
     private fun canCreateTask(taskCount: Int, plan: SubscriptionPlan): Boolean {

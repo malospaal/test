@@ -46,6 +46,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -733,7 +734,7 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                             )
                             showThemedDatePicker(
                                 context = context,
-                                themeResId = R.style.ThemeOverlay_MicroHabit_Picker,
+                                themeResId = R.style.ThemeOverlay_MicroHabit_DatePicker,
                                 initialDate = initialDate,
                                 actionColorArgb = semantic.primary.toArgb(),
                                 onDateSet = { year, month, day ->
@@ -979,12 +980,14 @@ private fun TrackerPage(
                                 done = state.selectedDateDone,
                                 partial = state.selectedDatePartial,
                                 scheduled = state.selectedDateScheduled,
+                                nextScheduledDate = state.selectedDateNextScheduled,
                                 selectedValue = state.selectedDateValue,
                                 selectedTarget = state.selectedDateTarget,
                                 selectedUnit = state.selectedDateUnit,
                                 selectedCompletionPercent = state.selectedDateCompletionPercent,
                                 minimumCompletionPercent = state.minimumCompletionPercent,
                                 onDone = vm::toggleSelectedDateDone,
+                                onMarkAnyway = vm::markSelectedDateAnyway,
                                 onSetValue = vm::setSelectedDateValue,
                                 onIncrementValue = vm::incrementSelectedDateValue,
                                 highlightMarkButton = highlightCompletionButton,
@@ -1981,44 +1984,11 @@ private fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
     val spacing = AppTheme.spacing
     val colors = AppTheme.colors
     val locale = appLocale()
-    val selectedTask = state.tasks.firstOrNull { it.id == state.selectedTaskId }
     val today = LocalDate.now()
-
-    if (selectedTask == null) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(spacing.x2),
-            verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
-        ) {
-            item {
-                GlassCard {
-                    Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
-                        Text(
-                            text = t("Calendar"),
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            color = colors.textPrimary
-                        )
-                        Text(
-                            text = t("Select or create a habit to view completion history."),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = colors.textSecondary
-                        )
-                    }
-                }
-            }
-        }
-        return
-    }
-
-    val selectedState = dayStateFor(
-        date = state.selectedDate,
-        doneDates = state.doneDatesInCurrentMonth,
-        partialDates = state.partialDatesInCurrentMonth,
-        scheduledDates = state.scheduledDatesInCurrentMonth,
-        today = today
-    )
-    val selectedIsTodayPending = state.selectedDate == today && !state.selectedDateDone
+    val filterScroll = rememberScrollState()
+    val maxCompletedInMonth = state.calendarCompletedCountByDate.values.maxOrNull()?.coerceAtLeast(1) ?: 1
+    val selectedCompletedCount = state.calendarCompletedCountByDate[state.selectedDate] ?: 0
+    val selectedScheduledCount = state.calendarScheduledCountByDate[state.selectedDate] ?: 0
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -2026,11 +1996,50 @@ private fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
         verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
     ) {
         item {
-            TaskSelector(
-                tasks = state.tasks,
-                selectedTaskId = state.selectedTaskId,
-                onSelect = vm::selectTask
-            )
+            GlassCard {
+                Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+                    Text(
+                        text = t("Calendar"),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.textPrimary
+                    )
+                    Text(
+                        text = t("Global overview"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.textSecondary
+                    )
+                    if (state.calendarFilterOptions.isEmpty()) {
+                        Text(
+                            text = t("No active or completed habits yet."),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.textSecondary
+                        )
+                    } else {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(filterScroll),
+                            horizontalArrangement = Arrangement.spacedBy(spacing.x0_5),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val allSelected = state.calendarFilterTaskId == null
+                            CalendarFilterChip(
+                                label = t("All habits"),
+                                selected = allSelected,
+                                onClick = { vm.setCalendarFilterTask(null) }
+                            )
+                            state.calendarFilterOptions.forEach { option ->
+                                CalendarFilterChip(
+                                    label = "${option.emoji.ifBlank { "✨" }} ${option.title}",
+                                    selected = state.calendarFilterTaskId == option.taskId,
+                                    onClick = { vm.setCalendarFilterTask(option.taskId) }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         item {
@@ -2065,25 +2074,23 @@ private fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(2.dp)
                         ) {
-                            week.forEachIndexed { _, day ->
-                                val dayState = dayStateFor(
-                                    date = day,
-                                    doneDates = state.doneDatesInCurrentMonth,
-                                    partialDates = state.partialDatesInCurrentMonth,
-                                    scheduledDates = state.scheduledDatesInCurrentMonth,
-                                    today = today
-                                )
-                                val dayDate = day
-                                val done = dayDate != null && dayDate in state.doneDatesInCurrentMonth
-                                CalendarDay(
+                            week.forEach { dayDate ->
+                                GlobalCalendarHeatCell(
                                     modifier = Modifier.weight(1f),
                                     date = dayDate,
-                                    state = dayState,
                                     selected = dayDate == state.selectedDate,
                                     today = dayDate == today,
-                                    connectLeft = done && dayDate != null && dayDate.minusDays(1) in state.doneDatesInCurrentMonth,
-                                    connectRight = done && dayDate != null && dayDate.plusDays(1) in state.doneDatesInCurrentMonth,
-                                    enabled = dayDate != null,
+                                    completedCount = if (dayDate != null) {
+                                        state.calendarCompletedCountByDate[dayDate] ?: 0
+                                    } else {
+                                        0
+                                    },
+                                    scheduledCount = if (dayDate != null) {
+                                        state.calendarScheduledCountByDate[dayDate] ?: 0
+                                    } else {
+                                        0
+                                    },
+                                    maxCompletedInMonth = maxCompletedInMonth,
                                     onClick = { dayDate?.let(vm::selectDate) }
                                 )
                             }
@@ -2097,7 +2104,7 @@ private fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
             GlassCard {
                 Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
                     Text(
-                        text = t("Completion details"),
+                        text = t("Day breakdown"),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = colors.textPrimary
@@ -2108,21 +2115,200 @@ private fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
                         color = colors.textSecondary
                     )
                     Text(
-                        text = if (selectedIsTodayPending) t("Today") else statusLabel(selectedState, state.language),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = when {
-                            selectedIsTodayPending -> colors.primary
-                            else -> when (selectedState) {
-                            CalendarDayState.COMPLETED -> colors.success
-                            CalendarDayState.PARTIAL -> colors.success
-                            CalendarDayState.MISSED -> colors.danger
-                            CalendarDayState.NOT_SCHEDULED -> colors.textSecondary
-                            CalendarDayState.FUTURE -> colors.textSecondary
+                        text = tf("Completed %d of %d scheduled", selectedCompletedCount, selectedScheduledCount),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.textSecondary
+                    )
+                    state.calendarBreakdownItems.forEach { item ->
+                        val statusLabel = when (item.status) {
+                            CalendarBreakdownStatus.COMPLETED -> t("Completed")
+                            CalendarBreakdownStatus.PARTIAL -> t("Partial")
+                            CalendarBreakdownStatus.MISSED -> t("Missed")
+                            CalendarBreakdownStatus.NOT_SCHEDULED -> t("Not scheduled")
+                            CalendarBreakdownStatus.TODAY_PENDING -> t("Today pending")
+                            CalendarBreakdownStatus.FUTURE -> t("Future")
+                        }
+                        val statusColor = when (item.status) {
+                            CalendarBreakdownStatus.COMPLETED -> colors.success
+                            CalendarBreakdownStatus.PARTIAL -> colors.success
+                            CalendarBreakdownStatus.MISSED -> colors.danger
+                            CalendarBreakdownStatus.NOT_SCHEDULED -> colors.textSecondary
+                            CalendarBreakdownStatus.TODAY_PENDING -> colors.primary
+                            CalendarBreakdownStatus.FUTURE -> colors.textSecondary
+                        }
+                        val valueLabel = when (item.trackingType) {
+                            TrackingType.YES_NO -> null
+                            TrackingType.COUNT, TrackingType.DURATION -> {
+                                val unit = item.unitLabel.ifBlank { if (item.trackingType == TrackingType.DURATION) t("min") else "" }
+                                if (unit.isBlank()) {
+                                    tf("Value %d / %d", item.value, item.target)
+                                } else {
+                                    tf("Value %d / %d %s", item.value, item.target, unit)
+                                }
                             }
                         }
-                    )
+                        Surface(
+                            color = colors.backgroundSurfaceMuted,
+                            shape = RoundedCornerShape(AppTheme.radius.md)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = spacing.x1, vertical = spacing.x0_5),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+                            ) {
+                                Text(
+                                    text = item.emoji.ifBlank { "✨" },
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                                ) {
+                                    Text(
+                                        text = item.title,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = colors.textPrimary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    valueLabel?.let { label ->
+                                        Text(
+                                            text = label,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = colors.textSecondary
+                                        )
+                                    }
+                                }
+                                Text(
+                                    text = statusLabel,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = statusColor
+                                )
+                            }
+                        }
+                    }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun CalendarFilterChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val spacing = AppTheme.spacing
+    val radius = AppTheme.radius
+    val stroke = AppTheme.stroke
+    val colors = AppTheme.colors
+    Surface(
+        modifier = Modifier
+            .clip(RoundedCornerShape(radius.full))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(radius.full),
+        color = if (selected) colors.primary.copy(alpha = 0.15f) else colors.backgroundSurfaceMuted,
+        border = BorderStroke(
+            width = if (selected) stroke.medium else stroke.thin,
+            color = if (selected) colors.primary else colors.borderSubtle
+        )
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.padding(horizontal = spacing.x1, vertical = spacing.x0_5),
+            style = MaterialTheme.typography.labelMedium,
+            color = colors.textPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun GlobalCalendarHeatCell(
+    date: LocalDate?,
+    selected: Boolean,
+    today: Boolean,
+    completedCount: Int,
+    scheduledCount: Int,
+    maxCompletedInMonth: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val spacing = AppTheme.spacing
+    val radius = AppTheme.radius
+    val stroke = AppTheme.stroke
+    val colors = AppTheme.colors
+
+    if (date == null) {
+        Box(
+            modifier = modifier
+                .height(spacing.x5 + spacing.x0_5)
+        )
+        return
+    }
+
+    val todayDate = LocalDate.now()
+    val isFuture = date.isAfter(todayDate)
+    val intensityLevel = if (completedCount <= 0 || maxCompletedInMonth <= 0) {
+        0
+    } else {
+        kotlin.math.ceil((completedCount.toFloat() / maxCompletedInMonth.toFloat()) * 4f).toInt().coerceIn(1, 4)
+    }
+    val fillColor = when {
+        isFuture -> colors.backgroundSurfaceMuted.copy(alpha = 0.22f)
+        scheduledCount <= 0 -> colors.neutralMuted.copy(alpha = 0.42f)
+        completedCount <= 0 -> colors.danger.copy(alpha = 0.10f)
+        intensityLevel == 1 -> colors.success.copy(alpha = 0.28f)
+        intensityLevel == 2 -> colors.success.copy(alpha = 0.42f)
+        intensityLevel == 3 -> colors.success.copy(alpha = 0.58f)
+        else -> colors.success.copy(alpha = 0.74f)
+    }
+    val borderColor = when {
+        selected -> colors.primary
+        isFuture -> colors.borderSubtle.copy(alpha = 0.45f)
+        scheduledCount <= 0 -> colors.borderSubtle
+        completedCount <= 0 -> colors.danger.copy(alpha = 0.40f)
+        else -> colors.success.copy(alpha = 0.35f)
+    }
+    val textColor = when {
+        isFuture -> colors.textTertiary
+        completedCount > 0 -> MaterialTheme.colorScheme.onPrimary
+        scheduledCount > 0 -> colors.textPrimary
+        else -> colors.textSecondary
+    }
+
+    Box(
+        modifier = modifier
+            .height(spacing.x5 + spacing.x0_5)
+            .clip(RoundedCornerShape(radius.sm))
+            .background(fillColor, RoundedCornerShape(radius.sm))
+            .border(
+                width = if (selected) stroke.medium else stroke.thin,
+                color = borderColor,
+                shape = RoundedCornerShape(radius.sm)
+            )
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = date.dayOfMonth.toString(),
+            style = MaterialTheme.typography.bodySmall,
+            color = textColor,
+            fontWeight = if (selected || today) FontWeight.SemiBold else FontWeight.Medium
+        )
+        if (today) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(3.dp)
+                    .size(4.dp)
+                    .background(colors.calendarTodayRing, RoundedCornerShape(radius.full))
+            )
         }
     }
 }
@@ -3847,12 +4033,95 @@ private fun TrackerHabitContextHeader(
     onSelect: (String) -> Unit,
     onAddHabit: () -> Unit
 ) {
-    TaskSelector(
-        tasks = tasks,
-        selectedTaskId = selectedTaskId,
-        onSelect = onSelect,
-        onAddHabit = onAddHabit
-    )
+    val spacing = AppTheme.spacing
+    val radius = AppTheme.radius
+    val stroke = AppTheme.stroke
+    val colors = AppTheme.colors
+    val tileWidth = 152.dp
+    val tileHeight = 72.dp
+    val actionTileWidth = 64.dp
+
+    Column(verticalArrangement = Arrangement.spacedBy(spacing.x0_5)) {
+        Text(
+            text = t("My habits"),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = colors.textSecondary
+        )
+        GlassCard(contentPadding = PaddingValues(spacing.x1)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .width(actionTileWidth)
+                        .height(tileHeight)
+                        .clip(RoundedCornerShape(radius.md))
+                        .clickable(onClick = onAddHabit),
+                    shape = RoundedCornerShape(radius.md),
+                    color = colors.backgroundSurfaceMuted
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.AddCircle,
+                            contentDescription = t("Create habit"),
+                            tint = colors.primary
+                        )
+                    }
+                }
+            LazyRow(
+                modifier = Modifier.weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(spacing.x1),
+                contentPadding = PaddingValues(end = spacing.x0_5)
+            ) {
+                items(tasks, key = { it.id }) { task ->
+                    val selected = task.id == selectedTaskId
+                    Surface(
+                        modifier = Modifier
+                            .width(tileWidth)
+                            .height(tileHeight)
+                            .clip(RoundedCornerShape(radius.md))
+                            .clickable { onSelect(task.id) },
+                        shape = RoundedCornerShape(radius.md),
+                        color = if (selected) colors.primary.copy(alpha = 0.16f) else colors.backgroundSurfaceMuted,
+                        border = BorderStroke(
+                            width = if (selected) stroke.medium else stroke.thin,
+                            color = if (selected) colors.primary else colors.borderSubtle
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = spacing.x1, vertical = spacing.x0_5),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(spacing.x0_5)
+                        ) {
+                            Text(
+                                text = task.emoji.ifBlank { "✨" },
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Text(
+                                text = task.title,
+                                modifier = Modifier.weight(1f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                                color = colors.textPrimary
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -3863,12 +4132,14 @@ private fun HeroCard(
     done: Boolean,
     partial: Boolean,
     scheduled: Boolean,
+    nextScheduledDate: LocalDate?,
     selectedValue: Int,
     selectedTarget: Int,
     selectedUnit: String,
     selectedCompletionPercent: Int,
     minimumCompletionPercent: Int,
     onDone: () -> Unit,
+    onMarkAnyway: () -> Unit,
     onSetValue: (Int) -> Unit,
     onIncrementValue: (Int) -> Unit,
     highlightMarkButton: Boolean,
@@ -4054,29 +4325,51 @@ private fun HeroCard(
                 color = semantic.textSecondary
             )
             if (!canMarkForSelectedDate) {
-                Box(
+                GlassCard(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 36.dp),
-                    contentAlignment = Alignment.Center
+                        .padding(vertical = spacing.x1),
+                    contentPadding = PaddingValues(spacing.x1_5)
                 ) {
-                    OutlinedButton(
-                        onClick = {},
-                        enabled = false,
-                        modifier = Modifier
-                            .fillMaxWidth(0.94f)
-                            .height(56.dp),
-                        shape = RoundedCornerShape(radius.full),
-                        border = BorderStroke(stroke.thin * 1.5f, semantic.borderSubtle),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = Color.Transparent,
-                            disabledContentColor = semantic.textSecondary
-                        )
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(spacing.x1)
                     ) {
                         Text(
-                            text = t("Not scheduled for this date"),
-                            style = MaterialTheme.typography.labelLarge
+                            text = t("Rest day"),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = semantic.textPrimary
                         )
+                        Text(
+                            text = t("This habit is not scheduled for this date."),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = semantic.textSecondary
+                        )
+                        nextScheduledDate?.let { nextDate ->
+                            val nextDateLabel = nextDate.format(
+                                DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)
+                            )
+                            Text(
+                                text = tf("Next scheduled date: %s", nextDateLabel),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = semantic.textSecondary
+                            )
+                        }
+                        if (selectedValue > 0) {
+                            Text(
+                                text = t("Manual log saved for this date."),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = semantic.success
+                            )
+                        }
+                        Button(
+                            onClick = onMarkAnyway,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(radius.full)
+                        ) {
+                            Text(t("Mark anyway"))
+                        }
                     }
                 }
             } else if (!isValueTracking && done) {
@@ -5476,6 +5769,7 @@ private fun TaskEditorDialog(
     val is24HourView = android.text.format.DateFormat.is24HourFormat(context)
     val selectedColor = parseColorHex(state.editorColorHex)
     val pickerTheme = R.style.ThemeOverlay_MicroHabit_Picker
+    val datePickerTheme = R.style.ThemeOverlay_MicroHabit_DatePicker
     val pickerActionColor = colors.primary.toArgb()
 
     val trackingCards = listOf(
@@ -5737,7 +6031,7 @@ private fun TaskEditorDialog(
                 val onEditStartDate = {
                     showThemedDatePicker(
                         context = context,
-                        themeResId = pickerTheme,
+                        themeResId = datePickerTheme,
                         initialDate = state.editorStartDate,
                         actionColorArgb = pickerActionColor,
                         onDateSet = { year, month, day ->
@@ -5819,7 +6113,7 @@ private fun TaskEditorDialog(
                                 onClick = {
                                     showThemedDatePicker(
                                         context = context,
-                                        themeResId = pickerTheme,
+                                        themeResId = datePickerTheme,
                                         initialDate = state.editorEndDate ?: state.editorStartDate,
                                         actionColorArgb = pickerActionColor,
                                         onDateSet = { year, month, day ->
@@ -5937,6 +6231,13 @@ private fun showThemedDatePicker(
         initialDate.dayOfMonth
     )
     dialog.setOnShowListener {
+        dialog.window?.let { window ->
+            window.setLayout(
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+            window.setGravity(android.view.Gravity.CENTER)
+        }
         dialog.getButton(DatePickerDialog.BUTTON_POSITIVE)?.setTextColor(actionColorArgb)
         dialog.getButton(DatePickerDialog.BUTTON_NEGATIVE)?.setTextColor(actionColorArgb)
     }

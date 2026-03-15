@@ -141,6 +141,7 @@
 - Для `COUNT` и `DURATION` completed-дни в аналитике определяются через `minimumCompletionPercent`.
 - `progressPercentForWidget` возвращает 0 для not scheduled.
 - `totalCompletions` считает до `min(today, endDate)` для конечных привычек.
+- Manual override на not scheduled дате сохраняет day value/mark, но не меняет schedule-статус даты; scheduled-only метрики остаются основанными на `isScheduledOn`.
 
 ## 10. Habit End Date and Completion Flow
 Источники: `HabitRepository`, `MainViewModel`, `MainActivity`.
@@ -210,10 +211,17 @@ Future scope (не часть текущего канонического пов
 - Показывает только `ACTIVE` привычки.
 - Основное действие: completion/value update на выбранную дату.
 - Содержит:
+  - компактный heading над selector-строкой (локализованный, спокойный тон) для явного контекста выбора привычки;
+  - видимый горизонтальный selector активных привычек в виде фиксированных tiles (emoji + title) с явным selected state;
+  - первый фиксированный tile = `+` (Create habit), всегда доступен как отдельный первый элемент selector-строки;
+  - `+` tile является action-only контролом (без текстового label внутри tile) и не визуализируется как selected habit;
   - Hero control (адаптивный по tracking type),
+  - rest-day UX для not scheduled даты (объяснение + optional next scheduled date + explicit `Mark anyway` override action),
   - streak tiles,
   - 7-day chart,
   - calendar.
+- Канонический default для Tracker при normal open/load: selected habit = первый `ACTIVE` habit.
+- Переключение привычек выполняется через tiles selector-строки и обновляет текущий Tracker context.
 - Ссылка `Подробнее →` ведёт в `HabitDetail`.
 
 ### 12.2 Habit Detail (Progress Screen)
@@ -268,6 +276,26 @@ Start date отображается облегчённой строкой в о�
 - `COUNT` в onboarding не показывается.
 - Напоминания в onboarding опциональны; notification permission запрашивается только при создании привычки, если reminder включён.
 
+### 12.6 Calendar (Global Overview Screen)
+- `Calendar` — канонический global overview экран, отдельный от Tracker/Habit Detail.
+- Базовый scope календаря по умолчанию:
+  - включает `ACTIVE` и `COMPLETED` привычки;
+  - исключает `ARCHIVED` привычки.
+- В календаре поддерживаются фильтры:
+  - `All habits` (default);
+  - фильтр на одну конкретную привычку.
+- Heatmap-семантика:
+  - GitHub-style сетка по дням месяца;
+  - интенсивность дня строится по `completed habit count` за дату (а не по completion ratio);
+  - scheduled-контекст вычисляется по `isScheduledOn` и используется для корректной интерпретации дня.
+- Tap по дню открывает breakdown на той же странице:
+  - дата;
+  - summary `completed / scheduled`;
+  - список привычек из текущего filter-scope со статусом за выбранную дату (`completed`, `partial`, `missed`, `not scheduled`, `today pending`/`future`).
+- Calendar не заменяет Tracker:
+  - Tracker остаётся action-screen для одной выбранной `ACTIVE` привычки;
+  - Habit Detail остаётся deep analytics экраном одной привычки.
+
 ## 13. Reminder System
 Источник: `notifications/HabitReminderScheduler.kt`.
 
@@ -308,6 +336,10 @@ Start date отображается облегчённой строкой в о�
 - В календарном UI `FUTURE` имеет визуальный приоритет над `NOT_SCHEDULED` для будущих дат.
 - `MISSED` применяется только к scheduled-датам **до** сегодня, которые не были завершены.
 - Scheduled-дата = сегодня и не завершена отображается как отдельный today-pending UX слой (не как `MISSED`).
+- Manual override на not scheduled дате не переводит дату в scheduled и не меняет семантическое состояние schedule-window.
+- Для global heatmap различаются:
+  - дни без scheduled привычек в текущем filter-scope;
+  - дни со scheduled привычками, но без completed.
 
 ## 15. Data Persistence and Deletion Rules
 ### 15.1 Primary Runtime Storage

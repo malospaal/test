@@ -50,6 +50,22 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     ),
     "Account" to v("Konto", "Compte", "Cuenta", "Account", "Аккаунт"),
     "Settings" to v("Einstellungen", "Parametres", "Ajustes", "Impostazioni", "Настройки"),
+    "Account controls" to v("Kontosteuerung", "Controles du compte", "Controles de la cuenta", "Controlli account", "Управление аккаунтом"),
+    "Premium and app preferences." to v(
+        "Premium und App-Einstellungen.",
+        "Premium et preferences de l'application.",
+        "Premium y preferencias de la aplicacion.",
+        "Premium e preferenze dell'app.",
+        "Премиум и настройки приложения."
+    ),
+    "Open advanced app options" to v(
+        "Erweiterte App-Optionen offnen",
+        "Ouvrir les options avancees de l'application",
+        "Abrir opciones avanzadas de la aplicacion",
+        "Apri opzioni avanzate dell'app",
+        "Открыть расширенные параметры приложения"
+    ),
+    "Reminders enabled" to v("Erinnerungen aktiv", "Rappels actives", "Recordatorios activos", "Promemoria attivi", "Напоминания включены"),
     "Menu" to v("Menu", "Menu", "Menu", "Menu", "Меню"),
     "Add" to v("Hinzufugen", "Ajouter", "Anadir", "Aggiungi", "Добавить"),
     "Upgrade" to v("Upgrade", "Mettre a niveau", "Mejorar", "Aggiorna", "Улучшить"),

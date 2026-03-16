@@ -296,6 +296,28 @@ Start date отображается облегчённой строкой в о�
   - Tracker остаётся action-screen для одной выбранной `ACTIVE` привычки;
   - Habit Detail остаётся deep analytics экраном одной привычки.
 
+### 12.7 Primary Navigation Shell
+- Основная (primary) навигация реализована через нижнюю horizontal bottom bar (icons-only).
+- Bottom bar содержит ровно 5 primary destination:
+  - `Tracker`
+  - `Habits`
+  - `Analytics`
+  - `Calendar`
+  - `Account`
+- Текстовые label в bottom bar не отображаются; выбранная вкладка определяется через визуальное выделение icon + индикатор.
+- Drawer / burger menu не используется как primary navigation паттерн для основных экранов.
+- Top app bar использует контекстные действия экрана (например, `Add` в Habits, `Today` в Calendar), без burger-кнопки primary навигации.
+
+### 12.8 Account Screen
+- `Account` — primary destination для профиля/подписки и входная точка ко вторичным настройкам.
+- `Premium` и `Settings` не являются primary пунктами навигации и открываются из Account-контекста (или из контекстных flow, где это требуется продуктовой логикой).
+- В Account доступны entry points для:
+  - Premium
+  - Settings
+  - Theme
+  - Language
+  - Notifications / reminders
+
 ## 13. Reminder System
 Источник: `notifications/HabitReminderScheduler.kt`.
 

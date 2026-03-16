@@ -48,6 +48,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -83,12 +84,14 @@ import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.AddCircle
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Checklist
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
-import androidx.compose.material.icons.rounded.Menu
+import androidx.compose.material.icons.rounded.BarChart
+import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.WorkspacePremium
 import androidx.compose.material3.AlertDialog
@@ -98,17 +101,12 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.ModalDrawerSheet
-import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.NavigationDrawerItem
-import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -117,7 +115,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -126,7 +123,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -138,6 +134,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -254,6 +251,12 @@ private enum class OnboardingStep {
     READY
 }
 
+private data class PrimaryNavItem(
+    val page: AppPage,
+    val icon: ImageVector,
+    val contentDescription: String
+)
+
 private data class StreakOverlayModel(
     val streak: Int,
     val milestone: Boolean
@@ -313,10 +316,10 @@ private fun pageTitle(page: AppPage): String {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
-    val drawerState = rememberDrawerState(DrawerValue.Closed)
-    val scope = rememberCoroutineScope()
     var page by rememberSaveable { mutableStateOf(AppPage.TRACKER) }
     var previousPage by rememberSaveable { mutableStateOf(AppPage.TRACKER) }
+    var trackerScrollToTopSignal by rememberSaveable { mutableStateOf(0) }
+    var habitsScrollToTopSignal by rememberSaveable { mutableStateOf(0) }
     var selectedBilling by rememberSaveable { mutableStateOf(BillingCycle.YEARLY) }
     var showNotificationsBlockedDialog by rememberSaveable { mutableStateOf(false) }
     var pendingPermissionAction by remember { mutableStateOf<NotificationPermissionAction?>(null) }
@@ -457,162 +460,209 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                 }
             )
         } else {
-            ModalNavigationDrawer(
-                drawerState = drawerState,
-                drawerContent = {
-                    DrawerContent(
-                        current = page,
-                        plan = state.plan,
-                        onNavigate = {
-                            if (it != AppPage.PAYWALL) previousPage = it
-                            page = it
-                            scope.launch { drawerState.close() }
-                        }
-                    )
-                }
-            ) {
-                Scaffold(
-                    topBar = {
-                        val selectedTaskTitle = state.tasks
-                            .firstOrNull { it.id == state.selectedTaskId }
-                            ?.let { "${it.emoji.ifBlank { "✨" }} ${it.title}" }
-                            ?: t("Habits")
-                        CenterAlignedTopAppBar(
-                            title = {
-                                Text(
-                                    if (page == AppPage.HABIT_DETAIL) selectedTaskTitle else pageTitle(page),
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            },
-                            navigationIcon = {
-                                if (page == AppPage.HABIT_DETAIL) {
+            val selectedTaskTitle = state.tasks
+                .firstOrNull { it.id == state.selectedTaskId }
+                ?.let { "${it.emoji.ifBlank { "✨" }} ${it.title}" }
+                ?: t("Habits")
+            val primaryPages = remember {
+                listOf(AppPage.TRACKER, AppPage.HABITS, AppPage.ANALYTICS, AppPage.CALENDAR, AppPage.ACCOUNT)
+            }
+            val isPrimaryPage = page in primaryPages
+
+            Scaffold(
+                topBar = {
+                    CenterAlignedTopAppBar(
+                        title = {
+                            Text(
+                                text = if (page == AppPage.HABIT_DETAIL) selectedTaskTitle else pageTitle(page),
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                        },
+                        navigationIcon = {
+                            when (page) {
+                                AppPage.HABIT_DETAIL -> {
                                     IconButton(onClick = { page = AppPage.TRACKER }) {
                                         Icon(
                                             imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
                                             contentDescription = t("Back")
                                         )
                                     }
-                                } else {
-                                    IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                                        Icon(Icons.Rounded.Menu, contentDescription = t("Menu"))
+                                }
+                                AppPage.PAYWALL, AppPage.SETTINGS -> {
+                                    IconButton(onClick = { page = previousPage }) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                                            contentDescription = t("Back")
+                                        )
                                     }
                                 }
-                            },
-                            actions = {
-                                when (page) {
-                                    AppPage.HABITS -> {
-                                        val canAdd = state.plan == SubscriptionPlan.PRO || state.tasks.size < 1
-                                        TextButton(onClick = {
-                                            if (canAdd) {
-                                                vm.openCreateTask()
-                                            } else {
-                                                previousPage = page
-                                                page = AppPage.PAYWALL
-                                            }
-                                        }) {
-                                            Text(if (canAdd) t("Add") else t("Upgrade"))
+                                else -> Unit
+                            }
+                        },
+                        actions = {
+                            when (page) {
+                                AppPage.HABITS -> {
+                                    val canAdd = state.plan == SubscriptionPlan.PRO || state.tasks.size < 1
+                                    TextButton(onClick = {
+                                        if (canAdd) {
+                                            vm.openCreateTask()
+                                        } else {
+                                            previousPage = page
+                                            page = AppPage.PAYWALL
                                         }
+                                    }) {
+                                        Text(if (canAdd) t("Add") else t("Upgrade"))
                                     }
-                                    else -> Unit
                                 }
-                            },
-                            colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                                containerColor = semantic.backgroundSurface
-                            )
+                                AppPage.CALENDAR -> {
+                                    TextButton(onClick = vm::jumpToToday) {
+                                        Text(t("Today"))
+                                    }
+                                }
+                                AppPage.ACCOUNT -> {
+                                    IconButton(
+                                        onClick = {
+                                            previousPage = AppPage.ACCOUNT
+                                            page = AppPage.SETTINGS
+                                        }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Settings,
+                                            contentDescription = t("Settings")
+                                        )
+                                    }
+                                }
+                                else -> Unit
+                            }
+                        },
+                        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                            containerColor = semantic.backgroundSurface
+                        )
+                    )
+                },
+                bottomBar = {
+                    if (isPrimaryPage) {
+                        PrimaryBottomNavigationBar(
+                            currentPage = page,
+                            onSelect = { destination, reselected ->
+                                if (reselected) {
+                                    when (destination) {
+                                        AppPage.TRACKER -> {
+                                            trackerScrollToTopSignal += 1
+                                            vm.jumpToToday()
+                                        }
+                                        AppPage.HABITS -> {
+                                            habitsScrollToTopSignal += 1
+                                        }
+                                        AppPage.CALENDAR -> {
+                                            vm.jumpToToday()
+                                        }
+                                        else -> Unit
+                                    }
+                                } else {
+                                    page = destination
+                                }
+                            }
                         )
                     }
-                ) { padding ->
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(semantic.backgroundCanvas)
-                            .padding(padding)
-                    ) {
-                        when (page) {
-                            AppPage.TRACKER -> TrackerPage(
-                                state = state,
-                                vm = vm,
-                                onOpenDetails = { page = AppPage.HABIT_DETAIL },
-                                highlightCompletionButton = highlightCompletionButton,
-                                onHighlightConsumed = { highlightCompletionButton = false }
-                            )
-                            AppPage.HABIT_DETAIL -> HabitDetailPage(
-                                state = state,
-                                vm = vm
-                            )
-                            AppPage.HABITS -> HabitsPage(
-                                state = state,
-                                vm = vm,
-                                onOpenHabit = {
-                                    page = AppPage.HABIT_DETAIL
-                                },
-                                onUpgrade = {
-                                    previousPage = AppPage.HABITS
-                                    page = AppPage.PAYWALL
-                                }
-                            )
-                            AppPage.ANALYTICS -> AnalyticsPage(
-                                state = state,
-                                onSelectTask = vm::selectTask
-                            )
-                            AppPage.CALENDAR -> CalendarScreen(state = state, vm = vm)
-                            AppPage.PAYWALL -> PaywallPage(
-                                currentPlan = state.plan,
-                                selectedBilling = selectedBilling,
-                                onSelectBilling = { selectedBilling = it },
-                                onSubscribe = {
-                                    vm.setPlan(SubscriptionPlan.PRO)
-                                    Toast.makeText(
-                                        context,
-                                        if (selectedBilling == BillingCycle.YEARLY) {
-                                            translate(language, "PRO yearly activated (debug)")
-                                        } else {
-                                            translate(language, "PRO monthly activated (debug)")
-                                        },
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                },
-                                onRestorePurchase = {
-                                    vm.setPlan(SubscriptionPlan.PRO)
-                                    Toast.makeText(
-                                        context,
-                                        translate(language, "Purchases restored (debug)"),
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                },
-                                onClose = { page = previousPage }
-                            )
-                            AppPage.ACCOUNT -> AccountPage(
-                                state = state,
-                                onSetPlan = vm::setPlan,
-                                onOpenPaywall = {
-                                    previousPage = AppPage.ACCOUNT
-                                    page = AppPage.PAYWALL
-                                }
-                            )
-                            AppPage.SETTINGS -> SettingsPage(
-                                state = state,
-                                onSetTheme = vm::setThemeMode,
-                                onSetLanguage = vm::setLanguage,
-                                onSetNotificationsEnabled = { enabled ->
-                                    if (!enabled) {
-                                        vm.setNotificationsEnabled(false)
+                }
+            ) { padding ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(semantic.backgroundCanvas)
+                        .padding(padding)
+                ) {
+                    when (page) {
+                        AppPage.TRACKER -> TrackerPage(
+                            state = state,
+                            vm = vm,
+                            onOpenDetails = { page = AppPage.HABIT_DETAIL },
+                            highlightCompletionButton = highlightCompletionButton,
+                            onHighlightConsumed = { highlightCompletionButton = false },
+                            scrollToTopSignal = trackerScrollToTopSignal
+                        )
+                        AppPage.HABIT_DETAIL -> HabitDetailPage(
+                            state = state,
+                            vm = vm
+                        )
+                        AppPage.HABITS -> HabitsPage(
+                            state = state,
+                            vm = vm,
+                            onOpenHabit = {
+                                page = AppPage.HABIT_DETAIL
+                            },
+                            onUpgrade = {
+                                previousPage = AppPage.HABITS
+                                page = AppPage.PAYWALL
+                            },
+                            scrollToTopSignal = habitsScrollToTopSignal
+                        )
+                        AppPage.ANALYTICS -> AnalyticsPage(
+                            state = state,
+                            onSelectTask = vm::selectTask
+                        )
+                        AppPage.CALENDAR -> CalendarScreen(state = state, vm = vm)
+                        AppPage.PAYWALL -> PaywallPage(
+                            currentPlan = state.plan,
+                            selectedBilling = selectedBilling,
+                            onSelectBilling = { selectedBilling = it },
+                            onSubscribe = {
+                                vm.setPlan(SubscriptionPlan.PRO)
+                                Toast.makeText(
+                                    context,
+                                    if (selectedBilling == BillingCycle.YEARLY) {
+                                        translate(language, "PRO yearly activated (debug)")
                                     } else {
-                                        ensureNotificationPermissionAndRun(NotificationPermissionAction.ENABLE_REMINDERS)
-                                    }
-                                },
-                                onSetDefaultReminder = vm::setDefaultReminder,
-                                onSetMinimumCompletionPercent = vm::setMinimumCompletionPercent,
-                                onOpenPaywall = {
-                                    previousPage = AppPage.SETTINGS
-                                    page = AppPage.PAYWALL
-                                },
-                                onExportData = vm::exportData,
-                                onResetProgress = vm::resetProgress,
-                                onDeleteAccount = vm::deleteAccount
-                            )
-                        }
+                                        translate(language, "PRO monthly activated (debug)")
+                                    },
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            },
+                            onRestorePurchase = {
+                                vm.setPlan(SubscriptionPlan.PRO)
+                                Toast.makeText(
+                                    context,
+                                    translate(language, "Purchases restored (debug)"),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            },
+                            onClose = { page = previousPage }
+                        )
+                        AppPage.ACCOUNT -> AccountPage(
+                            state = state,
+                            onSetPlan = vm::setPlan,
+                            onOpenPaywall = {
+                                previousPage = AppPage.ACCOUNT
+                                page = AppPage.PAYWALL
+                            },
+                            onOpenSettings = {
+                                previousPage = AppPage.ACCOUNT
+                                page = AppPage.SETTINGS
+                            }
+                        )
+                        AppPage.SETTINGS -> SettingsPage(
+                            state = state,
+                            onSetTheme = vm::setThemeMode,
+                            onSetLanguage = vm::setLanguage,
+                            onSetNotificationsEnabled = { enabled ->
+                                if (!enabled) {
+                                    vm.setNotificationsEnabled(false)
+                                } else {
+                                    ensureNotificationPermissionAndRun(NotificationPermissionAction.ENABLE_REMINDERS)
+                                }
+                            },
+                            onSetDefaultReminder = vm::setDefaultReminder,
+                            onSetMinimumCompletionPercent = vm::setMinimumCompletionPercent,
+                            onOpenPaywall = {
+                                previousPage = AppPage.SETTINGS
+                                page = AppPage.PAYWALL
+                            },
+                            onExportData = vm::exportData,
+                            onResetProgress = vm::resetProgress,
+                            onDeleteAccount = vm::deleteAccount
+                        )
                     }
                 }
             }
@@ -792,72 +842,106 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
 }
 
 @Composable
-private fun DrawerContent(current: AppPage, plan: SubscriptionPlan, onNavigate: (AppPage) -> Unit) {
-    val colors = MaterialTheme.colorScheme
-    val semantic = AppTheme.colors
+private fun PrimaryBottomNavigationBar(
+    currentPage: AppPage,
+    onSelect: (destination: AppPage, reselected: Boolean) -> Unit
+) {
     val spacing = AppTheme.spacing
-    ModalDrawerSheet {
-        Column(
-            modifier = Modifier.padding(spacing.x2),
-            verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
-        ) {
-            Text(t("Micro-habit"), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
-            Text(
-                if (plan == SubscriptionPlan.PRO) t("Plan: PRO") else t("Plan: Free"),
-                color = semantic.textSecondary,
-                style = MaterialTheme.typography.bodyMedium
-            )
+    val radius = AppTheme.radius
+    val stroke = AppTheme.stroke
+    val colors = AppTheme.colors
+    val items = remember {
+        listOf(
+            PrimaryNavItem(AppPage.TRACKER, Icons.Rounded.Home, "Tracker"),
+            PrimaryNavItem(AppPage.HABITS, Icons.Rounded.Checklist, "Habits"),
+            PrimaryNavItem(AppPage.ANALYTICS, Icons.Rounded.BarChart, "Analytics"),
+            PrimaryNavItem(AppPage.CALENDAR, Icons.Rounded.CalendarMonth, "Calendar"),
+            PrimaryNavItem(AppPage.ACCOUNT, Icons.Rounded.AccountCircle, "Account")
+        )
+    }
 
-            NavigationDrawerItem(
-                label = { Text(t("Tracker")) },
-                selected = current == AppPage.TRACKER,
-                onClick = { onNavigate(AppPage.TRACKER) },
-                icon = { Icon(Icons.Rounded.Home, contentDescription = null) },
-                colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = colors.primary.copy(alpha = 0.15f))
-            )
-            NavigationDrawerItem(
-                label = { Text(t("Habits")) },
-                selected = current == AppPage.HABITS,
-                onClick = { onNavigate(AppPage.HABITS) },
-                icon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
-                colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = colors.primary.copy(alpha = 0.15f))
-            )
-            NavigationDrawerItem(
-                label = { Text(t("Analytics")) },
-                selected = current == AppPage.ANALYTICS,
-                onClick = { onNavigate(AppPage.ANALYTICS) },
-                icon = { Icon(Icons.Rounded.CheckCircle, contentDescription = null) },
-                colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = colors.primary.copy(alpha = 0.15f))
-            )
-            NavigationDrawerItem(
-                label = { Text(t("Calendar")) },
-                selected = current == AppPage.CALENDAR,
-                onClick = { onNavigate(AppPage.CALENDAR) },
-                icon = { Icon(Icons.Rounded.Home, contentDescription = null) },
-                colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = colors.primary.copy(alpha = 0.15f))
-            )
-            NavigationDrawerItem(
-                label = { Text(t("Premium")) },
-                selected = current == AppPage.PAYWALL,
-                onClick = { onNavigate(AppPage.PAYWALL) },
-                icon = { Icon(Icons.Rounded.WorkspacePremium, contentDescription = null) },
-                colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = colors.primary.copy(alpha = 0.15f))
-            )
-            NavigationDrawerItem(
-                label = { Text(t("Account")) },
-                selected = current == AppPage.ACCOUNT,
-                onClick = { onNavigate(AppPage.ACCOUNT) },
-                icon = { Icon(Icons.Rounded.AccountCircle, contentDescription = null) },
-                colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = colors.primary.copy(alpha = 0.15f))
-            )
-            NavigationDrawerItem(
-                label = { Text(t("Settings")) },
-                selected = current == AppPage.SETTINGS,
-                onClick = { onNavigate(AppPage.SETTINGS) },
-                icon = { Icon(Icons.Rounded.Settings, contentDescription = null) },
-                colors = NavigationDrawerItemDefaults.colors(selectedContainerColor = colors.primary.copy(alpha = 0.15f))
-            )
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(horizontal = spacing.x2, vertical = spacing.x1)
+    ) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(radius.xl),
+            color = colors.backgroundSurface.copy(alpha = 0.94f),
+            border = BorderStroke(stroke.thin, colors.borderSubtle.copy(alpha = 0.8f)),
+            tonalElevation = AppTheme.elevation.sm,
+            shadowElevation = AppTheme.elevation.md
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = spacing.x1_5, vertical = spacing.x0_5),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                items.forEach { item ->
+                    val selected = currentPage == item.page
+                    BottomNavigationIconItem(
+                        icon = item.icon,
+                        description = t(item.contentDescription),
+                        selected = selected,
+                        onClick = { onSelect(item.page, selected) }
+                    )
+                }
+            }
         }
+    }
+}
+
+@Composable
+private fun BottomNavigationIconItem(
+    icon: ImageVector,
+    description: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val spacing = AppTheme.spacing
+    val colors = AppTheme.colors
+    val activeColor by animateColorAsState(
+        targetValue = if (selected) colors.primary else colors.textTertiary,
+        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+        label = "bottomNavIconColor"
+    )
+    val scale by animateFloatAsState(
+        targetValue = if (selected) 1.1f else 1f,
+        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+        label = "bottomNavIconScale"
+    )
+    val indicatorAlpha by animateFloatAsState(
+        targetValue = if (selected) 1f else 0f,
+        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+        label = "bottomNavIndicatorAlpha"
+    )
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(AppTheme.radius.full))
+            .clickable(onClick = onClick)
+            .padding(horizontal = spacing.x1, vertical = spacing.x0_5),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = description,
+            tint = activeColor,
+            modifier = Modifier.graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+        )
+        Box(
+            modifier = Modifier
+                .size(width = 6.dp, height = 6.dp)
+                .clip(RoundedCornerShape(AppTheme.radius.full))
+                .background(colors.primary.copy(alpha = 0.85f * indicatorAlpha))
+        )
     }
 }
 
@@ -867,9 +951,11 @@ private fun TrackerPage(
     vm: MainViewModel,
     onOpenDetails: () -> Unit,
     highlightCompletionButton: Boolean,
-    onHighlightConsumed: () -> Unit
+    onHighlightConsumed: () -> Unit,
+    scrollToTopSignal: Int
 ) {
     val spacing = AppTheme.spacing
+    val listState = rememberLazyListState()
     var previousTotalCompletions by remember(state.selectedTaskId) { mutableStateOf(state.totalCompletions) }
     var streakOverlay by remember { mutableStateOf<StreakOverlayModel?>(null) }
     var overlayVisible by remember { mutableStateOf(false) }
@@ -916,6 +1002,11 @@ private fun TrackerPage(
             onHighlightConsumed()
         }
     }
+    LaunchedEffect(scrollToTopSignal) {
+        if (scrollToTopSignal > 0) {
+            listState.animateScrollToItem(0)
+        }
+    }
 
     fun switchToTask(taskId: String, direction: Int = 0) {
         if (taskId == state.selectedTaskId) return
@@ -926,6 +1017,7 @@ private fun TrackerPage(
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
+            state = listState,
             contentPadding = PaddingValues(start = spacing.x2, top = spacing.x1, end = spacing.x2, bottom = spacing.x2),
             verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
         ) {
@@ -1091,15 +1183,23 @@ private fun HabitsPage(
     state: HabitUiState,
     vm: MainViewModel,
     onOpenHabit: () -> Unit,
-    onUpgrade: () -> Unit
+    onUpgrade: () -> Unit,
+    scrollToTopSignal: Int
 ) {
     val context = LocalContext.current
     val spacing = AppTheme.spacing
     val colors = AppTheme.colors
+    val listState = rememberLazyListState()
     val canAdd = state.plan == SubscriptionPlan.PRO || state.tasks.size < 1
     var pendingDeleteTaskId by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(scrollToTopSignal) {
+        if (scrollToTopSignal > 0) {
+            listState.animateScrollToItem(0)
+        }
+    }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
+        state = listState,
         contentPadding = PaddingValues(spacing.x2),
         verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
     ) {
@@ -2342,7 +2442,8 @@ private fun statusLabel(state: CalendarDayState, language: AppLanguage): String 
 private fun AccountPage(
     state: HabitUiState,
     onSetPlan: (SubscriptionPlan) -> Unit,
-    onOpenPaywall: () -> Unit
+    onOpenPaywall: () -> Unit,
+    onOpenSettings: () -> Unit
 ) {
     val spacing = AppTheme.spacing
     val semantic = AppTheme.colors
@@ -2367,6 +2468,51 @@ private fun AccountPage(
                 Button(onClick = onOpenPaywall, modifier = Modifier.fillMaxWidth()) {
                     Text(if (state.plan == SubscriptionPlan.PRO) t("Open Premium") else t("Upgrade to Premium"))
                 }
+            }
+        }
+        item {
+            SettingsGroup(
+                title = t("Account controls"),
+                subtitle = t("Premium and app preferences.")
+            ) {
+                SettingsRow(
+                    title = t("Premium"),
+                    subtitle = if (state.plan == SubscriptionPlan.PRO) {
+                        t("PRO active")
+                    } else {
+                        t("Free plan: one active habit")
+                    },
+                    value = if (state.plan == SubscriptionPlan.PRO) "PRO" else t("FREE"),
+                    onClick = onOpenPaywall
+                )
+                SettingsDivider()
+                SettingsRow(
+                    title = t("Settings"),
+                    subtitle = t("Open advanced app options"),
+                    onClick = onOpenSettings
+                )
+                SettingsDivider()
+                SettingsRow(
+                    title = t("Theme"),
+                    subtitle = themeLabel(state.themeMode, state.language),
+                    onClick = onOpenSettings
+                )
+                SettingsDivider()
+                SettingsRow(
+                    title = t("Language"),
+                    subtitle = languageNativeLabel(state.language),
+                    onClick = onOpenSettings
+                )
+                SettingsDivider()
+                SettingsRow(
+                    title = t("Notifications"),
+                    subtitle = if (state.notificationsEnabled) {
+                        t("Reminders enabled")
+                    } else {
+                        t("Reminder off")
+                    },
+                    onClick = onOpenSettings
+                )
             }
         }
         item {

@@ -10,7 +10,10 @@ local.properties
 
 # Local helper dirs
 .android-local/
+.android-user-home/
 .gradle-local/
+.gradle-user-home/
+.gradle-user-home-check/
 
 # Expo / Node
 expo/node_modules/

@@ -212,7 +212,7 @@ Future scope (не часть текущего канонического пов
 - Показывает только `ACTIVE` привычки.
 - Основное действие: completion/value update на выбранную дату.
 - Содержит:
-  - компактный heading над selector-строкой с динамическим количеством активных привычек (`N active habits` / локализованный plural, для `0` — отдельный zero-state label);
+  - компактный heading над selector-строкой с динамическим количеством привычек (`N habits` / локализованный plural, для `0` — отдельный zero-state label);
   - видимый горизонтальный selector активных привычек в виде pill-таблеток (emoji + title) с явным selected state;
   - первый элемент selector-строки = компактный `+` action-tile (Create habit), всегда доступен как отдельный первый элемент;
   - `+` action-tile открывает template-based create flow (`HabitTemplateScreen`), а не пустой editor по умолчанию;
@@ -235,11 +235,14 @@ Future scope (не часть текущего канонического пов
     - для `DURATION` действие `Enter manually` использует тот же встроенный numpad-редактор (консистентно с inline `edit`);
     - completion-threshold (`minimumCompletionPercent`) продолжает влиять на completion-state через Repository и не меняет schedule/business семантику;
   - внутри `HeroCard` сохраняется rest-day UX для not scheduled даты (объяснение + optional next scheduled date + explicit `Mark anyway` override action);
+  - для not scheduled даты manual override (`day value > 0`) в `HeroCard` отображается как completed-state кнопки (`Completed ✓`) с возможностью undo тем же toggle-действием;
+  - для not scheduled даты без manual override в `HeroCard` отображается action `Mark anyway` (без отдельной строки-подтверждения `Manual log saved...`);
   - между `HeroCard` и calendar показывается `page dots` индикатор текущей привычки:
     - скрыт при `<=1` активной привычке;
     - для `2..5` отображает все точки;
     - для `6+` использует окно из 5 точек с уменьшенными edge-fade точками;
   - отдельные standalone блоки streak tiles и 7-day chart на Tracker-экране не отображаются (их контекст перенесён в `HeroCard`);
+  - mini 7-day track в `HeroCard` визуально различает manual override на not scheduled дате (muted completed fill), при этом schedule-семантика даты не меняется;
   - calendar.
 - Канонический default для Tracker при normal open/load: selected habit = первый `ACTIVE` habit.
 - Переключение привычек выполняется через tiles selector-строки и обновляет текущий Tracker context.
@@ -404,6 +407,9 @@ Unit label UX для `COUNT`:
 - `MISSED` применяется только к scheduled-датам **до** сегодня, которые не были завершены.
 - Scheduled-дата = сегодня и не завершена отображается как отдельный today-pending UX слой (не как `MISSED`).
 - Manual override на not scheduled дате не переводит дату в scheduled и не меняет семантическое состояние schedule-window.
+- Визуально manual override на not scheduled дате выделяется отдельным muted состоянием:
+  - в mini 7-day track (`HeroCard`);
+  - в global calendar heatmap (отлично от `completed` scheduled и `missed`).
 - Для global heatmap различаются:
   - дни без scheduled привычек в текущем filter-scope;
   - дни со scheduled привычками, но без completed.

@@ -132,6 +132,7 @@ data class HabitUiState(
     val progressPercent: Int = 0,
     val last7Days: List<Int> = List(7) { 0 },
     val last7DaysScheduled: List<Boolean> = List(7) { false },
+    val last7DaysManualOverride: List<Boolean> = List(7) { false },
     val monthlyProgress: List<Int> = emptyList(),
     val weekdayConsistency: List<Int> = List(7) { 0 },
     val doneDatesInCurrentMonth: Set<LocalDate> = emptySet(),
@@ -141,6 +142,7 @@ data class HabitUiState(
     val calendarFilterOptions: List<CalendarFilterOption> = emptyList(),
     val calendarCompletedCountByDate: Map<LocalDate, Int> = emptyMap(),
     val calendarScheduledCountByDate: Map<LocalDate, Int> = emptyMap(),
+    val calendarManualOverrideCountByDate: Map<LocalDate, Int> = emptyMap(),
     val calendarBreakdownCompletedCount: Int = 0,
     val calendarBreakdownScheduledCount: Int = 0,
     val calendarBreakdownItems: List<CalendarBreakdownItem> = emptyList(),
@@ -355,25 +357,35 @@ class MainViewModel(
     }
 
     fun toggleSelectedDateDone() {
+        toggleSelectedDateDoneInternal(allowNotScheduledOverride = false)
+    }
+
+    private fun toggleSelectedDateDoneInternal(allowNotScheduledOverride: Boolean) {
         val current = _state.value
         val task = current.tasks.firstOrNull { it.id == current.selectedTaskId } ?: return
         val selectedDate = current.selectedDate
         val shouldShiftStartDate =
             selectedDate.isBefore(task.startDate) && repository.isScheduledByFrequency(task, selectedDate)
-        if (!repository.isScheduledOn(task, selectedDate) && !shouldShiftStartDate) return
+        val isScheduled = repository.isScheduledOn(task, selectedDate)
+        val hasManualOverride = !isScheduled && repository.getDayValue(task, selectedDate) > 0
+        if (!isScheduled && !shouldShiftStartDate && !allowNotScheduledOverride && !hasManualOverride) return
 
         viewModelScope.launch {
             val previousStreak = repository.calculateStreak(task)
             if (shouldShiftStartDate) {
                 repository.updateTaskStartDate(task.id, selectedDate)
             }
-            val alreadyDone = repository.isCompletedOn(task, selectedDate)
+            val alreadyDone = if (!isScheduled && !shouldShiftStartDate) {
+                repository.getDayValue(task, selectedDate) > 0
+            } else {
+                repository.isCompletedOn(task, selectedDate)
+            }
             if (alreadyDone) {
                 repository.setDayValue(task, selectedDate, 0)
             } else {
                 repository.setDayValue(task, selectedDate, 1)
             }
-            if (!alreadyDone && selectedDate == LocalDate.now()) {
+            if (!alreadyDone && selectedDate == LocalDate.now() && (isScheduled || shouldShiftStartDate)) {
                 maybeAwardStreakSaver(task.id, previousStreak)
             }
             repository.refreshWidget()
@@ -643,14 +655,7 @@ class MainViewModel(
     }
 
     fun markSelectedDateAnyway() {
-        val current = _state.value
-        val task = current.tasks.firstOrNull { it.id == current.selectedTaskId } ?: return
-        val selectedDate = current.selectedDate
-        viewModelScope.launch {
-            repository.setDone(task.id, selectedDate, true)
-            repository.refreshWidget()
-            refresh()
-        }
+        toggleSelectedDateDoneInternal(allowNotScheduledOverride = true)
     }
 
     fun startDurationTimer(): Boolean {
@@ -966,6 +971,8 @@ class MainViewModel(
             } ?: calendarScopeTasks
             val (calendarCompletedCountByDate, calendarScheduledCountByDate) =
                 buildCalendarMonthCounts(filteredCalendarTasks, currentMonth)
+            val calendarManualOverrideCountByDate =
+                buildCalendarMonthManualOverrideCounts(filteredCalendarTasks, currentMonth)
             val (
                 calendarBreakdownCompletedCount,
                 calendarBreakdownScheduledCount,
@@ -975,8 +982,20 @@ class MainViewModel(
             val selectedDateTarget = selectedTask?.let { repository.dailyTarget(it) } ?: 1
             val selectedDateUnit = selectedTask?.let { repository.unitLabel(it) }.orEmpty()
             val selectedDateCompletionPercent = selectedTask?.let { repository.completionPercent(it, date) } ?: 0
-            val selectedDateDone = selectedTask?.let { repository.isCompletedOn(it, date) } ?: false
-            val selectedDatePartial = selectedTask?.let { repository.isPartialOn(it, date) } ?: false
+            val selectedDateScheduled = selectedTask?.let { task ->
+                repository.isScheduledOn(task, date) ||
+                    (date.isBefore(task.startDate) && repository.isScheduledByFrequency(task, date))
+            } ?: false
+            val selectedDateDone = selectedTask?.let { task ->
+                if (selectedDateScheduled) {
+                    repository.isCompletedOn(task, date)
+                } else {
+                    repository.getDayValue(task, date) > 0
+                }
+            } ?: false
+            val selectedDatePartial = selectedTask?.let { task ->
+                if (selectedDateScheduled) repository.isPartialOn(task, date) else false
+            } ?: false
             val selectedDateNextScheduled = selectedTask?.let { task ->
                 if (repository.isScheduledOn(task, date)) null else repository.nextScheduledDate(task, date)
             }
@@ -1052,10 +1071,7 @@ class MainViewModel(
                     streakSaverCount = streakSaverCount,
                     showStreakSaverDialog = showStreakSaverDialog,
                     streakSaverMissedDate = streakSaverMissedDate,
-                    selectedDateScheduled = selectedTask?.let { task ->
-                        repository.isScheduledOn(task, date) ||
-                            (date.isBefore(task.startDate) && repository.isScheduledByFrequency(task, date))
-                    } ?: false,
+                    selectedDateScheduled = selectedDateScheduled,
                     selectedDateNextScheduled = selectedDateNextScheduled,
                     selectedDateDone = selectedDateDone,
                     selectedDatePartial = selectedDatePartial,
@@ -1084,6 +1100,12 @@ class MainViewModel(
                             repository.isScheduledOn(task, day)
                         }
                     } ?: List(7) { false },
+                    last7DaysManualOverride = selectedTask?.let { task ->
+                        (6L downTo 0L).map { offset ->
+                            val day = metricsAnchorDate.minusDays(offset)
+                            !repository.isScheduledOn(task, day) && repository.getDayValue(task, day) > 0
+                        }
+                    } ?: List(7) { false },
                     monthlyProgress = selectedTask?.let { repository.monthlyWeeklyProgress(it, state.currentMonth) } ?: emptyList(),
                     weekdayConsistency = weekdayConsistency,
                     doneDatesInCurrentMonth = selectedTask?.let { task ->
@@ -1099,6 +1121,7 @@ class MainViewModel(
                     calendarFilterOptions = calendarFilterOptions,
                     calendarCompletedCountByDate = calendarCompletedCountByDate,
                     calendarScheduledCountByDate = calendarScheduledCountByDate,
+                    calendarManualOverrideCountByDate = calendarManualOverrideCountByDate,
                     calendarBreakdownCompletedCount = calendarBreakdownCompletedCount,
                     calendarBreakdownScheduledCount = calendarBreakdownScheduledCount,
                     calendarBreakdownItems = calendarBreakdownItems,
@@ -1146,6 +1169,8 @@ class MainViewModel(
         } ?: calendarScopeTasks
         val (calendarCompletedCountByDate, calendarScheduledCountByDate) =
             buildCalendarMonthCounts(filteredCalendarTasks, month)
+        val calendarManualOverrideCountByDate =
+            buildCalendarMonthManualOverrideCounts(filteredCalendarTasks, month)
         val (
             calendarBreakdownCompletedCount,
             calendarBreakdownScheduledCount,
@@ -1155,8 +1180,20 @@ class MainViewModel(
         val selectedDateTarget = selectedTask?.let { repository.dailyTarget(it) } ?: 1
         val selectedDateUnit = selectedTask?.let { repository.unitLabel(it) }.orEmpty()
         val selectedDateCompletionPercent = selectedTask?.let { repository.completionPercent(it, date) } ?: 0
-        val selectedDateDone = selectedTask?.let { repository.isCompletedOn(it, date) } ?: false
-        val selectedDatePartial = selectedTask?.let { repository.isPartialOn(it, date) } ?: false
+        val selectedDateScheduled = selectedTask?.let { task ->
+            repository.isScheduledOn(task, date) ||
+                (date.isBefore(task.startDate) && repository.isScheduledByFrequency(task, date))
+        } ?: false
+        val selectedDateDone = selectedTask?.let { task ->
+            if (selectedDateScheduled) {
+                repository.isCompletedOn(task, date)
+            } else {
+                repository.getDayValue(task, date) > 0
+            }
+        } ?: false
+        val selectedDatePartial = selectedTask?.let { task ->
+            if (selectedDateScheduled) repository.isPartialOn(task, date) else false
+        } ?: false
         val selectedDateNextScheduled = selectedTask?.let { task ->
             if (repository.isScheduledOn(task, date)) null else repository.nextScheduledDate(task, date)
         }
@@ -1208,10 +1245,7 @@ class MainViewModel(
                 streakSaverCount = streakSaverCount,
                 showStreakSaverDialog = showStreakSaverDialog,
                 streakSaverMissedDate = streakSaverMissedDate,
-                selectedDateScheduled = selectedTask?.let { task ->
-                    repository.isScheduledOn(task, date) ||
-                        (date.isBefore(task.startDate) && repository.isScheduledByFrequency(task, date))
-                } ?: false,
+                selectedDateScheduled = selectedDateScheduled,
                 selectedDateNextScheduled = selectedDateNextScheduled,
                 selectedDateDone = selectedDateDone,
                 selectedDatePartial = selectedDatePartial,
@@ -1239,6 +1273,12 @@ class MainViewModel(
                         repository.isScheduledOn(task, day)
                     }
                 } ?: List(7) { false },
+                last7DaysManualOverride = selectedTask?.let { task ->
+                    (6L downTo 0L).map { offset ->
+                        val day = metricsAnchorDate.minusDays(offset)
+                        !repository.isScheduledOn(task, day) && repository.getDayValue(task, day) > 0
+                    }
+                } ?: List(7) { false },
                 monthlyProgress = selectedTask?.let { repository.monthlyWeeklyProgress(it, month) } ?: emptyList(),
                 weekdayConsistency = weekdayConsistency,
                 doneDatesInCurrentMonth = selectedTask?.let { task ->
@@ -1254,6 +1294,7 @@ class MainViewModel(
                 calendarFilterOptions = calendarFilterOptions,
                 calendarCompletedCountByDate = calendarCompletedCountByDate,
                 calendarScheduledCountByDate = calendarScheduledCountByDate,
+                calendarManualOverrideCountByDate = calendarManualOverrideCountByDate,
                 calendarBreakdownCompletedCount = calendarBreakdownCompletedCount,
                 calendarBreakdownScheduledCount = calendarBreakdownScheduledCount,
                 calendarBreakdownItems = calendarBreakdownItems,
@@ -1312,6 +1353,25 @@ class MainViewModel(
             scheduledByDate[date] = scheduled
         }
         return completedByDate to scheduledByDate
+    }
+
+    private fun buildCalendarMonthManualOverrideCounts(
+        tasks: List<HabitTask>,
+        month: YearMonth
+    ): Map<LocalDate, Int> {
+        if (tasks.isEmpty()) return emptyMap()
+        val manualByDate = mutableMapOf<LocalDate, Int>()
+        for (day in 1..month.lengthOfMonth()) {
+            val date = month.atDay(day)
+            var manual = 0
+            tasks.forEach { task ->
+                if (!repository.isScheduledOn(task, date) && repository.getDayValue(task, date) > 0) {
+                    manual += 1
+                }
+            }
+            manualByDate[date] = manual
+        }
+        return manualByDate
     }
 
     private fun buildCalendarBreakdown(

@@ -1319,6 +1319,7 @@ private fun TrackerPage(
                                 weeklyRingScheduled = state.weeklyRingScheduled,
                                 last7Days = state.last7Days,
                                 last7DaysScheduled = state.last7DaysScheduled,
+                                last7DaysManualOverride = state.last7DaysManualOverride,
                                 onDone = vm::toggleSelectedDateDone,
                                 onMarkAnyway = vm::markSelectedDateAnyway,
                                 onSetValue = vm::setSelectedDateValue,
@@ -2379,6 +2380,11 @@ private fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
                                     } else {
                                         0
                                     },
+                                    manualOverrideCount = if (dayDate != null) {
+                                        state.calendarManualOverrideCountByDate[dayDate] ?: 0
+                                    } else {
+                                        0
+                                    },
                                     maxCompletedInMonth = maxCompletedInMonth,
                                     onClick = { dayDate?.let(vm::selectDate) }
                                 )
@@ -2407,6 +2413,7 @@ private fun GlobalCalendarHeatCell(
     today: Boolean,
     completedCount: Int,
     scheduledCount: Int,
+    manualOverrideCount: Int,
     maxCompletedInMonth: Int,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -2427,6 +2434,7 @@ private fun GlobalCalendarHeatCell(
     val todayDate = LocalDate.now()
     val isToday = date.isEqual(todayDate)
     val isFuture = date.isAfter(todayDate)
+    val hasManualOverride = manualOverrideCount > 0 && scheduledCount <= 0 && !isFuture && !isToday
     val intensityLevel = if (completedCount <= 0 || maxCompletedInMonth <= 0) {
         0
     } else {
@@ -2435,6 +2443,7 @@ private fun GlobalCalendarHeatCell(
     val fillColor = when {
         isToday -> Color.Transparent
         isFuture -> Color.Transparent
+        hasManualOverride -> colors.success.copy(alpha = 0.18f)
         scheduledCount <= 0 -> Color.Transparent
         completedCount <= 0 -> colors.danger.copy(alpha = 0.10f)
         intensityLevel == 1 -> colors.success.copy(alpha = 0.28f)
@@ -2445,12 +2454,14 @@ private fun GlobalCalendarHeatCell(
     val baseBorderColor = when {
         isToday -> colors.primary
         isFuture -> Color.Transparent
+        hasManualOverride -> colors.success.copy(alpha = 0.45f)
         scheduledCount <= 0 -> Color.Transparent
         completedCount <= 0 -> colors.danger.copy(alpha = 0.25f)
         else -> Color.Transparent
     }
     val baseBorderWidth = when {
         isToday -> 1.5.dp
+        hasManualOverride -> 1.dp
         completedCount <= 0 && scheduledCount > 0 && !isFuture -> 1.dp
         else -> 0.dp
     }
@@ -2467,6 +2478,7 @@ private fun GlobalCalendarHeatCell(
     val textColor = when {
         isToday -> colors.primary
         isFuture -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
+        hasManualOverride -> colors.success
         completedCount > 0 -> MaterialTheme.colorScheme.onPrimary
         scheduledCount > 0 -> colors.danger
         else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)
@@ -4288,28 +4300,28 @@ private fun formatHeroDate(date: LocalDate, locale: Locale): String {
 }
 
 private fun activeHabitsCountLabel(count: Int, language: AppLanguage): String {
-    if (count <= 0) return translate(language, "No active habits")
+    if (count <= 0) return translate(language, "No habits")
     return when (language) {
         AppLanguage.RU, AppLanguage.UK -> {
             val mod10 = count % 10
             val mod100 = count % 100
             val key = when {
-                mod10 == 1 && mod100 != 11 -> "%d active habit (one)"
-                mod10 in 2..4 && mod100 !in 12..14 -> "%d active habits (few)"
-                else -> "%d active habits (many)"
+                mod10 == 1 && mod100 != 11 -> "%d habit"
+                mod10 in 2..4 && mod100 !in 12..14 -> "%d habits few"
+                else -> "%d habits"
             }
             formatTranslate(language, key, count)
         }
         AppLanguage.CS -> {
             val key = when (count) {
-                1 -> "%d active habit (one)"
-                2, 3, 4 -> "%d active habits (few)"
-                else -> "%d active habits (many)"
+                1 -> "%d habit"
+                2, 3, 4 -> "%d habits few"
+                else -> "%d habits"
             }
             formatTranslate(language, key, count)
         }
         else -> {
-            val key = if (count == 1) "%d active habit (one)" else "%d active habits (many)"
+            val key = if (count == 1) "%d habit" else "%d habits"
             formatTranslate(language, key, count)
         }
     }
@@ -4432,10 +4444,20 @@ private fun HabitPill(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
+    val isDarkTheme = isSystemInDarkTheme()
     val selectedColor = parseColorHex(habit.colorHex)
-    val backgroundColor = if (isSelected) selectedColor else Color.Transparent
+    val unselectedBackgroundColor = if (isDarkTheme) {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)
+    } else {
+        MaterialTheme.colorScheme.secondaryContainer
+    }
+    val backgroundColor = if (isSelected) selectedColor else unselectedBackgroundColor
     val textColor = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-    val borderColor = if (isSelected) Color.Transparent else MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
+    val borderColor = if (isSelected) {
+        Color.Transparent
+    } else {
+        MaterialTheme.colorScheme.outline.copy(alpha = if (isDarkTheme) 0.36f else 0.55f)
+    }
 
     Surface(
         onClick = onClick,
@@ -4546,6 +4568,7 @@ private fun HeroCard(
     weeklyRingScheduled: Int,
     last7Days: List<Int>,
     last7DaysScheduled: List<Boolean>,
+    last7DaysManualOverride: List<Boolean>,
     onDone: () -> Unit,
     onMarkAnyway: () -> Unit,
     onSetValue: (Int) -> Unit,
@@ -4852,6 +4875,7 @@ private fun HeroCard(
             HeroMiniWeekRow(
                 points = last7Days,
                 scheduled = last7DaysScheduled,
+                manualOverride = last7DaysManualOverride,
                 trackingType = trackingType,
                 anchorDate = LocalDate.now(),
                 todayShortLabel = t("Today short")
@@ -4867,21 +4891,86 @@ private fun HeroCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = semantic.textSecondary
                     )
-                    if (selectedValue > 0) {
-                        Text(
-                            text = t("Manual log saved for this date."),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = semantic.success
+                    if (!isValueTracking && done) {
+                        val interactionSource = remember { MutableInteractionSource() }
+                        val pressed by interactionSource.collectIsPressedAsState()
+                        val pressScale by animateFloatAsState(
+                            targetValue = if (pressed) pressScaleTarget else 1f,
+                            animationSpec = tween(durationMillis = pressScaleDuration, easing = FastOutSlowInEasing),
+                            label = "restDayCompleteButtonPressScale"
                         )
-                    }
-                    Button(
-                        onClick = onMarkAnyway,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp),
-                        shape = RoundedCornerShape(radius.full)
-                    ) {
-                        Text(t("Mark anyway"))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 10.dp, bottom = 0.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            val showCompletedLottie = completedButtonComposition != null &&
+                                (completedAnimationPlaying || completedLottieReady)
+                            val completedLottieSize = (spacing.x2 + spacing.x1) * 1.5f
+                            val completedLottieSlotWidth by animateDpAsState(
+                                targetValue = if (showCompletedLottie) completedLottieSize else 0.dp,
+                                animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing),
+                                label = "restDayCompletedLottieSlotWidth"
+                            )
+                            Button(
+                                onClick = onDone,
+                                interactionSource = interactionSource,
+                                modifier = Modifier
+                                    .fillMaxWidth(0.94f)
+                                    .height(56.dp)
+                                    .graphicsLayer {
+                                        scaleX = pressScale * completionPulseScale.value
+                                        scaleY = pressScale * completionPulseScale.value
+                                    },
+                                shape = RoundedCornerShape(radius.full),
+                                border = if (useDarkPalette) {
+                                    BorderStroke(stroke.thin, semantic.borderSubtle)
+                                } else {
+                                    null
+                                },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (useDarkPalette) semantic.successMuted else semantic.success,
+                                    contentColor = if (useDarkPalette) semantic.success else Color.White
+                                )
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(1.5.dp)
+                                ) {
+                                    Text(
+                                        text = t("Completed"),
+                                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.W600)
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .width(completedLottieSlotWidth)
+                                            .height(completedLottieSize)
+                                            .clip(RoundedCornerShape(AppTheme.radius.sm)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (completedButtonComposition != null && completedLottieSlotWidth > 0.dp) {
+                                            LottieAnimation(
+                                                composition = completedButtonComposition,
+                                                progress = { completedButtonLottieProgress },
+                                                dynamicProperties = completedButtonDynamicProperties,
+                                                modifier = Modifier.size(completedLottieSize)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        Button(
+                            onClick = onMarkAnyway,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(56.dp),
+                            shape = RoundedCornerShape(radius.full)
+                        ) {
+                            Text(t("Mark anyway"))
+                        }
                     }
                 }
             } else if (!isValueTracking && done) {
@@ -5516,6 +5605,7 @@ private fun AllHabitsPill(
 private fun HeroMiniWeekRow(
     points: List<Int>,
     scheduled: List<Boolean>,
+    manualOverride: List<Boolean>,
     trackingType: TrackingType,
     anchorDate: LocalDate,
     todayShortLabel: String
@@ -5524,6 +5614,9 @@ private fun HeroMiniWeekRow(
     val locale = appLocale()
     val normalizedPoints = points.takeLast(7).let { if (it.size == 7) it else List(7 - it.size) { 0 } + it }
     val normalizedScheduled = scheduled.takeLast(7).let { if (it.size == 7) it else List(7 - it.size) { false } + it }
+    val normalizedManualOverride = manualOverride.takeLast(7).let {
+        if (it.size == 7) it else List(7 - it.size) { false } + it
+    }
     val dates = (6L downTo 0L).map { offset -> anchorDate.minusDays(offset) }
 
     Row(
@@ -5534,6 +5627,7 @@ private fun HeroMiniWeekRow(
             val date = dates[index]
             val value = normalizedPoints.getOrElse(index) { 0 }.coerceIn(0, 100)
             val isScheduled = normalizedScheduled.getOrElse(index) { false }
+            val isManualOverride = normalizedManualOverride.getOrElse(index) { false }
             val isToday = date == LocalDate.now()
             val isFuture = date.isAfter(LocalDate.now())
             val isCompleted = when (trackingType) {
@@ -5542,7 +5636,9 @@ private fun HeroMiniWeekRow(
             }
             val isPartial = !isCompleted && value > 0 && isScheduled && !isFuture
             val dayColor = when {
-                !isScheduled || isFuture -> MaterialTheme.colorScheme.surfaceVariant
+                isFuture -> MaterialTheme.colorScheme.surfaceVariant
+                !isScheduled && isManualOverride -> semantic.success.copy(alpha = 0.55f)
+                !isScheduled -> MaterialTheme.colorScheme.surfaceVariant
                 isCompleted -> semantic.success
                 isPartial -> semantic.success.copy(alpha = 0.45f)
                 isToday -> Color.Transparent

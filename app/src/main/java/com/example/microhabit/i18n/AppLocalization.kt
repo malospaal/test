@@ -24,21 +24,21 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "Habit details" to v("Gewohnheitsdetails", "Details de l'habitude", "Detalles del habito", "Dettagli abitudine", "Детали привычки"),
     "Habits" to v("Gewohnheiten", "Habitudes", "Habitos", "Abitudini", "Привычки"),
     "My habits" to v("Meine Gewohnheiten", "Mes habitudes", "Mis habitos", "Le mie abitudini", "Мои привычки"),
-    "No active habits" to (
-        v("Keine aktiven Gewohnheiten", "Aucune habitude active", "No hay habitos activos", "Nessuna abitudine attiva", "Нет активных привычек") +
-            mapOf(AppLanguage.CS to "Žádné aktivní návyky")
+    "No habits" to (
+        v("Keine Gewohnheiten", "Aucune habitude", "No hay habitos", "Nessuna abitudine", "Нет привычек") +
+            mapOf(AppLanguage.CS to "Žádné návyky")
     ),
-    "%d active habit (one)" to (
-        v("%d aktive Gewohnheit", "%d habitude active", "%d habito activo", "%d abitudine attiva", "%d активная привычка") +
-            mapOf(AppLanguage.CS to "%d aktivní návyk")
+    "%d habit" to (
+        v("%d Gewohnheit", "%d habitude", "%d habito", "%d abitudine", "%d привычка") +
+            mapOf(AppLanguage.CS to "%d návyk")
     ),
-    "%d active habits (few)" to (
-        v("%d aktive Gewohnheiten", "%d habitudes actives", "%d habitos activos", "%d abitudini attive", "%d активные привычки") +
-            mapOf(AppLanguage.CS to "%d aktivní návyky")
+    "%d habits few" to (
+        v("%d Gewohnheiten", "%d habitudes", "%d habitos", "%d abitudini", "%d привычки") +
+            mapOf(AppLanguage.CS to "%d návyky")
     ),
-    "%d active habits (many)" to (
-        v("%d aktive Gewohnheiten", "%d habitudes actives", "%d habitos activos", "%d abitudini attive", "%d активных привычек") +
-            mapOf(AppLanguage.CS to "%d aktivních návyků")
+    "%d habits" to (
+        v("%d Gewohnheiten", "%d habitudes", "%d habitos", "%d abitudini", "%d привычек") +
+            mapOf(AppLanguage.CS to "%d návyků")
     ),
     "← → swipe to switch habits" to (
         v(

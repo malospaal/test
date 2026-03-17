@@ -139,6 +139,82 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
         "Crea e seleziona un'abitudine per vedere le analisi.",
         "Создайте и выберите привычку, чтобы увидеть аналитику."
     ),
+    "Stability score" to (
+        v("Stabilitatswert", "Score de stabilite", "Puntuacion de estabilidad", "Punteggio stabilita", "Рейтинг стабильности") +
+            mapOf(AppLanguage.CS to "Skore stability")
+    ),
+    "out of 100" to (
+        v("von 100", "sur 100", "de 100", "su 100", "из 100") +
+            mapOf(AppLanguage.CS to "ze 100")
+    ),
+    "pts this week" to (
+        v("pkt diese Woche", "pts cette semaine", "pts esta semana", "pt questa settimana", "очков за неделю") +
+            mapOf(AppLanguage.CS to "bodů tento týden")
+    ),
+    "Best: %dd" to (
+        v("Rekord: %dT", "Record : %dj", "Mejor: %dd", "Record: %dg", "Рекорд: %dд") +
+            mapOf(AppLanguage.CS to "Rekord: %dd")
+    ),
+    "30-day rate" to (
+        v("30-Tage-Quote", "Taux sur 30 jours", "Tasa de 30 dias", "Tasso 30 giorni", "За 30 дней") +
+            mapOf(AppLanguage.CS to "Za 30 dní")
+    ),
+    "7-day rate" to (
+        v("7-Tage-Quote", "Taux sur 7 jours", "Tasa de 7 dias", "Tasso 7 giorni", "За 7 дней") +
+            mapOf(AppLanguage.CS to "Za 7 dní")
+    ),
+    "↑ %d this week" to (
+        v("↑ %d diese Woche", "↑ %d cette semaine", "↑ %d esta semana", "↑ %d questa settimana", "↑ %d эта неделя") +
+            mapOf(AppLanguage.CS to "↑ %d tento týden")
+    ),
+    "%d more days — new record" to (
+        v("Noch %d Tage — neuer Rekord", "Encore %d jours — nouveau record", "%d dias mas — nuevo record", "Ancora %d giorni — nuovo record", "Ещё %d дн. — новый рекорд") +
+            mapOf(AppLanguage.CS to "Ještě %d dnů — nový rekord")
+    ),
+    "Best is %dd. At this pace you'll beat it on %s." to (
+        v("Bestwert ist %dT. In diesem Tempo schaffst du es am %s.", "Le record est de %dj. A ce rythme, vous le battrez le %s.", "El mejor es %dd. A este ritmo lo superarás el %s.", "Il record e %dg. A questo ritmo lo supererai il %s.", "Рекорд %dд. При текущем темпе побьёшь %s.") +
+            mapOf(AppLanguage.CS to "Rekord je %dd. Tímto tempem ho překonáš %s.")
+    ),
+    "Best time of day" to (
+        v("Beste Tageszeit", "Meilleur moment de la journee", "Mejor momento del dia", "Momento migliore della giornata", "Лучшее время дня") +
+            mapOf(AppLanguage.CS to "Nejlepší čas dne")
+    ),
+    "You usually complete habits at %s. Set a reminder." to (
+        v("Du erledigst Gewohnheiten meist um %s. Stell eine Erinnerung ein.", "Vous terminez souvent vos habitudes a %s. Definissez un rappel.", "Sueles completar habitos a las %s. Configura un recordatorio.", "Di solito completi le abitudini alle %s. Imposta un promemoria.", "Чаще всего выполняешь в %s. Настрой напоминание.") +
+            mapOf(AppLanguage.CS to "Návyky nejčastěji plníš v %s. Nastav si připomínku.")
+    ),
+    "Week over week" to (
+        v("Woche zu Woche", "Semaine apres semaine", "Semana a semana", "Settimana su settimana", "Неделя к неделе") +
+            mapOf(AppLanguage.CS to "Týden po týdnu")
+    ),
+    "Unlock PRO" to (
+        v("PRO freischalten", "Debloquer PRO", "Desbloquear PRO", "Sblocca PRO", "Открыть PRO") +
+            mapOf(AppLanguage.CS to "Odemknout PRO")
+    ),
+    "Best time of day\navailable in PRO" to (
+        v("Beste Tageszeit\nnur in PRO", "Meilleur moment de la journee\ndisponible en PRO", "Mejor momento del dia\ndisponible en PRO", "Momento migliore della giornata\ndisponibile in PRO", "Лучшее время дня\nдоступно в PRO") +
+            mapOf(AppLanguage.CS to "Nejlepší čas dne\nk dispozici v PRO")
+    ),
+    "Weekday consistency\navailable in PRO" to (
+        v("Wochentags-Konsistenz\nnur in PRO", "Regularite par jour\ndisponible en PRO", "Consistencia por dias\ndisponible en PRO", "Costanza per giorni\ndisponibile in PRO", "Стабильность по дням\nдоступна в PRO") +
+            mapOf(AppLanguage.CS to "Stabilita podle dnů\nk dispozici v PRO")
+    ),
+    "Week comparison\navailable in PRO" to (
+        v("Wochenvergleich\nnur in PRO", "Comparaison des semaines\ndisponible en PRO", "Comparacion semanal\ndisponible en PRO", "Confronto settimane\ndisponibile in PRO", "Сравнение недель\nдоступно в PRO") +
+            mapOf(AppLanguage.CS to "Porovnání týdnů\nk dispozici v PRO")
+    ),
+    "−2 wk" to (
+        v("−2 Wo.", "−2 sem.", "−2 sem.", "−2 sett.", "−2 нед.") +
+            mapOf(AppLanguage.CS to "−2 týd.")
+    ),
+    "Last wk" to (
+        v("Letzte Wo.", "Semaine dern.", "Semana ant.", "Sett. scorsa", "Пр. нед.") +
+            mapOf(AppLanguage.CS to "Min. týden")
+    ),
+    "This wk" to (
+        v("Diese Wo.", "Cette sem.", "Esta sem.", "Questa sett.", "Эта нед.") +
+            mapOf(AppLanguage.CS to "Tento týden")
+    ),
     "Current streak" to v("Aktuelle Serie", "Serie actuelle", "Racha actual", "Serie attuale", "Текущая серия"),
     "Best streak" to v("Beste Serie", "Meilleure serie", "Mejor racha", "Serie migliore", "Лучшая серия"),
     "7 day completion" to v("Erfullung in 7 Tagen", "Realisation sur 7 jours", "Cumplimiento de 7 dias", "Completamento 7 giorni", "Выполнение за 7 дней"),

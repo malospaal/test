@@ -78,6 +78,8 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.EaseInOutQuart
+import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -222,6 +224,7 @@ import com.example.microhabit.ui.components.SettingsGroup
 import com.example.microhabit.ui.components.SettingsRow
 import com.example.microhabit.ui.components.SettingsSwitchRow
 import com.example.microhabit.ui.components.parseColorHex
+import com.example.microhabit.ui.analytics.AnalyticsScreen
 import com.example.microhabit.ui.create.CreateHabitTemplate
 import com.example.microhabit.ui.create.CreateHabitTemplateCatalog
 import com.example.microhabit.ui.create.TemplateCategory
@@ -243,6 +246,14 @@ import kotlin.math.ceil
 import kotlin.math.roundToInt
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
+
+// ─── Tracker habit switch animation constants ────────────────────────────────
+// Shared by HeroCard transition, calendar crossfade and page dots spring.
+internal const val HABIT_TRANSITION_MS = 220
+internal val HABIT_EASING: Easing = EaseInOutQuart
+internal const val DOTS_SPRING_DAMPING = 0.7f
+internal const val DOTS_SPRING_STIFFNESS = 500f
+// ──────────────────────────────────────────────────────────────────────────────
 
 private enum class AppPage {
     TRACKER,
@@ -730,9 +741,13 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                             onEditModeChange = { habitsEditMode = it },
                             scrollToTopSignal = habitsScrollToTopSignal
                         )
-                        AppPage.ANALYTICS -> AnalyticsPage(
+                        AppPage.ANALYTICS -> AnalyticsScreen(
                             state = state,
-                            onSelectTask = vm::selectTask
+                            onSelectTask = vm::selectTask,
+                            onUpgrade = {
+                                previousPage = AppPage.ANALYTICS
+                                page = AppPage.PAYWALL
+                            }
                         )
                         AppPage.CALENDAR -> CalendarScreen(state = state, vm = vm)
                         AppPage.PAYWALL -> PaywallPage(
@@ -1296,6 +1311,10 @@ private fun TrackerPage(
         overlayVisible = false
         pendingMilestone = null
         milestoneCelebration = null
+        if (habitSwitchDirection != 0) {
+            delay(16L)
+            habitSwitchDirection = 0
+        }
     }
     LaunchedEffect(state.totalCompletions, state.selectedDateDone, state.streak) {
         if (state.selectedDateDone && state.totalCompletions > previousTotalCompletions) {
@@ -1386,19 +1405,30 @@ private fun TrackerPage(
                         AnimatedContent(
                             targetState = state.selectedTaskId,
                             transitionSpec = {
-                                if (habitSwitchDirection == 0) {
-                                    fadeIn(animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing)) togetherWith
-                                        fadeOut(animationSpec = tween(durationMillis = 120, easing = FastOutSlowInEasing))
+                                if (habitSwitchDirection != 0) {
+                                    // +1 = next habit (left swipe), -1 = previous habit (right swipe).
+                                    val sign = if (habitSwitchDirection > 0) 1 else -1
+                                    (
+                                        slideInHorizontally(
+                                            animationSpec = tween(HABIT_TRANSITION_MS, easing = HABIT_EASING)
+                                        ) { fullWidth -> sign * fullWidth / 3 } +
+                                            fadeIn(
+                                                animationSpec = tween(HABIT_TRANSITION_MS, easing = HABIT_EASING)
+                                            )
+                                        ) togetherWith (
+                                        slideOutHorizontally(
+                                            animationSpec = tween(HABIT_TRANSITION_MS, easing = HABIT_EASING)
+                                        ) { fullWidth -> -sign * fullWidth / 3 } +
+                                            fadeOut(
+                                                animationSpec = tween(HABIT_TRANSITION_MS, easing = HABIT_EASING)
+                                            )
+                                        )
                                 } else {
-                                    val direction = if (habitSwitchDirection > 0) 1 else -1
-                                    (slideInHorizontally(
-                                        initialOffsetX = { fullWidth -> (fullWidth / 7) * direction },
-                                        animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing)
-                                    ) + fadeIn(animationSpec = tween(durationMillis = 160, easing = FastOutSlowInEasing))) togetherWith
-                                        (slideOutHorizontally(
-                                            targetOffsetX = { fullWidth -> (-fullWidth / 9) * direction },
-                                            animationSpec = tween(durationMillis = 130, easing = FastOutSlowInEasing)
-                                        ) + fadeOut(animationSpec = tween(durationMillis = 130, easing = FastOutSlowInEasing)))
+                                    fadeIn(
+                                        animationSpec = tween(HABIT_TRANSITION_MS, easing = HABIT_EASING)
+                                    ) togetherWith fadeOut(
+                                        animationSpec = tween(HABIT_TRANSITION_MS, easing = HABIT_EASING)
+                                    )
                                 }
                             },
                             label = "trackerHeroSwitch"
@@ -1440,7 +1470,10 @@ private fun TrackerPage(
                         )
                         Crossfade(
                             targetState = state.selectedTaskId,
-                            animationSpec = tween(durationMillis = 150),
+                            animationSpec = tween(
+                                durationMillis = HABIT_TRANSITION_MS,
+                                easing = HABIT_EASING
+                            ),
                             label = "trackerCalendarCrossfade"
                         ) { taskId ->
                             val animatedTask = state.tasks.firstOrNull { it.id == taskId }
@@ -4465,7 +4498,7 @@ private fun activeHabitsCountLabel(count: Int, language: AppLanguage): String {
 }
 
 @Composable
-private fun HabitSelectorRow(
+fun HabitSelectorRow(
     habits: List<HabitTask>,
     selectedId: String?,
     onHabitSelected: (String) -> Unit,

@@ -381,6 +381,26 @@ Unit label UX для `COUNT`:
   - `Data` (export data, reset progress),
   - `Danger zone` (delete account).
 
+### 12.10 Analytics Screen
+- `Analytics` — отдельный primary-экран с обзорной аналитикой по выбранной привычке или по режиму `All habits`.
+- Вверху экрана используется общий `HabitSelectorRow`:
+  - поддерживается `All habits` (агрегированный режим);
+  - выбор конкретной привычки переключает метрики на неё.
+- Базовые блоки (доступны всем тарифам):
+  - `Stability score` (0..100),
+  - stat-grid 2×2 (`Current streak`, `30-day rate`, `Total completions`, `7-day rate`),
+  - forecast card (`days to record` при наличии),
+  - weekly bar chart (`This week`).
+- PRO-gated блоки:
+  - `Best time of day`,
+  - `Weekday consistency` (radar),
+  - `Week over week`.
+- Для Free пользователей PRO-блоки отображаются с blur + lock overlay и CTA `Unlock PRO`; контент под overlay недоступен для взаимодействия.
+- Формула `Stability score`:
+  - 70% вклад `completion30`,
+  - 30% вклад отношения `currentStreak / bestStreak`,
+  - итог клампится в диапазон `0..100`.
+
 ## 13. Reminder System
 Источник: `notifications/HabitReminderScheduler.kt`.
 

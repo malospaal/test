@@ -217,7 +217,7 @@ internal val ukTranslations: Map<String, String> = mapOf(
     "Manual log saved for this date." to "Ручну позначку для цієї дати збережено.",
     "Mark anyway" to "Позначити все одно",
     "Mark as done" to "Позначити як виконане",
-    "More details →" to "Докладніше →",
+    "More details →" to "Детальніше →",
     "Great job, your streak is safe." to "Чудово, ваша серія збережена.",
     "Goal reached! 🎉" to "Ціль досягнута! 🎉",
     "%d %s to go" to "ще %d %s до цілі",

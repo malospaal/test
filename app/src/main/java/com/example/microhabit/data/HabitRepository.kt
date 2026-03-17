@@ -7,6 +7,7 @@ import org.json.JSONObject
 import kotlin.math.ceil
 import kotlin.math.roundToInt
 import java.io.File
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
@@ -73,6 +74,14 @@ data class HabitTask(
     val customDays: Set<Int> = emptySet(),
     val isArchived: Boolean = false
 )
+
+data class WeeklyProgressSnapshot(
+    val completed: Int,
+    val scheduled: Int
+) {
+    val progress: Float
+        get() = if (scheduled <= 0) 0f else completed.toFloat() / scheduled.toFloat()
+}
 
 data class StreakSegment(
     val length: Int
@@ -645,6 +654,28 @@ class HabitRepository(private val context: Context) {
             val day = anchorDate.minusDays(offset)
             progressPercentForWidget(task, day)
         }
+    }
+
+    fun weeklyProgressSnapshot(task: HabitTask, anchorDate: LocalDate = LocalDate.now()): WeeklyProgressSnapshot {
+        val weekStart = anchorDate.with(DayOfWeek.MONDAY)
+        val weekEnd = anchorDate.with(DayOfWeek.SUNDAY)
+        var scheduled = 0
+        var completed = 0
+
+        var date = weekStart
+        while (!date.isAfter(weekEnd)) {
+            if (isScheduledOn(task, date)) {
+                scheduled += 1
+                if (getDayValue(task, date) >= 1) {
+                    completed += 1
+                }
+            }
+            date = date.plusDays(1)
+        }
+        return WeeklyProgressSnapshot(
+            completed = completed,
+            scheduled = scheduled
+        )
     }
 
     fun progressForLast30Days(task: HabitTask, anchorDate: LocalDate = LocalDate.now()): Int {

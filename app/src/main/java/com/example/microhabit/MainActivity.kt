@@ -1140,31 +1140,22 @@ private fun TrackerPage(
                                 streak = state.streak,
                                 bestStreak = state.bestStreak,
                                 completionRate30 = state.completionRate30Day,
+                                weeklyRingProgress = state.weeklyRingProgress,
+                                weeklyRingCompleted = state.weeklyRingCompleted,
+                                weeklyRingScheduled = state.weeklyRingScheduled,
                                 last7Days = state.last7Days,
                                 last7DaysScheduled = state.last7DaysScheduled,
                                 onDone = vm::toggleSelectedDateDone,
                                 onMarkAnyway = vm::markSelectedDateAnyway,
                                 onSetValue = vm::setSelectedDateValue,
                                 onIncrementValue = vm::incrementSelectedDateValue,
+                                onNavigateToDetail = onOpenDetails,
                                 highlightMarkButton = highlightCompletionButton,
                                 onHighlightConsumed = onHighlightConsumed,
                                 appThemeMode = state.themeMode,
                                 swipeEnabled = state.tasks.size > 1,
                                 onSwipeNext = { switchHabitBy(1) },
                                 onSwipePrevious = { switchHabitBy(-1) }
-                            )
-                        }
-                        TextButton(
-                            onClick = onOpenDetails,
-                            modifier = Modifier
-                                .align(Alignment.End)
-                                .padding(top = spacing.x0_5),
-                            contentPadding = PaddingValues(horizontal = spacing.x0_5, vertical = spacing.x0)
-                        ) {
-                            Text(
-                                text = t("More details →"),
-                                style = MaterialTheme.typography.titleSmall,
-                                color = AppTheme.colors.primary
                             )
                         }
                         Crossfade(
@@ -4446,12 +4437,16 @@ private fun HeroCard(
     streak: Int,
     bestStreak: Int,
     completionRate30: Int,
+    weeklyRingProgress: Float,
+    weeklyRingCompleted: Int,
+    weeklyRingScheduled: Int,
     last7Days: List<Int>,
     last7DaysScheduled: List<Boolean>,
     onDone: () -> Unit,
     onMarkAnyway: () -> Unit,
     onSetValue: (Int) -> Unit,
     onIncrementValue: (Int) -> Unit,
+    onNavigateToDetail: () -> Unit,
     highlightMarkButton: Boolean,
     onHighlightConsumed: () -> Unit,
     appThemeMode: AppThemeMode,
@@ -4480,6 +4475,7 @@ private fun HeroCard(
         AppThemeMode.DARK -> true
         AppThemeMode.LIGHT -> false
     }
+    val useDarkPalette = useDarkCompletedLottie
     val swipeThresholdPx = with(density) { 56.dp.toPx() }
     var horizontalDragDistance by remember(task?.id, selectedDate) { mutableStateOf(0f) }
     val completedButtonLottieResId = remember(context, useDarkCompletedLottie) {
@@ -4613,10 +4609,26 @@ private fun HeroCard(
         else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
     }
     val habitColor = parseColorHex(task?.colorHex.orEmpty())
+    val yesNoWeeklyProgress = if (weeklyRingScheduled > 0) {
+        (weeklyRingCompleted.toFloat() / weeklyRingScheduled.toFloat()).coerceIn(0f, 1f)
+    } else {
+        weeklyRingProgress.coerceIn(0f, 1f)
+    }
     val ringProgress = when {
         task == null -> 0f
-        trackingType == TrackingType.YES_NO -> if (done) 1f else 0f
+        trackingType == TrackingType.YES_NO -> yesNoWeeklyProgress
         else -> (selectedValue.toFloat() / selectedTarget.coerceAtLeast(1).toFloat()).coerceIn(0f, 1f)
+    }
+    val ringArcColor = when {
+        trackingType == TrackingType.YES_NO && weeklyRingScheduled > 0 && ringProgress >= 1f -> semantic.success
+        trackingType == TrackingType.YES_NO -> semantic.primary
+        else -> habitColor
+    }
+    val ringTrackColor = MaterialTheme.colorScheme.surfaceVariant
+    val ringCenterLabel = if (trackingType == TrackingType.YES_NO) {
+        "${(ringProgress * 100f).roundToInt()}%"
+    } else {
+        task?.emoji?.ifBlank { "✨" } ?: "✨"
     }
     val streakMetaText = when {
         !canMarkForSelectedDate -> {
@@ -4644,8 +4656,8 @@ private fun HeroCard(
             .fillMaxWidth()
             .padding(bottom = 12.dp),
         shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
-        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+        color = semantic.backgroundSurface,
+        border = BorderStroke(stroke.thin, semantic.borderSubtle)
     ) {
         Column(
             modifier = Modifier
@@ -4702,9 +4714,10 @@ private fun HeroCard(
                 }
                 ProgressRing(
                     percent = ringProgress,
-                    emoji = task?.emoji?.ifBlank { "✨" } ?: "✨",
-                    color = habitColor,
-                    trackColor = semantic.backgroundSurface
+                    centerLabel = ringCenterLabel,
+                    centerLabelColor = if (trackingType == TrackingType.YES_NO) ringArcColor else semantic.textPrimary,
+                    color = ringArcColor,
+                    trackColor = ringTrackColor
                 )
             }
 
@@ -4712,7 +4725,6 @@ private fun HeroCard(
                 points = last7Days,
                 scheduled = last7DaysScheduled,
                 trackingType = trackingType,
-                habitColor = habitColor,
                 anchorDate = LocalDate.now(),
                 todayShortLabel = t("Today short")
             )
@@ -4775,9 +4787,14 @@ private fun HeroCard(
                                 scaleY = pressScale * completionPulseScale.value
                             },
                         shape = RoundedCornerShape(radius.full),
+                        border = if (useDarkPalette) {
+                            BorderStroke(stroke.thin, semantic.borderSubtle)
+                        } else {
+                            null
+                        },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = semantic.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
+                            containerColor = if (useDarkPalette) semantic.successMuted else semantic.success,
+                            contentColor = if (useDarkPalette) semantic.success else Color.White
                         )
                     ) {
                         Row(
@@ -4820,7 +4837,7 @@ private fun HeroCard(
                         .padding(vertical = 36.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    OutlinedButton(
+                    Button(
                         onClick = {
                             if (highlightActive) onHighlightConsumed()
                             onDone()
@@ -4839,14 +4856,15 @@ private fun HeroCard(
                         border = BorderStroke(
                             stroke.thin * if (highlightActive) 2.4f else 1.5f,
                             when {
-                                !canMarkForSelectedDate -> semantic.borderSubtle
                                 highlightActive -> semantic.success
-                                else -> semantic.primary
+                                useDarkPalette -> semantic.borderSubtle
+                                else -> Color.Transparent
                             }
                         ),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            containerColor = Color.Transparent,
-                            contentColor = if (highlightActive) semantic.success else semantic.primary,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (useDarkPalette) semantic.primaryMuted else semantic.primary,
+                            contentColor = if (useDarkPalette) semantic.primary else Color.White,
+                            disabledContainerColor = semantic.backgroundSurfaceMuted,
                             disabledContentColor = semantic.textSecondary
                         )
                     ) {
@@ -5019,6 +5037,23 @@ private fun HeroCard(
                             }
                         }
                     }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(
+                    onClick = onNavigateToDetail,
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                ) {
+                    Text(
+                        text = t("More details →"),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = semantic.primary,
+                        fontWeight = FontWeight.Medium
+                    )
                 }
             }
             Box(
@@ -5239,15 +5274,17 @@ private fun HeroCard(
 @Composable
 private fun ProgressRing(
     percent: Float,
-    emoji: String,
+    centerLabel: String,
+    centerLabelColor: Color,
     color: Color,
     trackColor: Color,
     size: androidx.compose.ui.unit.Dp = 52.dp,
     strokeWidth: androidx.compose.ui.unit.Dp = 5.dp
 ) {
+    val easeOutCubic = remember { androidx.compose.animation.core.CubicBezierEasing(0.33f, 1f, 0.68f, 1f) }
     val animatedPercent by animateFloatAsState(
         targetValue = percent.coerceIn(0f, 1f),
-        animationSpec = tween(durationMillis = 400, easing = FastOutSlowInEasing),
+        animationSpec = tween(durationMillis = 500, easing = easeOutCubic),
         label = "heroProgressRing"
     )
     Box(
@@ -5267,8 +5304,10 @@ private fun ProgressRing(
             strokeWidth = strokeWidth
         )
         Text(
-            text = emoji.ifBlank { "✨" },
-            fontSize = 18.sp
+            text = centerLabel,
+            fontSize = if (centerLabel.contains("%")) 12.sp else 18.sp,
+            fontWeight = if (centerLabel.contains("%")) FontWeight.SemiBold else FontWeight.Normal,
+            color = centerLabelColor
         )
     }
 }
@@ -5278,7 +5317,6 @@ private fun HeroMiniWeekRow(
     points: List<Int>,
     scheduled: List<Boolean>,
     trackingType: TrackingType,
-    habitColor: Color,
     anchorDate: LocalDate,
     todayShortLabel: String
 ) {
@@ -5304,11 +5342,11 @@ private fun HeroMiniWeekRow(
             }
             val isPartial = !isCompleted && value > 0 && isScheduled && !isFuture
             val dayColor = when {
-                !isScheduled || isFuture -> Color.Transparent
-                isCompleted -> habitColor
-                isPartial -> habitColor.copy(alpha = 0.4f)
+                !isScheduled || isFuture -> MaterialTheme.colorScheme.surfaceVariant
+                isCompleted -> semantic.success
+                isPartial -> semantic.success.copy(alpha = 0.45f)
                 isToday -> Color.Transparent
-                else -> semantic.danger.copy(alpha = 0.25f)
+                else -> semantic.chartMissed
             }
             val showTodayBorder = isToday && isScheduled && !isFuture && !isCompleted && !isPartial
             val dayLabel = if (isToday) {
@@ -5322,7 +5360,7 @@ private fun HeroMiniWeekRow(
                 fillColor = dayColor,
                 isToday = isToday,
                 showTodayBorder = showTodayBorder,
-                todayBorderColor = habitColor
+                todayBorderColor = semantic.primary
             )
         }
     }

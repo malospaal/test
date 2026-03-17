@@ -522,7 +522,10 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     ),
     "Mark anyway" to v("Trotzdem markieren", "Marquer quand meme", "Marcar de todos modos", "Segna comunque", "Отметить всё равно"),
     "Mark as done" to v("Als erledigt markieren", "Marquer comme fait", "Marcar como hecho", "Segna come completata", "Отметить как выполнено"),
-    "More details →" to v("Mehr Details ->", "Plus de details ->", "Mas detalles ->", "Piu dettagli ->", "Подробнее →"),
+    "More details →" to (
+        v("Details →", "Details →", "Detalles →", "Dettagli →", "Подробнее →") +
+            mapOf(AppLanguage.CS to "Podrobnosti →")
+    ),
     "Great job, your streak is safe." to v("Super, deine Serie ist gesichert.", "Bravo, votre serie est preservee.", "Buen trabajo, tu racha esta a salvo.", "Ottimo lavoro, la tua serie e salva.", "Отлично, ваша серия сохранена."),
     "Goal reached! 🎉" to (
         v("Ziel erreicht! 🎉", "Objectif atteint ! 🎉", "Objetivo alcanzado! 🎉", "Obiettivo raggiunto! 🎉", "Цель достигнута! 🎉") +

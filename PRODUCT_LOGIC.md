@@ -220,7 +220,9 @@ Future scope (не часть текущего канонического пов
   - флаг показа swipe-hint хранится локально (`pref_selector_hint_shown`) и не показывается повторно после первого скролла;
   - единый `HeroCard` для выбранной привычки (адаптивный по tracking type), который объединяет:
     - заголовок (emoji + title),
-    - progress ring (YES_NO: 0/100; COUNT/DURATION: `value/target`),
+    - progress ring:
+      - для `YES_NO` — недельная стабильность `completedThisWeek / scheduledThisWeek` (ISO неделя, пн-вс);
+      - для `COUNT/DURATION` — `value/target`;
     - streak/meta строку (`streak`, `best streak`, `30-day completion`) или zero-streak fallback,
     - compact 7-day mini-track;
   - для `COUNT` / `DURATION` внутри `HeroCard` отображаются:
@@ -232,7 +234,7 @@ Future scope (не часть текущего канонического пов
   - calendar.
 - Канонический default для Tracker при normal open/load: selected habit = первый `ACTIVE` habit.
 - Переключение привычек выполняется через tiles selector-строки и обновляет текущий Tracker context.
-- Ссылка `Подробнее →` ведёт в `HabitDetail`.
+- Внутри `HeroCard` доступно действие `Подробнее →` (нижний правый угол карточки), ведущее в `HabitDetail`.
 
 ### 12.2 Habit Detail (Progress Screen)
 - Без daily action-кнопок.

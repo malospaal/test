@@ -15,6 +15,7 @@ import com.example.microhabit.data.HabitTemplateCatalog
 import com.example.microhabit.data.SubscriptionPlan
 import com.example.microhabit.data.TaskFrequency
 import com.example.microhabit.data.TrackingType
+import com.example.microhabit.data.WeeklyProgressSnapshot
 import com.example.microhabit.i18n.localeForLanguage
 import com.example.microhabit.i18n.translate
 import com.example.microhabit.notifications.HabitReminderScheduler
@@ -100,6 +101,9 @@ data class HabitUiState(
     val bestStreak: Int = 0,
     val completionRate7Day: Int = 0,
     val completionRate30Day: Int = 0,
+    val weeklyRingProgress: Float = 0f,
+    val weeklyRingCompleted: Int = 0,
+    val weeklyRingScheduled: Int = 0,
     val totalCompletions: Int = 0,
     val totalTrackedValue: Int = 0,
     val averageTrackedValue: Int = 0,
@@ -938,6 +942,10 @@ class MainViewModel(
             val selectedDateNextScheduled = selectedTask?.let { task ->
                 if (repository.isScheduledOn(task, date)) null else repository.nextScheduledDate(task, date)
             }
+            val weeklyRingSnapshot = selectedTask
+                ?.takeIf { it.trackingType == TrackingType.YES_NO }
+                ?.let { repository.weeklyProgressSnapshot(it, date) }
+                ?: WeeklyProgressSnapshot(completed = 0, scheduled = 0)
             val weekdayConsistency = selectedTask?.let { repository.weekdayConsistency(it, 84, metricsAnchorDate) } ?: List(7) { 0 }
             val consistencyNonZero = weekdayConsistency
                 .mapIndexed { index, value -> index to value }
@@ -1024,6 +1032,9 @@ class MainViewModel(
                     selectedTaskNote = selectedTask?.let { repository.getTaskNote(it.id) }.orEmpty(),
                     completionRate7Day = selectedTask?.let { repository.completionRate(it, 7, metricsAnchorDate) } ?: 0,
                     completionRate30Day = selectedTask?.let { repository.completionRate(it, 30, metricsAnchorDate) } ?: 0,
+                    weeklyRingProgress = weeklyRingSnapshot.progress,
+                    weeklyRingCompleted = weeklyRingSnapshot.completed,
+                    weeklyRingScheduled = weeklyRingSnapshot.scheduled,
                     totalCompletions = selectedTask?.let { repository.totalCompletions(it) } ?: 0,
                     totalTrackedValue = selectedTask?.let { repository.totalTrackedValue(it) } ?: 0,
                     averageTrackedValue = selectedTask?.let { repository.averageTrackedValue(it, 30, metricsAnchorDate) } ?: 0,
@@ -1111,6 +1122,10 @@ class MainViewModel(
         val selectedDateNextScheduled = selectedTask?.let { task ->
             if (repository.isScheduledOn(task, date)) null else repository.nextScheduledDate(task, date)
         }
+        val weeklyRingSnapshot = selectedTask
+            ?.takeIf { it.trackingType == TrackingType.YES_NO }
+            ?.let { repository.weeklyProgressSnapshot(it, date) }
+            ?: WeeklyProgressSnapshot(completed = 0, scheduled = 0)
         val weekdayConsistency = selectedTask?.let { repository.weekdayConsistency(it, 84, metricsAnchorDate) } ?: List(7) { 0 }
         val consistencyNonZero = weekdayConsistency
             .mapIndexed { index, value -> index to value }
@@ -1172,6 +1187,9 @@ class MainViewModel(
                 completionConsistency = completionConsistency,
                 completionRate7Day = selectedTask?.let { repository.completionRate(it, 7, metricsAnchorDate) } ?: 0,
                 completionRate30Day = selectedTask?.let { repository.completionRate(it, 30, metricsAnchorDate) } ?: 0,
+                weeklyRingProgress = weeklyRingSnapshot.progress,
+                weeklyRingCompleted = weeklyRingSnapshot.completed,
+                weeklyRingScheduled = weeklyRingSnapshot.scheduled,
                 totalCompletions = selectedTask?.let { repository.totalCompletions(it) } ?: 0,
                 totalTrackedValue = selectedTask?.let { repository.totalTrackedValue(it) } ?: 0,
                 averageTrackedValue = selectedTask?.let { repository.averageTrackedValue(it, 30, metricsAnchorDate) } ?: 0,

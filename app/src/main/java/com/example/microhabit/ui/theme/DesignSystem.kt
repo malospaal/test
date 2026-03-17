@@ -51,6 +51,7 @@ data class AppSemanticColors(
     val primaryMuted: Color,
     val success: Color,
     val successMuted: Color,
+    val lottieCheckmarkTint: Color,
     val neutral: Color,
     val neutralMuted: Color,
     val backgroundCanvas: Color,

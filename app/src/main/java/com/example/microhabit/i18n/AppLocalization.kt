@@ -766,6 +766,10 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
         "Completate %d su %d pianificate",
         "Выполнено %d из %d запланированных"
     ),
+    "Done %d of %d" to (
+        v("%d von %d erledigt", "%d sur %d terminees", "%d de %d completadas", "%d su %d completate", "Выполнено %d из %d") +
+            mapOf(AppLanguage.CS to "Splněno %d z %d")
+    ),
     "Today pending" to v("Heute ausstehend", "Aujourd'hui en attente", "Pendiente de hoy", "In attesa oggi", "Ожидается сегодня"),
     "Value %d / %d" to v("Wert %d / %d", "Valeur %d / %d", "Valor %d / %d", "Valore %d / %d", "Значение %d / %d"),
     "Value %d / %d %s" to v("Wert %d / %d %s", "Valeur %d / %d %s", "Valor %d / %d %s", "Valore %d / %d %s", "Значение %d / %d %s"),

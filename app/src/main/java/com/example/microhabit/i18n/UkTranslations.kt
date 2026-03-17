@@ -323,6 +323,7 @@ internal val ukTranslations: Map<String, String> = mapOf(
     "No active or completed habits yet." to "Поки немає активних або завершених звичок.",
     "Day breakdown" to "Розбір дня",
     "Completed %d of %d scheduled" to "Виконано %d із %d запланованих",
+    "Done %d of %d" to "Виконано %d з %d",
     "Today pending" to "Очікується сьогодні",
     "Value %d / %d" to "Значення %d / %d",
     "Value %d / %d %s" to "Значення %d / %d %s",

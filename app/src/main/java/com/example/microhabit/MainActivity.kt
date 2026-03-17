@@ -7,6 +7,8 @@ import android.app.TimePickerDialog
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffColorFilter
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -171,7 +173,10 @@ import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.LottieConstants
 import com.airbnb.lottie.compose.animateLottieCompositionAsState
+import com.airbnb.lottie.compose.rememberLottieDynamicProperties
+import com.airbnb.lottie.compose.rememberLottieDynamicProperty
 import com.airbnb.lottie.compose.rememberLottieComposition
+import com.airbnb.lottie.LottieProperty
 import com.example.microhabit.data.AppLanguage
 import com.example.microhabit.data.AppThemeMode
 import com.example.microhabit.data.HabitCategory
@@ -216,6 +221,7 @@ import com.example.microhabit.ui.create.CreateHabitTemplate
 import com.example.microhabit.ui.create.CreateHabitTemplateCatalog
 import com.example.microhabit.ui.create.TemplateCategory
 import com.example.microhabit.ui.create.TemplateConfirmDraft
+import com.example.microhabit.ui.calendar.BreakdownCard
 import com.example.microhabit.ui.tracker.HabitPageDots
 import com.example.microhabit.ui.theme.AppTheme
 import com.example.microhabit.ui.theme.MicroHabitTheme
@@ -2293,8 +2299,6 @@ private fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
     val locale = appLocale()
     val today = LocalDate.now()
     val maxCompletedInMonth = state.calendarCompletedCountByDate.values.maxOrNull()?.coerceAtLeast(1) ?: 1
-    val selectedCompletedCount = state.calendarCompletedCountByDate[state.selectedDate] ?: 0
-    val selectedScheduledCount = state.calendarScheduledCountByDate[state.selectedDate] ?: 0
     val taskById = remember(state.allTasks) { state.allTasks.associateBy { it.id } }
     val calendarFilterHabits = remember(state.calendarFilterOptions, taskById) {
         state.calendarFilterOptions.mapNotNull { option -> taskById[option.taskId] }
@@ -2386,109 +2390,12 @@ private fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
         }
 
         item {
-            GlassCard(tone = SurfaceTone.SECONDARY) {
-                Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
-                    Text(
-                        text = t("Day breakdown"),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = colors.textPrimary
-                    )
-                    Text(
-                        text = state.selectedDate.format(DateTimeFormatter.ofPattern(t("dd MMM yyyy"), locale)),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.textSecondary
-                    )
-                    Text(
-                        text = tf("Completed %d of %d scheduled", selectedCompletedCount, selectedScheduledCount),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.textSecondary
-                    )
-                    state.calendarBreakdownItems.forEach { item ->
-                        val statusLabel = when (item.status) {
-                            CalendarBreakdownStatus.COMPLETED -> t("Completed")
-                            CalendarBreakdownStatus.PARTIAL -> t("Partial")
-                            CalendarBreakdownStatus.MISSED -> t("Missed")
-                            CalendarBreakdownStatus.NOT_SCHEDULED -> t("Not scheduled")
-                            CalendarBreakdownStatus.TODAY_PENDING -> t("Today pending")
-                            CalendarBreakdownStatus.FUTURE -> t("Upcoming")
-                        }
-                        val statusColor = when (item.status) {
-                            CalendarBreakdownStatus.COMPLETED -> colors.success
-                            CalendarBreakdownStatus.PARTIAL -> colors.textSecondary
-                            CalendarBreakdownStatus.MISSED -> colors.danger
-                            CalendarBreakdownStatus.NOT_SCHEDULED -> colors.textSecondary
-                            CalendarBreakdownStatus.TODAY_PENDING -> colors.textSecondary
-                            CalendarBreakdownStatus.FUTURE -> colors.textSecondary
-                        }
-                        val valueLabel = when (item.trackingType) {
-                            TrackingType.YES_NO -> null
-                            TrackingType.COUNT, TrackingType.DURATION -> {
-                                if (!item.scheduled) {
-                                    null
-                                } else {
-                                    val unit = item.unitLabel.ifBlank {
-                                        if (item.trackingType == TrackingType.DURATION) t("min") else ""
-                                    }
-                                    if (unit.isBlank()) {
-                                        "${item.value} / ${item.target}"
-                                    } else {
-                                        "${item.value} / ${item.target} $unit"
-                                    }
-                                }
-                            }
-                        }
-                        Surface(
-                            color = colors.backgroundSurfaceMuted,
-                            shape = RoundedCornerShape(AppTheme.radius.md)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = spacing.x1, vertical = spacing.x0_5),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(spacing.x1)
-                            ) {
-                                Box(
-                                    modifier = Modifier.size(24.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = item.emoji.ifBlank { "✨" },
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        fontSize = 14.sp
-                                    )
-                                }
-                                Column(
-                                    modifier = Modifier.weight(1f),
-                                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                                ) {
-                                    Text(
-                                        text = item.title,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = colors.textPrimary,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                    valueLabel?.let { label ->
-                                        Text(
-                                            text = label,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = colors.textSecondary
-                                        )
-                                    }
-                                }
-                                Text(
-                                    text = statusLabel,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = statusColor
-                                )
-                            }
-                        }
-                    }
-                }
-            }
+            BreakdownCard(
+                selectedDate = state.selectedDate,
+                completedCount = state.calendarBreakdownCompletedCount,
+                scheduledCount = state.calendarBreakdownScheduledCount,
+                items = state.calendarBreakdownItems
+            )
         }
     }
 }
@@ -4655,7 +4562,6 @@ private fun HeroCard(
     val radius = AppTheme.radius
     val stroke = AppTheme.stroke
     val semantic = AppTheme.colors
-    val context = LocalContext.current
     val locale = appLocale()
     val trackingType = task?.trackingType ?: TrackingType.YES_NO
     val isValueTracking = trackingType != TrackingType.YES_NO
@@ -4675,24 +4581,34 @@ private fun HeroCard(
     val useDarkPalette = useDarkCompletedLottie
     val swipeThresholdPx = with(density) { 56.dp.toPx() }
     var horizontalDragDistance by remember(task?.id, selectedDate) { mutableStateOf(0f) }
-    val completedButtonLottieResId = remember(context, useDarkCompletedLottie) {
-        val packageName = context.packageName
-        if (useDarkCompletedLottie) {
-            val darkUnderscore = context.resources.getIdentifier("completed_button_lottie_dark", "raw", packageName)
-            val darkDash = context.resources.getIdentifier("completed_button_lottie-dark", "raw", packageName)
-            when {
-                darkUnderscore != 0 -> darkUnderscore
-                darkDash != 0 -> darkDash
-                else -> context.resources.getIdentifier("completed_button_lottie", "raw", packageName)
-            }
-        } else {
-            context.resources.getIdentifier("completed_button_lottie", "raw", packageName)
-        }
-    }
+    val completedButtonLottieResId = remember { R.raw.completed_button_lottie }
     val completedButtonComposition by if (completedButtonLottieResId != 0) {
         rememberLottieComposition(LottieCompositionSpec.RawRes(completedButtonLottieResId))
     } else {
         remember { mutableStateOf(null) }
+    }
+    val completedCheckmarkFilter = remember(useDarkCompletedLottie, semantic.lottieCheckmarkTint) {
+        if (!useDarkCompletedLottie) {
+            null
+        } else {
+            PorterDuffColorFilter(semantic.lottieCheckmarkTint.toArgb(), PorterDuff.Mode.SRC_ATOP)
+        }
+    }
+    val completedButtonDynamicProperties = if (completedCheckmarkFilter != null) {
+        rememberLottieDynamicProperties(
+            rememberLottieDynamicProperty(
+                property = LottieProperty.COLOR_FILTER,
+                value = completedCheckmarkFilter,
+                keyPath = arrayOf("line1", "Group 4", "Stroke 1")
+            ),
+            rememberLottieDynamicProperty(
+                property = LottieProperty.COLOR_FILTER,
+                value = completedCheckmarkFilter,
+                keyPath = arrayOf("line2", "Group 3", "Stroke 1")
+            )
+        )
+    } else {
+        null
     }
     val completedTargetFrame = 22f
     val completedTargetProgress = remember(completedButtonComposition) {
@@ -5030,6 +4946,7 @@ private fun HeroCard(
                                     LottieAnimation(
                                         composition = completedButtonComposition,
                                         progress = { completedButtonLottieProgress },
+                                        dynamicProperties = completedButtonDynamicProperties,
                                         modifier = Modifier.size(completedLottieSize)
                                     )
                                 }

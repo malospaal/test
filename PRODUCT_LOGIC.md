@@ -228,6 +228,8 @@ Future scope (не часть текущего канонического пов
   - для `COUNT` / `DURATION` внутри `HeroCard` отображаются:
     - linear progress bar по физическому прогрессу к target (`value/target`);
     - human-readable goal status (`to go` / `goal reached` / `beyond goal`);
+    - inline action `edit` (показывается только при `value > 0`) открывает встроенный numpad-редактор значения дня; сохранение применяет `setDayValue` для выбранной даты, отмена не меняет значение;
+    - для `DURATION` действие `Enter manually` использует тот же встроенный numpad-редактор (консистентно с inline `edit`);
     - completion-threshold (`minimumCompletionPercent`) продолжает влиять на completion-state через Repository и не меняет schedule/business семантику;
   - внутри `HeroCard` сохраняется rest-day UX для not scheduled даты (объяснение + optional next scheduled date + explicit `Mark anyway` override action);
   - отдельные standalone блоки streak tiles и 7-day chart на Tracker-экране не отображаются (их контекст перенесён в `HeroCard`);

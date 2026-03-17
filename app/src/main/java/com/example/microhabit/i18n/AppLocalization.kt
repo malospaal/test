@@ -331,6 +331,18 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "Progress reset." to v("Fortschritt zuruckgesetzt.", "Progression reinitialisee.", "Progreso restablecido.", "Progressi reimpostati.", "Прогресс сброшен."),
     "Reset" to v("Zurucksetzen", "Reinitialiser", "Restablecer", "Reimposta", "Сброс"),
     "Cancel" to v("Abbrechen", "Annuler", "Cancelar", "Annulla", "Отмена"),
+    "Save" to (
+        v("Speichern", "Enregistrer", "Guardar", "Salva", "Сохранить") +
+            mapOf(AppLanguage.CS to "Uložit")
+    ),
+    "edit" to (
+        v("andern", "modifier", "editar", "modifica", "изменить") +
+            mapOf(AppLanguage.CS to "upravit")
+    ),
+    "Backspace" to (
+        v("Loschen", "Supprimer", "Borrar", "Elimina", "Удалить") +
+            mapOf(AppLanguage.CS to "Smazat")
+    ),
     "Delete account?" to v("Konto loschen?", "Supprimer le compte ?", "Eliminar cuenta?", "Eliminare account?", "Удалить аккаунт?"),
     "Delete habit?" to v("Gewohnheit loschen?", "Supprimer l'habitude ?", "Eliminar habito?", "Eliminare abitudine?", "Удалить привычку?"),
     "Congratulations! Habit completed." to v(

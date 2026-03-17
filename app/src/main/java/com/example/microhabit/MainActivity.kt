@@ -61,8 +61,10 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
@@ -82,6 +84,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.Backspace
 import androidx.compose.material.icons.rounded.AccountCircle
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AddCircle
@@ -147,6 +150,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -4577,6 +4581,8 @@ private fun HeroCard(
     var timerUiState by remember(task?.id, selectedDate) { mutableStateOf(TimerUiState.IDLE) }
     var timerElapsedSeconds by remember(task?.id, selectedDate) { mutableStateOf(0) }
     var pendingTimerAddMinutes by remember(task?.id, selectedDate) { mutableStateOf<Int?>(null) }
+    var showValueNumpad by rememberSaveable(task?.id, selectedDate) { mutableStateOf(false) }
+    var valueNumpadInput by rememberSaveable(task?.id, selectedDate) { mutableStateOf("") }
     val unitLabel = when {
         trackingType == TrackingType.DURATION -> t("min")
         trackingType == TrackingType.COUNT && selectedUnit.isNotBlank() -> selectedUnit
@@ -4660,6 +4666,9 @@ private fun HeroCard(
             delay(1000)
             timerElapsedSeconds += 1
         }
+    }
+    LaunchedEffect(showValueNumpad) {
+        if (showValueNumpad) valueNumpadInput = ""
     }
 
     Surface(
@@ -4903,152 +4912,201 @@ private fun HeroCard(
                         verticalArrangement = Arrangement.spacedBy(spacing.x1),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        if (isDurationTracking) {
-                            AnimatedContent(
-                                targetState = selectedValue,
-                                transitionSpec = {
-                                    (fadeIn(animationSpec = tween(170, easing = FastOutSlowInEasing)) +
-                                        slideInVertically(
-                                            initialOffsetY = { it / 3 },
-                                            animationSpec = tween(170, easing = FastOutSlowInEasing)
-                                        )) togetherWith
-                                        (fadeOut(animationSpec = tween(120, easing = FastOutSlowInEasing)) +
-                                            slideOutVertically(
-                                                targetOffsetY = { -it / 4 },
-                                                animationSpec = tween(120, easing = FastOutSlowInEasing)
-                                            ))
-                                },
-                                label = "durationProgressValue"
-                            ) { animatedValue ->
-                                Text(
-                                    text = "$animatedValue / $selectedTarget ${t("min")}",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = semantic.textPrimary
-                                )
-                            }
-                        } else {
-                            Text(
-                                text = progressLabel,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = semantic.textPrimary
-                            )
-                        }
                         Row(
+                            modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 6.dp)
+                            horizontalArrangement = Arrangement.spacedBy(spacing.x1)
                         ) {
-                            LinearProgressIndicator(
-                                progress = { animatedProgress },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(6.dp)
-                                    .clip(RoundedCornerShape(3.dp)),
-                                color = habitColor,
-                                trackColor = MaterialTheme.colorScheme.surfaceVariant
-                            )
-                            Spacer(Modifier.width(10.dp))
-                            Text(
-                                text = "$displayPercent%",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.widthIn(min = 32.dp),
-                                textAlign = TextAlign.End
-                            )
-                        }
-                        Text(
-                            text = goalStatusText,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = goalStatusColor,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 8.dp)
-                        )
-
-                        if (isCountTracking) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(spacing.x1),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                OutlinedButton(
-                                    onClick = { onIncrementValue(-1) },
-                                    modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(radius.full)
-                                ) {
-                                    Text("−")
-                                }
-                                Surface(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .height(48.dp),
-                                    shape = RoundedCornerShape(radius.md),
-                                    color = semantic.backgroundSurfaceMuted
-                                ) {
-                                    Box(contentAlignment = Alignment.Center) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                if (isDurationTracking) {
+                                    AnimatedContent(
+                                        targetState = selectedValue,
+                                        transitionSpec = {
+                                            (fadeIn(animationSpec = tween(170, easing = FastOutSlowInEasing)) +
+                                                slideInVertically(
+                                                    initialOffsetY = { it / 3 },
+                                                    animationSpec = tween(170, easing = FastOutSlowInEasing)
+                                                )) togetherWith
+                                                (fadeOut(animationSpec = tween(120, easing = FastOutSlowInEasing)) +
+                                                    slideOutVertically(
+                                                        targetOffsetY = { -it / 4 },
+                                                        animationSpec = tween(120, easing = FastOutSlowInEasing)
+                                                    ))
+                                        },
+                                        label = "durationProgressValue"
+                                    ) { animatedValue ->
                                         Text(
-                                            text = selectedValue.toString(),
-                                            style = MaterialTheme.typography.titleLarge,
-                                            fontWeight = FontWeight.Bold,
+                                            text = "$animatedValue / $selectedTarget ${t("min")}",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.SemiBold,
                                             color = semantic.textPrimary
                                         )
                                     }
+                                } else {
+                                    Text(
+                                        text = progressLabel,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = semantic.textPrimary
+                                    )
                                 }
-                                OutlinedButton(
-                                    onClick = { onIncrementValue(1) },
-                                    modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(radius.full)
+                            }
+                            if (selectedValue > 0) {
+                                EditValueButton(onClick = { showValueNumpad = true })
+                            }
+                        }
+
+                        AnimatedVisibility(
+                            visible = !showValueNumpad,
+                            enter = expandVertically(animationSpec = tween(190, easing = FastOutSlowInEasing)) +
+                                fadeIn(animationSpec = tween(170, easing = FastOutSlowInEasing)),
+                            exit = shrinkVertically(animationSpec = tween(160, easing = FastOutSlowInEasing)) +
+                                fadeOut(animationSpec = tween(130, easing = FastOutSlowInEasing))
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(spacing.x1)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 6.dp)
                                 ) {
-                                    Text("+")
+                                    LinearProgressIndicator(
+                                        progress = { animatedProgress },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(6.dp)
+                                            .clip(RoundedCornerShape(3.dp)),
+                                        color = habitColor,
+                                        trackColor = MaterialTheme.colorScheme.surfaceVariant
+                                    )
+                                    Spacer(Modifier.width(10.dp))
+                                    Text(
+                                        text = "$displayPercent%",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.widthIn(min = 32.dp),
+                                        textAlign = TextAlign.End
+                                    )
+                                }
+                                Text(
+                                    text = goalStatusText,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = goalStatusColor,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 8.dp)
+                                )
+
+                                if (isCountTracking) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(spacing.x1),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        OutlinedButton(
+                                            onClick = { onIncrementValue(-1) },
+                                            modifier = Modifier.weight(1f),
+                                            shape = RoundedCornerShape(radius.full)
+                                        ) {
+                                            Text("−")
+                                        }
+                                        Surface(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .height(48.dp),
+                                            shape = RoundedCornerShape(radius.md),
+                                            color = semantic.backgroundSurfaceMuted
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Text(
+                                                    text = selectedValue.toString(),
+                                                    style = MaterialTheme.typography.titleLarge,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = semantic.textPrimary
+                                                )
+                                            }
+                                        }
+                                        OutlinedButton(
+                                            onClick = { onIncrementValue(1) },
+                                            modifier = Modifier.weight(1f),
+                                            shape = RoundedCornerShape(radius.full)
+                                        ) {
+                                            Text("+")
+                                        }
+                                    }
+                                }
+
+                                if (isDurationTracking) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+                                    ) {
+                                        listOf(5, 10, 20).forEach { delta ->
+                                            OutlinedButton(
+                                                onClick = { onIncrementValue(delta) },
+                                                modifier = Modifier.weight(1f),
+                                                shape = RoundedCornerShape(radius.full)
+                                            ) {
+                                                Text("+$delta")
+                                            }
+                                        }
+                                    }
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+                                    ) {
+                                        OutlinedButton(
+                                            onClick = {
+                                                showValueNumpad = true
+                                            },
+                                            modifier = Modifier.weight(1f),
+                                            shape = RoundedCornerShape(radius.md)
+                                        ) {
+                                            Text(t("Enter manually"))
+                                        }
+                                        OutlinedButton(
+                                            onClick = {
+                                                timerElapsedSeconds = 0
+                                                timerUiState = TimerUiState.IDLE
+                                                durationSheetMode = DurationSheetMode.TIMER
+                                            },
+                                            modifier = Modifier.weight(1f),
+                                            shape = RoundedCornerShape(radius.md)
+                                        ) {
+                                            Text(t("Timer"))
+                                        }
+                                    }
                                 }
                             }
                         }
 
-                        if (isDurationTracking) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(spacing.x1)
-                            ) {
-                                listOf(5, 10, 20).forEach { delta ->
-                                    OutlinedButton(
-                                        onClick = { onIncrementValue(delta) },
-                                        modifier = Modifier.weight(1f),
-                                        shape = RoundedCornerShape(radius.full)
-                                    ) {
-                                        Text("+$delta")
+                        AnimatedVisibility(
+                            visible = showValueNumpad,
+                            enter = expandVertically(animationSpec = tween(190, easing = FastOutSlowInEasing)) +
+                                fadeIn(animationSpec = tween(170, easing = FastOutSlowInEasing)),
+                            exit = shrinkVertically(animationSpec = tween(160, easing = FastOutSlowInEasing)) +
+                                fadeOut(animationSpec = tween(130, easing = FastOutSlowInEasing))
+                        ) {
+                            ValueNumpad(
+                                input = valueNumpadInput,
+                                unitLabel = unitLabel,
+                                onInputChange = { updated -> valueNumpadInput = updated },
+                                onBackspace = {
+                                    if (valueNumpadInput.isNotEmpty()) {
+                                        valueNumpadInput = valueNumpadInput.dropLast(1)
                                     }
-                                }
-                            }
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(spacing.x1)
-                            ) {
-                                OutlinedButton(
-                                    onClick = {
-                                        manualMinutesInput = selectedValue.coerceAtLeast(0).toString()
-                                        durationSheetMode = DurationSheetMode.MANUAL
-                                    },
-                                    modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(radius.md)
-                                ) {
-                                    Text(t("Enter manually"))
-                                }
-                                OutlinedButton(
-                                    onClick = {
-                                        timerElapsedSeconds = 0
-                                        timerUiState = TimerUiState.IDLE
-                                        durationSheetMode = DurationSheetMode.TIMER
-                                    },
-                                    modifier = Modifier.weight(1f),
-                                    shape = RoundedCornerShape(radius.md)
-                                ) {
-                                    Text(t("Timer"))
-                                }
-                            }
+                                },
+                                onSave = {
+                                    val newValue = valueNumpadInput.toIntOrNull() ?: return@ValueNumpad
+                                    onSetValue(newValue.coerceAtLeast(0))
+                                    showValueNumpad = false
+                                },
+                                onDismiss = { showValueNumpad = false }
+                            )
                         }
                     }
                 }
@@ -5393,7 +5451,7 @@ private fun DayDot(
                 .background(fillColor)
                 .then(
                     if (showTodayBorder) {
-                        Modifier.border(1.5.dp, todayBorderColor, RoundedCornerShape(6.dp))
+                        Modifier.border(1.dp, todayBorderColor, RoundedCornerShape(6.dp))
                     } else {
                         Modifier
                     }
@@ -5404,6 +5462,8 @@ private fun DayDot(
             text = label,
             style = MaterialTheme.typography.bodySmall,
             color = if (isToday) todayBorderColor else semantic.textTertiary,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center,
             maxLines = 1,
             overflow = TextOverflow.Clip
         )
@@ -5423,6 +5483,163 @@ private fun HeroDetailsButton(onClick: () -> Unit) {
             color = semantic.primary,
             fontWeight = FontWeight.Medium
         )
+    }
+}
+
+@Composable
+private fun EditValueButton(onClick: () -> Unit) {
+    val colors = AppTheme.colors
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .border(
+                width = 1.dp,
+                color = colors.primary.copy(alpha = 0.4f),
+                shape = RoundedCornerShape(10.dp)
+            )
+            .background(colors.primaryMuted.copy(alpha = 0.8f))
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_pencil),
+            contentDescription = null,
+            tint = colors.primary,
+            modifier = Modifier.size(10.dp)
+        )
+        Text(
+            text = t("edit"),
+            style = MaterialTheme.typography.labelSmall,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Medium,
+            color = colors.primary
+        )
+    }
+}
+
+@Composable
+private fun ValueNumpad(
+    input: String,
+    unitLabel: String,
+    onInputChange: (String) -> Unit,
+    onBackspace: () -> Unit,
+    onSave: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val spacing = AppTheme.spacing
+    val keys = listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫")
+    val keySize = 52.dp
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(spacing.x1)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+        ) {
+            Text(
+                text = if (input.isEmpty()) "—" else input,
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = if (input.isEmpty()) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
+                modifier = Modifier.weight(1f),
+                textAlign = TextAlign.Center
+            )
+            Text(
+                text = unitLabel,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        keys.chunked(3).forEach { rowKeys ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(spacing.x1, Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                rowKeys.forEach { key ->
+                    when (key) {
+                        "" -> Spacer(Modifier.size(keySize))
+                        "⌫" -> {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .size(keySize)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                                    .clickable(onClick = onBackspace)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Rounded.Backspace,
+                                    contentDescription = t("Backspace"),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                        else -> {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .size(keySize)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                                    .clickable {
+                                        if (input.length < 4) {
+                                            onInputChange(input + key)
+                                        }
+                                    }
+                            ) {
+                                Text(
+                                    text = key,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            OutlinedButton(
+                onClick = onDismiss,
+                modifier = Modifier.weight(1f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+            ) {
+                Text(t("Cancel"))
+            }
+            Button(
+                onClick = onSave,
+                modifier = Modifier.weight(2f),
+                enabled = input.isNotEmpty(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AppTheme.colors.primary,
+                    contentColor = Color.White,
+                    disabledContainerColor = AppTheme.colors.primaryMuted,
+                    disabledContentColor = AppTheme.colors.primary.copy(alpha = 0.4f)
+                )
+            ) {
+                Text(
+                    text = t("Save"),
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
     }
 }
 

@@ -223,6 +223,7 @@ internal val ukTranslations: Map<String, String> = mapOf(
     "%d %s to go" to "ще %d %s до цілі",
     "+%d %s beyond goal" to "+%d %s понад ціль",
     "Start today 🌱" to "Почни сьогодні 🌱",
+    "🔥 %dd streak · ⭐ %dd best · %d%% week" to "🔥 %dд серія · ⭐ %dд рекорд · %d%% тиждень",
     "🔥 Streak %dd · Best %dd · %d%% this month" to "🔥 Серія %dд · Краща %dд · %d%% за місяць",
     "Great job" to "Чудова робота",
     "Keep it going" to "Продовжуйте в тому ж дусі",

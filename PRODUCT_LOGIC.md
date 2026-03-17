@@ -223,7 +223,7 @@ Future scope (не часть текущего канонического пов
     - progress ring:
       - для `YES_NO` — недельная стабильность `completedThisWeek / scheduledThisWeek` (ISO неделя, пн-вс);
       - для `COUNT/DURATION` — `value/target`;
-    - streak/meta строку (`streak`, `best streak`, `30-day completion`) или zero-streak fallback,
+    - streak/meta строку (`streak`, `best streak`, weekly percent, синхронизированный с логикой progress ring) или zero-streak fallback,
     - compact 7-day mini-track;
   - для `COUNT` / `DURATION` внутри `HeroCard` отображаются:
     - linear progress bar по физическому прогрессу к target (`value/target`);

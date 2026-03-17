@@ -543,6 +543,15 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
         v("Heute starten 🌱", "Commencez aujourd'hui 🌱", "Empieza hoy 🌱", "Inizia oggi 🌱", "Начни сегодня 🌱") +
             mapOf(AppLanguage.CS to "Začni dnes 🌱")
     ),
+    "🔥 %dd streak · ⭐ %dd best · %d%% week" to (
+        v(
+            "🔥 %dT Serie · ⭐ %dT Rekord · %d%% Woche",
+            "🔥 Serie %dj · ⭐ Record %dj · %d%% semaine",
+            "🔥 Racha %dd · ⭐ Record %dd · %d%% semana",
+            "🔥 Serie %dg · ⭐ Record %dg · %d%% settimana",
+            "🔥 %dд серия · ⭐ %dд рекорд · %d%% неделя"
+        ) + mapOf(AppLanguage.CS to "🔥 %dd série · ⭐ %dd rekord · %d%% týden")
+    ),
     "🔥 Streak %dd · Best %dd · %d%% this month" to (
         v(
             "🔥 Serie %dT · Beste %dT · %d%% diesen Monat",

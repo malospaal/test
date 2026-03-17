@@ -1139,7 +1139,6 @@ private fun TrackerPage(
                                 selectedUnit = state.selectedDateUnit,
                                 streak = state.streak,
                                 bestStreak = state.bestStreak,
-                                completionRate30 = state.completionRate30Day,
                                 weeklyRingProgress = state.weeklyRingProgress,
                                 weeklyRingCompleted = state.weeklyRingCompleted,
                                 weeklyRingScheduled = state.weeklyRingScheduled,
@@ -4448,7 +4447,6 @@ private fun HeroCard(
     selectedUnit: String,
     streak: Int,
     bestStreak: Int,
-    completionRate30: Int,
     weeklyRingProgress: Float,
     weeklyRingCompleted: Int,
     weeklyRingScheduled: Int,
@@ -4642,6 +4640,7 @@ private fun HeroCard(
     } else {
         task?.emoji?.ifBlank { "✨" } ?: "✨"
     }
+    val ringPercent = (ringProgress * 100f).roundToInt()
     val streakMetaText = when {
         !canMarkForSelectedDate -> {
             val nextLabel = nextScheduledDate?.format(
@@ -4654,7 +4653,7 @@ private fun HeroCard(
             }
         }
         streak <= 0 -> t("Start today 🌱")
-        else -> tf("🔥 Streak %dd · Best %dd · %d%% this month", streak, bestStreak, completionRate30)
+        else -> tf("🔥 %dd streak · ⭐ %dd best · %d%% week", streak, bestStreak, ringPercent)
     }
     LaunchedEffect(durationSheetMode, timerUiState, task?.id, selectedDate) {
         while (durationSheetMode == DurationSheetMode.TIMER && timerUiState == TimerUiState.RUNNING) {
@@ -4674,7 +4673,7 @@ private fun HeroCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(15.dp)
                 .then(
                     if (!swipeEnabled) {
                         Modifier
@@ -4780,7 +4779,7 @@ private fun HeroCard(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 12.dp, bottom = 4.dp),
+                        .padding(top = 10.dp, bottom = 0.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     val showCompletedLottie = completedButtonComposition != null &&
@@ -4849,7 +4848,7 @@ private fun HeroCard(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 12.dp, bottom = 4.dp),
+                        .padding(top = 10.dp, bottom = 0.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Button(
@@ -4896,7 +4895,7 @@ private fun HeroCard(
                 GlassCard(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = spacing.x1),
+                        .padding(top = spacing.x1, bottom = 2.dp),
                     contentPadding = PaddingValues(spacing.x1_5)
                 ) {
                     Column(
@@ -5054,7 +5053,6 @@ private fun HeroCard(
                     }
                 }
             }
-            Spacer(Modifier.height(2.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
@@ -5311,8 +5309,8 @@ private fun ProgressRing(
         )
         Text(
             text = centerLabel,
-            fontSize = if (centerLabel.contains("%")) 12.sp else 18.sp,
-            fontWeight = if (centerLabel.contains("%")) FontWeight.SemiBold else FontWeight.Normal,
+            fontSize = if (centerLabel.contains("%")) 13.sp else 18.sp,
+            fontWeight = if (centerLabel.contains("%")) FontWeight.Bold else FontWeight.Normal,
             color = centerLabelColor
         )
     }
@@ -5388,7 +5386,7 @@ private fun DayDot(
     ) {
         Box(
             modifier = Modifier
-                .fillMaxWidth(0.8f)
+                .fillMaxWidth(0.76f)
                 .align(Alignment.CenterHorizontally)
                 .aspectRatio(1f)
                 .clip(RoundedCornerShape(6.dp))

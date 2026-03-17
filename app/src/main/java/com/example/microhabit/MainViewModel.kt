@@ -15,7 +15,6 @@ import com.example.microhabit.data.HabitTemplateCatalog
 import com.example.microhabit.data.SubscriptionPlan
 import com.example.microhabit.data.TaskFrequency
 import com.example.microhabit.data.TrackingType
-import com.example.microhabit.data.WeeklyProgressSnapshot
 import com.example.microhabit.i18n.localeForLanguage
 import com.example.microhabit.i18n.translate
 import com.example.microhabit.notifications.HabitReminderScheduler
@@ -186,6 +185,15 @@ private data class EditorSavePayload(
     val unitLabel: String,
     val frequency: TaskFrequency,
     val customDays: Set<Int>
+)
+
+private data class HeroRolling7Snapshot(
+    val points: List<Int>,
+    val scheduled: List<Boolean>,
+    val manualOverride: List<Boolean>,
+    val completedScheduled: Int,
+    val scheduledCount: Int,
+    val progress: Float
 )
 
 class MainViewModel(
@@ -457,9 +465,7 @@ class MainViewModel(
         } else {
             setOf(1, 2, 3, 4, 5)
         }
-        val normalizedShowAdvanced = prefill?.let {
-            it.reminderEnabled || endDate != null
-        } ?: false
+        val normalizedShowAdvanced = false
         _state.update {
             it.copy(
                 showEditor = true,
@@ -999,10 +1005,7 @@ class MainViewModel(
             val selectedDateNextScheduled = selectedTask?.let { task ->
                 if (repository.isScheduledOn(task, date)) null else repository.nextScheduledDate(task, date)
             }
-            val weeklyRingSnapshot = selectedTask
-                ?.takeIf { it.trackingType == TrackingType.YES_NO }
-                ?.let { repository.weeklyProgressSnapshot(it, date) }
-                ?: WeeklyProgressSnapshot(completed = 0, scheduled = 0)
+            val heroRolling7Snapshot = buildHeroRolling7Snapshot(selectedTask, metricsAnchorDate)
             val weekdayConsistency = selectedTask?.let { repository.weekdayConsistency(it, 84, metricsAnchorDate) } ?: List(7) { 0 }
             val consistencyNonZero = weekdayConsistency
                 .mapIndexed { index, value -> index to value }
@@ -1086,26 +1089,16 @@ class MainViewModel(
                     selectedTaskNote = selectedTask?.let { repository.getTaskNote(it.id) }.orEmpty(),
                     completionRate7Day = selectedTask?.let { repository.completionRate(it, 7, metricsAnchorDate) } ?: 0,
                     completionRate30Day = selectedTask?.let { repository.completionRate(it, 30, metricsAnchorDate) } ?: 0,
-                    weeklyRingProgress = weeklyRingSnapshot.progress,
-                    weeklyRingCompleted = weeklyRingSnapshot.completed,
-                    weeklyRingScheduled = weeklyRingSnapshot.scheduled,
+                    weeklyRingProgress = heroRolling7Snapshot.progress,
+                    weeklyRingCompleted = heroRolling7Snapshot.completedScheduled,
+                    weeklyRingScheduled = heroRolling7Snapshot.scheduledCount,
                     totalCompletions = selectedTask?.let { repository.totalCompletions(it) } ?: 0,
                     totalTrackedValue = selectedTask?.let { repository.totalTrackedValue(it) } ?: 0,
                     averageTrackedValue = selectedTask?.let { repository.averageTrackedValue(it, 30, metricsAnchorDate) } ?: 0,
                     progressPercent = selectedTask?.let { repository.progressForLast30Days(it, metricsAnchorDate) } ?: 0,
-                    last7Days = selectedTask?.let { repository.last7Days(it, metricsAnchorDate) } ?: List(7) { 0 },
-                    last7DaysScheduled = selectedTask?.let { task ->
-                        (6L downTo 0L).map { offset ->
-                            val day = metricsAnchorDate.minusDays(offset)
-                            repository.isScheduledOn(task, day)
-                        }
-                    } ?: List(7) { false },
-                    last7DaysManualOverride = selectedTask?.let { task ->
-                        (6L downTo 0L).map { offset ->
-                            val day = metricsAnchorDate.minusDays(offset)
-                            !repository.isScheduledOn(task, day) && repository.getDayValue(task, day) > 0
-                        }
-                    } ?: List(7) { false },
+                    last7Days = heroRolling7Snapshot.points,
+                    last7DaysScheduled = heroRolling7Snapshot.scheduled,
+                    last7DaysManualOverride = heroRolling7Snapshot.manualOverride,
                     monthlyProgress = selectedTask?.let { repository.monthlyWeeklyProgress(it, state.currentMonth) } ?: emptyList(),
                     weekdayConsistency = weekdayConsistency,
                     doneDatesInCurrentMonth = selectedTask?.let { task ->
@@ -1197,10 +1190,7 @@ class MainViewModel(
         val selectedDateNextScheduled = selectedTask?.let { task ->
             if (repository.isScheduledOn(task, date)) null else repository.nextScheduledDate(task, date)
         }
-        val weeklyRingSnapshot = selectedTask
-            ?.takeIf { it.trackingType == TrackingType.YES_NO }
-            ?.let { repository.weeklyProgressSnapshot(it, date) }
-            ?: WeeklyProgressSnapshot(completed = 0, scheduled = 0)
+        val heroRolling7Snapshot = buildHeroRolling7Snapshot(selectedTask, metricsAnchorDate)
         val weekdayConsistency = selectedTask?.let { repository.weekdayConsistency(it, 84, metricsAnchorDate) } ?: List(7) { 0 }
         val consistencyNonZero = weekdayConsistency
             .mapIndexed { index, value -> index to value }
@@ -1259,26 +1249,16 @@ class MainViewModel(
                 completionConsistency = completionConsistency,
                 completionRate7Day = selectedTask?.let { repository.completionRate(it, 7, metricsAnchorDate) } ?: 0,
                 completionRate30Day = selectedTask?.let { repository.completionRate(it, 30, metricsAnchorDate) } ?: 0,
-                weeklyRingProgress = weeklyRingSnapshot.progress,
-                weeklyRingCompleted = weeklyRingSnapshot.completed,
-                weeklyRingScheduled = weeklyRingSnapshot.scheduled,
+                weeklyRingProgress = heroRolling7Snapshot.progress,
+                weeklyRingCompleted = heroRolling7Snapshot.completedScheduled,
+                weeklyRingScheduled = heroRolling7Snapshot.scheduledCount,
                 totalCompletions = selectedTask?.let { repository.totalCompletions(it) } ?: 0,
                 totalTrackedValue = selectedTask?.let { repository.totalTrackedValue(it) } ?: 0,
                 averageTrackedValue = selectedTask?.let { repository.averageTrackedValue(it, 30, metricsAnchorDate) } ?: 0,
                 progressPercent = selectedTask?.let { repository.progressForLast30Days(it, metricsAnchorDate) } ?: 0,
-                last7Days = selectedTask?.let { repository.last7Days(it, metricsAnchorDate) } ?: List(7) { 0 },
-                last7DaysScheduled = selectedTask?.let { task ->
-                    (6L downTo 0L).map { offset ->
-                        val day = metricsAnchorDate.minusDays(offset)
-                        repository.isScheduledOn(task, day)
-                    }
-                } ?: List(7) { false },
-                last7DaysManualOverride = selectedTask?.let { task ->
-                    (6L downTo 0L).map { offset ->
-                        val day = metricsAnchorDate.minusDays(offset)
-                        !repository.isScheduledOn(task, day) && repository.getDayValue(task, day) > 0
-                    }
-                } ?: List(7) { false },
+                last7Days = heroRolling7Snapshot.points,
+                last7DaysScheduled = heroRolling7Snapshot.scheduled,
+                last7DaysManualOverride = heroRolling7Snapshot.manualOverride,
                 monthlyProgress = selectedTask?.let { repository.monthlyWeeklyProgress(it, month) } ?: emptyList(),
                 weekdayConsistency = weekdayConsistency,
                 doneDatesInCurrentMonth = selectedTask?.let { task ->
@@ -1301,6 +1281,47 @@ class MainViewModel(
                 minimumCompletionPercent = minimumCompletionPercent
             )
         }
+    }
+
+    private fun buildHeroRolling7Snapshot(
+        task: HabitTask?,
+        anchorDate: LocalDate
+    ): HeroRolling7Snapshot {
+        if (task == null) {
+            return HeroRolling7Snapshot(
+                points = List(7) { 0 },
+                scheduled = List(7) { false },
+                manualOverride = List(7) { false },
+                completedScheduled = 0,
+                scheduledCount = 0,
+                progress = 0f
+            )
+        }
+
+        val dates = (6L downTo 0L).map { offset -> anchorDate.minusDays(offset) }
+        val scheduled = dates.map { day -> repository.isScheduledOn(task, day) }
+        val points = dates.map { day -> repository.progressPercentForWidget(task, day) }
+        val manualOverride = dates.map { day ->
+            !repository.isScheduledOn(task, day) && repository.getDayValue(task, day) > 0
+        }
+        val scheduledCount = scheduled.count { it }
+        val completedScheduled = scheduled.indices.count { index ->
+            scheduled[index] && points[index] >= 100
+        }
+        val progress = if (scheduledCount == 0) {
+            0f
+        } else {
+            completedScheduled.toFloat() / scheduledCount.toFloat()
+        }
+
+        return HeroRolling7Snapshot(
+            points = points,
+            scheduled = scheduled,
+            manualOverride = manualOverride,
+            completedScheduled = completedScheduled,
+            scheduledCount = scheduledCount,
+            progress = progress.coerceIn(0f, 1f)
+        )
     }
 
     private fun doneDatesForMonth(task: HabitTask, month: YearMonth): Set<LocalDate> {

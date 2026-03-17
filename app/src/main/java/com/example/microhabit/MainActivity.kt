@@ -112,6 +112,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -372,7 +373,7 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
     var showDeleteCompletedHabitConfirm by rememberSaveable { mutableStateOf(false) }
     var showTemplatePicker by rememberSaveable { mutableStateOf(false) }
     var selectedTemplateId by rememberSaveable { mutableStateOf<String?>(null) }
-    var selectedTemplateCategory by rememberSaveable { mutableStateOf(TemplateCategory.ALL.name) }
+    var selectedTemplateCategory by rememberSaveable { mutableStateOf<String?>(null) }
     var templateDraft by remember { mutableStateOf<TemplateConfirmDraft?>(null) }
     var pendingTemplateReminderPicker by remember { mutableStateOf<(() -> Unit)?>(null) }
     val semantic = AppTheme.colors
@@ -450,7 +451,7 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
         page = AppPage.PAYWALL
     }
     val openTemplatePicker = {
-        selectedTemplateCategory = TemplateCategory.ALL.name
+        selectedTemplateCategory = null
         selectedTemplateId = null
         templateDraft = null
         showTemplatePicker = true
@@ -751,139 +752,190 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
         }
 
         if (showTemplatePicker) {
-            val selectedTemplate = CreateHabitTemplateCatalog.templates.firstOrNull { it.id == selectedTemplateId }
-            if (selectedTemplate == null) {
-                HabitTemplateScreen(
-                    selectedCategory = runCatching { TemplateCategory.valueOf(selectedTemplateCategory) }
-                        .getOrDefault(TemplateCategory.ALL),
-                    onCategorySelected = { selectedTemplateCategory = it.name },
-                    onTemplateSelected = { template ->
-                        if (!vm.canCreateTask()) {
+            val selectedCategory = selectedTemplateCategory
+                ?.let { raw -> runCatching { TemplateCategory.valueOf(raw) }.getOrNull() }
+                ?.takeIf { it != TemplateCategory.ALL }
+            when {
+                selectedCategory == null -> {
+                    HabitCategoryScreen(
+                        onCategorySelected = { category ->
+                            if (!vm.canCreateTask()) {
+                                showTemplatePicker = false
+                                openPaywallFromCurrentPage()
+                            } else {
+                                selectedTemplateCategory = category.name
+                                selectedTemplateId = null
+                            }
+                        },
+                        onCreateCustom = {
+                            if (!vm.canCreateTask()) {
+                                showTemplatePicker = false
+                                openPaywallFromCurrentPage()
+                            } else {
+                                showTemplatePicker = false
+                                vm.openCreateTask()
+                            }
+                        },
+                        onSkip = {
+                            if (!vm.canCreateTask()) {
+                                showTemplatePicker = false
+                                openPaywallFromCurrentPage()
+                            } else {
+                                showTemplatePicker = false
+                                vm.openCreateTask()
+                            }
+                        },
+                        onDismiss = {
                             showTemplatePicker = false
-                            openPaywallFromCurrentPage()
-                            return@HabitTemplateScreen
+                            selectedTemplateCategory = null
+                            selectedTemplateId = null
+                            templateDraft = null
                         }
-                        selectedTemplateId = template.id
-                        templateDraft = TemplateConfirmDraft(
-                            template = template,
-                            habitName = translate(language, template.nameKey),
-                            dailyTarget = template.dailyTarget.coerceAtLeast(1),
-                            frequency = template.frequency,
-                            customDays = template.defaultDays.ifEmpty { setOf(1, 2, 3, 4, 5) },
-                            timesPerWeek = 3,
+                    )
+                }
+
+                selectedTemplateId == null -> {
+                    HabitTemplateScreen(
+                        category = selectedCategory,
+                        onTemplateSelected = { template ->
+                            if (!vm.canCreateTask()) {
+                                showTemplatePicker = false
+                                openPaywallFromCurrentPage()
+                                return@HabitTemplateScreen
+                            }
+                            selectedTemplateId = template.id
+                            templateDraft = TemplateConfirmDraft(
+                                template = template,
+                                habitName = translate(language, template.nameKey),
+                                dailyTarget = template.dailyTarget.coerceAtLeast(1),
+                                frequency = template.frequency,
+                                customDays = template.defaultDays.ifEmpty { setOf(1, 2, 3, 4, 5) },
+                                timesPerWeek = template.defaultTimesPerWeek.coerceIn(1, 7),
+                                startDate = LocalDate.now(),
+                                reminderEnabled = false,
+                                reminderHour = state.defaultReminderHour,
+                                reminderMinute = state.defaultReminderMinute
+                            )
+                        },
+                        onCreateCustomHabit = {
+                            if (!vm.canCreateTask()) {
+                                showTemplatePicker = false
+                                openPaywallFromCurrentPage()
+                            } else {
+                                showTemplatePicker = false
+                                vm.openCreateTask()
+                            }
+                        },
+                        onBack = {
+                            selectedTemplateCategory = null
+                            selectedTemplateId = null
+                            templateDraft = null
+                        }
+                    )
+                }
+
+                else -> {
+                    val selectedTemplate = CreateHabitTemplateCatalog.templatesFor(selectedCategory)
+                        .firstOrNull { it.id == selectedTemplateId }
+                    if (selectedTemplate == null) {
+                        selectedTemplateId = null
+                        templateDraft = null
+                    } else {
+                        val currentDraft = templateDraft ?: TemplateConfirmDraft(
+                            template = selectedTemplate,
+                            habitName = translate(language, selectedTemplate.nameKey),
+                            dailyTarget = selectedTemplate.dailyTarget.coerceAtLeast(1),
+                            frequency = selectedTemplate.frequency,
+                            customDays = selectedTemplate.defaultDays.ifEmpty { setOf(1, 2, 3, 4, 5) },
+                            timesPerWeek = selectedTemplate.defaultTimesPerWeek.coerceIn(1, 7),
                             startDate = LocalDate.now(),
                             reminderEnabled = false,
                             reminderHour = state.defaultReminderHour,
                             reminderMinute = state.defaultReminderMinute
                         )
-                    },
-                    onCreateCustomHabit = {
-                        if (!vm.canCreateTask()) {
-                            showTemplatePicker = false
-                            openPaywallFromCurrentPage()
-                        } else {
-                            showTemplatePicker = false
-                            vm.openCreateTask()
-                        }
-                    },
-                    onClose = {
-                        showTemplatePicker = false
-                        selectedTemplateId = null
-                        templateDraft = null
-                    }
-                )
-            } else {
-                val currentDraft = templateDraft ?: TemplateConfirmDraft(
-                    template = selectedTemplate,
-                    habitName = translate(language, selectedTemplate.nameKey),
-                    dailyTarget = selectedTemplate.dailyTarget.coerceAtLeast(1),
-                    frequency = selectedTemplate.frequency,
-                    customDays = selectedTemplate.defaultDays.ifEmpty { setOf(1, 2, 3, 4, 5) },
-                    timesPerWeek = 3,
-                    startDate = LocalDate.now(),
-                    reminderEnabled = false,
-                    reminderHour = state.defaultReminderHour,
-                    reminderMinute = state.defaultReminderMinute
-                )
-                templateDraft = currentDraft
-                HabitTemplateConfirmScreen(
-                    initial = currentDraft,
-                    onBack = { selectedTemplateId = null },
-                    onStateChange = { templateDraft = it },
-                    onCreateHabit = { draft ->
-                        val prefill = TaskEditorPrefill(
-                            title = draft.habitName,
-                            emoji = draft.template.emoji,
-                            colorHex = draft.template.colorHex,
-                            trackingType = draft.template.trackingType,
-                            dailyTarget = draft.dailyTarget.coerceAtLeast(1),
-                            unitLabel = if (draft.template.unitLabelKey.isBlank()) "" else translate(language, draft.template.unitLabelKey),
-                            frequency = draft.frequency,
-                            customDays = draft.customDays,
-                            timesPerWeek = draft.timesPerWeek,
-                            startDate = draft.startDate,
-                            reminderEnabled = draft.reminderEnabled,
-                            reminderHour = draft.reminderHour,
-                            reminderMinute = draft.reminderMinute
-                        )
-                        showTemplatePicker = false
-                        selectedTemplateId = null
-                        templateDraft = null
-                        vm.openCreateTask(prefill)
-                        if (draft.reminderEnabled) {
-                            ensureNotificationPermissionAndRun(NotificationPermissionAction.SAVE_EDITOR_REMINDER)
-                        } else {
-                            vm.saveEditor()
-                        }
-                    },
-                    onConfigureMore = { draft ->
-                        val prefill = TaskEditorPrefill(
-                            title = draft.habitName,
-                            emoji = draft.template.emoji,
-                            colorHex = draft.template.colorHex,
-                            trackingType = draft.template.trackingType,
-                            dailyTarget = draft.dailyTarget.coerceAtLeast(1),
-                            unitLabel = if (draft.template.unitLabelKey.isBlank()) "" else translate(language, draft.template.unitLabelKey),
-                            frequency = draft.frequency,
-                            customDays = draft.customDays,
-                            timesPerWeek = draft.timesPerWeek,
-                            startDate = draft.startDate,
-                            reminderEnabled = draft.reminderEnabled,
-                            reminderHour = draft.reminderHour,
-                            reminderMinute = draft.reminderMinute
-                        )
-                        showTemplatePicker = false
-                        selectedTemplateId = null
-                        templateDraft = null
-                        vm.openCreateTask(prefill)
-                    },
-                    onPickStartDate = { startDate, onPicked ->
-                        showThemedDatePicker(
-                            context = context,
-                            themeResId = datePickerTheme,
-                            initialDate = startDate,
-                            minDate = LocalDate.now(),
-                            actionColorArgb = pickerActionColor,
-                            onDateSet = { year, month, day ->
-                                onPicked(LocalDate.of(year, month + 1, day))
+                        templateDraft = currentDraft
+                        HabitTemplateConfirmScreen(
+                            initial = currentDraft,
+                            onBack = { selectedTemplateId = null },
+                            onStateChange = { templateDraft = it },
+                            onCreateHabit = { draft ->
+                                val prefill = TaskEditorPrefill(
+                                    title = draft.habitName,
+                                    emoji = draft.template.emoji,
+                                    colorHex = draft.template.colorHex,
+                                    trackingType = draft.template.trackingType,
+                                    dailyTarget = draft.dailyTarget.coerceAtLeast(1),
+                                    unitLabel = if (draft.template.unitLabelKey.isBlank()) "" else translate(language, draft.template.unitLabelKey),
+                                    frequency = draft.frequency,
+                                    customDays = draft.customDays,
+                                    timesPerWeek = draft.timesPerWeek,
+                                    startDate = draft.startDate,
+                                    reminderEnabled = draft.reminderEnabled,
+                                    reminderHour = draft.reminderHour,
+                                    reminderMinute = draft.reminderMinute
+                                )
+                                showTemplatePicker = false
+                                selectedTemplateCategory = null
+                                selectedTemplateId = null
+                                templateDraft = null
+                                vm.openCreateTask(prefill)
+                                if (draft.reminderEnabled) {
+                                    ensureNotificationPermissionAndRun(NotificationPermissionAction.SAVE_EDITOR_REMINDER)
+                                } else {
+                                    vm.saveEditor()
+                                }
+                            },
+                            onConfigureMore = { draft ->
+                                val prefill = TaskEditorPrefill(
+                                    title = draft.habitName,
+                                    emoji = draft.template.emoji,
+                                    colorHex = draft.template.colorHex,
+                                    trackingType = draft.template.trackingType,
+                                    dailyTarget = draft.dailyTarget.coerceAtLeast(1),
+                                    unitLabel = if (draft.template.unitLabelKey.isBlank()) "" else translate(language, draft.template.unitLabelKey),
+                                    frequency = draft.frequency,
+                                    customDays = draft.customDays,
+                                    timesPerWeek = draft.timesPerWeek,
+                                    startDate = draft.startDate,
+                                    reminderEnabled = draft.reminderEnabled,
+                                    reminderHour = draft.reminderHour,
+                                    reminderMinute = draft.reminderMinute
+                                )
+                                showTemplatePicker = false
+                                selectedTemplateCategory = null
+                                selectedTemplateId = null
+                                templateDraft = null
+                                vm.openCreateTask(prefill)
+                            },
+                            onPickStartDate = { startDate, onPicked ->
+                                showThemedDatePicker(
+                                    context = context,
+                                    themeResId = datePickerTheme,
+                                    initialDate = startDate,
+                                    minDate = LocalDate.now(),
+                                    actionColorArgb = pickerActionColor,
+                                    onDateSet = { year, month, day ->
+                                        onPicked(LocalDate.of(year, month + 1, day))
+                                    }
+                                )
+                            },
+                            onRequestReminderTime = { hour, minute, onPicked ->
+                                pendingTemplateReminderPicker = {
+                                    showThemedTimePicker(
+                                        context = context,
+                                        themeResId = pickerTheme,
+                                        initialHour = hour,
+                                        initialMinute = minute,
+                                        is24HourView = is24HourView,
+                                        actionColorArgb = pickerActionColor,
+                                        onTimeSet = onPicked
+                                    )
+                                }
+                                ensureNotificationPermissionAndRun(NotificationPermissionAction.PICK_TEMPLATE_REMINDER_TIME)
                             }
                         )
-                    },
-                    onRequestReminderTime = { hour, minute, onPicked ->
-                        pendingTemplateReminderPicker = {
-                            showThemedTimePicker(
-                                context = context,
-                                themeResId = pickerTheme,
-                                initialHour = hour,
-                                initialMinute = minute,
-                                is24HourView = is24HourView,
-                                actionColorArgb = pickerActionColor,
-                                onTimeSet = onPicked
-                            )
-                        }
-                        ensureNotificationPermissionAndRun(NotificationPermissionAction.PICK_TEMPLATE_REMINDER_TIME)
                     }
-                )
+                }
             }
         }
 
@@ -4747,28 +4799,15 @@ private fun HeroCard(
         else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
     }
     val habitColor = parseColorHex(task?.colorHex.orEmpty())
-    val yesNoWeeklyProgress = if (weeklyRingScheduled > 0) {
-        (weeklyRingCompleted.toFloat() / weeklyRingScheduled.toFloat()).coerceIn(0f, 1f)
-    } else {
-        weeklyRingProgress.coerceIn(0f, 1f)
-    }
-    val ringProgress = when {
-        task == null -> 0f
-        trackingType == TrackingType.YES_NO -> yesNoWeeklyProgress
-        else -> (selectedValue.toFloat() / selectedTarget.coerceAtLeast(1).toFloat()).coerceIn(0f, 1f)
-    }
+    val ringProgress = weeklyRingProgress.coerceIn(0f, 1f)
+    val ringPercent = (ringProgress * 100f).roundToInt()
     val ringArcColor = when {
-        trackingType == TrackingType.YES_NO && weeklyRingScheduled > 0 && ringProgress >= 1f -> semantic.success
+        weeklyRingScheduled > 0 && weeklyRingCompleted >= weeklyRingScheduled -> semantic.success
         trackingType == TrackingType.YES_NO -> semantic.primary
         else -> habitColor
     }
     val ringTrackColor = MaterialTheme.colorScheme.surfaceVariant
-    val ringCenterLabel = if (trackingType == TrackingType.YES_NO) {
-        "${(ringProgress * 100f).roundToInt()}%"
-    } else {
-        task?.emoji?.ifBlank { "✨" } ?: "✨"
-    }
-    val ringPercent = (ringProgress * 100f).roundToInt()
+    val ringCenterLabel = "${ringPercent}%"
     val streakMetaText = when {
         !canMarkForSelectedDate -> {
             val nextLabel = nextScheduledDate?.format(
@@ -4864,7 +4903,7 @@ private fun HeroCard(
                 ProgressRing(
                     percent = ringProgress,
                     centerLabel = ringCenterLabel,
-                    centerLabelColor = if (trackingType == TrackingType.YES_NO) ringArcColor else semantic.textPrimary,
+                    centerLabelColor = ringArcColor,
                     color = ringArcColor,
                     trackColor = ringTrackColor,
                     modifier = Modifier.offset(x = (-4).dp)
@@ -6793,16 +6832,23 @@ private fun SelectChip(title: String, selected: Boolean, onClick: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun HabitTemplateScreen(
-    selectedCategory: TemplateCategory,
+private fun HabitCategoryScreen(
     onCategorySelected: (TemplateCategory) -> Unit,
-    onTemplateSelected: (CreateHabitTemplate) -> Unit,
-    onCreateCustomHabit: () -> Unit,
-    onClose: () -> Unit
+    onCreateCustom: () -> Unit,
+    onSkip: () -> Unit,
+    onDismiss: () -> Unit
 ) {
     val spacing = AppTheme.spacing
     val colors = AppTheme.colors
-    val templates = remember(selectedCategory) { CreateHabitTemplateCatalog.templatesFor(selectedCategory) }
+    val language = LocalAppLanguage.current
+    val categories = remember {
+        listOf(
+            Triple(TemplateCategory.HEALTH, "💊", "cat_health"),
+            Triple(TemplateCategory.SPORT, "🏃", "cat_sport"),
+            Triple(TemplateCategory.MENTAL, "🧘", "cat_mental"),
+            Triple(TemplateCategory.PRODUCTIVITY, "📚", "cat_productivity")
+        )
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -6813,16 +6859,181 @@ private fun HabitTemplateScreen(
                 CenterAlignedTopAppBar(
                     title = {
                         Text(
-                            text = t("New habit"),
+                            text = t("screen_new_habit"),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.SemiBold
                         )
                     },
                     navigationIcon = {
-                        IconButton(onClick = onClose) {
+                        IconButton(onClick = onDismiss) {
+                            Icon(Icons.Rounded.Close, contentDescription = t("Close"))
+                        }
+                    },
+                    actions = {
+                        TextButton(onClick = onSkip) {
+                            Text(t("label_skip"))
+                        }
+                    },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = colors.backgroundSurface
+                    )
+                )
+            }
+        ) { innerPadding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(horizontal = spacing.x2, vertical = spacing.x1_5),
+                verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
+            ) {
+                Text(
+                    text = t("label_what_to_improve"),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = colors.textPrimary
+                )
+                Text(
+                    text = t("label_choose_category"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.textSecondary
+                )
+                categories.chunked(2).forEach { row ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+                    ) {
+                        row.forEach { (category, emoji, nameKey) ->
+                            val templateCount = CreateHabitTemplateCatalog.templatesFor(category).size
+                            CategoryTile(
+                                emoji = emoji,
+                                title = t(nameKey),
+                                countLabel = templateCountLabel(templateCount, language),
+                                modifier = Modifier.weight(1f),
+                                onClick = { onCategorySelected(category) }
+                            )
+                        }
+                        repeat((2 - row.size).coerceAtLeast(0)) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.weight(1f))
+                TextButton(
+                    onClick = onCreateCustom,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = t("btn_create_custom"),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = colors.primary
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CategoryTile(
+    emoji: String,
+    title: String,
+    countLabel: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val colors = AppTheme.colors
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(16.dp),
+        color = colors.backgroundSurface,
+        border = BorderStroke(1.dp, colors.borderSubtle),
+        modifier = modifier.aspectRatio(1.1f)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(text = emoji, fontSize = 28.sp)
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = countLabel,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+private fun templateCountLabel(count: Int, language: AppLanguage): String {
+    if (count <= 0) return formatTranslate(language, "template_count_many", 0)
+    return when (language) {
+        AppLanguage.RU, AppLanguage.UK -> {
+            val mod10 = count % 10
+            val mod100 = count % 100
+            val key = when {
+                mod10 == 1 && mod100 != 11 -> "template_count_one"
+                mod10 in 2..4 && mod100 !in 12..14 -> "template_count_few"
+                else -> "template_count_many"
+            }
+            formatTranslate(language, key, count)
+        }
+        AppLanguage.CS -> {
+            val key = when (count) {
+                1 -> "template_count_one"
+                2, 3, 4 -> "template_count_few"
+                else -> "template_count_many"
+            }
+            formatTranslate(language, key, count)
+        }
+        else -> {
+            val key = if (count == 1) "template_count_one" else "template_count_many"
+            formatTranslate(language, key, count)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HabitTemplateScreen(
+    category: TemplateCategory,
+    onTemplateSelected: (CreateHabitTemplate) -> Unit,
+    onCreateCustomHabit: () -> Unit,
+    onBack: () -> Unit
+) {
+    val spacing = AppTheme.spacing
+    val colors = AppTheme.colors
+    val templates = remember(category) { CreateHabitTemplateCatalog.templatesFor(category) }
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = colors.backgroundCanvas
+    ) {
+        Scaffold(
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = {
+                        Text(
+                            text = t(CreateHabitTemplateCatalog.categoryLabelKey(category)),
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
                             Icon(
-                                imageVector = Icons.Rounded.Close,
-                                contentDescription = t("Close")
+                                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                                contentDescription = t("Back")
                             )
                         }
                     },
@@ -6839,19 +7050,6 @@ private fun HabitTemplateScreen(
                 contentPadding = PaddingValues(horizontal = spacing.x2, vertical = spacing.x1_5),
                 verticalArrangement = Arrangement.spacedBy(spacing.x1)
             ) {
-                item {
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(spacing.x1)
-                    ) {
-                        items(CreateHabitTemplateCatalog.categories, key = { it.name }) { category ->
-                            SelectChip(
-                                title = t(CreateHabitTemplateCatalog.categoryLabelKey(category)),
-                                selected = category == selectedCategory,
-                                onClick = { onCategorySelected(category) }
-                            )
-                        }
-                    }
-                }
                 items(templates, key = { it.id }) { template ->
                     Surface(
                         onClick = { onTemplateSelected(template) },
@@ -6862,17 +7060,17 @@ private fun HabitTemplateScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = spacing.x1_5, vertical = spacing.x1),
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             Box(
-                                modifier = Modifier.size(26.dp),
+                                modifier = Modifier.size(36.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     text = template.emoji.ifBlank { "✨" },
-                                    style = MaterialTheme.typography.titleMedium
+                                    fontSize = 20.sp
                                 )
                             }
                             Column(
@@ -6886,7 +7084,7 @@ private fun HabitTemplateScreen(
                                     color = colors.textPrimary
                                 )
                                 Text(
-                                    text = "${templateTrackingTypeLabel(template.trackingType)} · ${templateFrequencyLabel(template.frequency)}",
+                                    text = templateMetaLabel(template),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = colors.textSecondary
                                 )
@@ -6933,8 +7131,10 @@ private fun HabitTemplateConfirmScreen(
     val locale = appLocale()
     val language = LocalAppLanguage.current
     val template = initial.template
-    var habitName by rememberSaveable(template.id) { mutableStateOf(initial.habitName) }
-    var dailyTarget by rememberSaveable(template.id) { mutableStateOf(initial.dailyTarget.coerceAtLeast(1)) }
+    val habitName = remember(template.id, initial.habitName, language) {
+        initial.habitName.ifBlank { translate(language, template.nameKey) }
+    }
+    val dailyTarget = remember(template.id, initial.dailyTarget) { initial.dailyTarget.coerceAtLeast(1) }
     var frequency by rememberSaveable(template.id) { mutableStateOf(initial.frequency) }
     var customDays by rememberSaveable(template.id) { mutableStateOf(initial.customDays) }
     var timesPerWeek by rememberSaveable(template.id) { mutableStateOf(initial.timesPerWeek.coerceIn(1, 7)) }
@@ -6942,9 +7142,7 @@ private fun HabitTemplateConfirmScreen(
     var reminderEnabled by rememberSaveable(template.id) { mutableStateOf(initial.reminderEnabled) }
     var reminderHour by rememberSaveable(template.id) { mutableStateOf(initial.reminderHour.coerceIn(0, 23)) }
     var reminderMinute by rememberSaveable(template.id) { mutableStateOf(initial.reminderMinute.coerceIn(0, 59)) }
-    var showGoalEditor by rememberSaveable(template.id) { mutableStateOf(false) }
-    var showFrequencySheet by rememberSaveable(template.id) { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
+    var expandedParam by rememberSaveable(template.id) { mutableStateOf<ExpandedConfirmParam?>(null) }
     val currentDraft = remember(
         template,
         habitName,
@@ -6962,7 +7160,11 @@ private fun HabitTemplateConfirmScreen(
             habitName = habitName.trim().ifBlank { translate(language, template.nameKey) },
             dailyTarget = dailyTarget.coerceAtLeast(1),
             frequency = frequency,
-            customDays = customDays,
+            customDays = if (frequency == TaskFrequency.SELECTED_DAYS) {
+                customDays.ifEmpty { template.defaultDays.ifEmpty { setOf(1) } }
+            } else {
+                customDays
+            },
             timesPerWeek = timesPerWeek.coerceIn(1, 7),
             startDate = startDate,
             reminderEnabled = reminderEnabled,
@@ -6973,78 +7175,6 @@ private fun HabitTemplateConfirmScreen(
 
     LaunchedEffect(currentDraft) {
         onStateChange(currentDraft)
-    }
-
-    if (showFrequencySheet) {
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        ModalBottomSheet(
-            onDismissRequest = { showFrequencySheet = false },
-            sheetState = sheetState
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = spacing.x2, vertical = spacing.x1_5),
-                verticalArrangement = Arrangement.spacedBy(spacing.x1)
-            ) {
-                Text(
-                    text = t("Frequency"),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                TemplateFrequencyOption(
-                    label = t("freq_every_day"),
-                    selected = frequency == TaskFrequency.DAILY,
-                    onClick = { frequency = TaskFrequency.DAILY }
-                )
-                TemplateFrequencyOption(
-                    label = t("freq_selected_days"),
-                    selected = frequency == TaskFrequency.SELECTED_DAYS,
-                    description = t("freq_selected_days_desc"),
-                    onClick = {
-                        frequency = TaskFrequency.SELECTED_DAYS
-                        if (customDays.isEmpty()) customDays = template.defaultDays.ifEmpty { setOf(1, 2, 3, 4, 5) }
-                    }
-                )
-                if (frequency == TaskFrequency.SELECTED_DAYS) {
-                    WeekdaySelector(
-                        selectedDays = customDays,
-                        onToggle = { day ->
-                            val next = customDays.toMutableSet()
-                            if (!next.add(day)) next.remove(day)
-                            customDays = next
-                        }
-                    )
-                }
-                TemplateFrequencyOption(
-                    label = t("freq_times_per_week"),
-                    selected = frequency == TaskFrequency.TIMES_PER_WEEK,
-                    description = t("freq_times_per_week_desc"),
-                    onClick = { frequency = TaskFrequency.TIMES_PER_WEEK }
-                )
-                if (frequency == TaskFrequency.TIMES_PER_WEEK) {
-                    Stepper(
-                        label = t("Times per week"),
-                        value = timesPerWeek,
-                        min = 1,
-                        max = 7,
-                        onValueChange = { timesPerWeek = it.coerceIn(1, 7) }
-                    )
-                }
-                Button(
-                    onClick = {
-                        scope.launch {
-                            sheetState.hide()
-                            showFrequencySheet = false
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(t("Done"))
-                }
-                Spacer(modifier = Modifier.height(spacing.x1))
-            }
-        }
     }
 
     Surface(
@@ -7078,105 +7208,180 @@ private fun HabitTemplateConfirmScreen(
                 verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
             ) {
                 Surface(
-                    shape = RoundedCornerShape(AppTheme.radius.md),
+                    shape = RoundedCornerShape(16.dp),
                     color = colors.backgroundSurface,
-                    border = BorderStroke(AppTheme.stroke.thin, colors.borderSubtle.copy(alpha = 0.6f))
+                    border = BorderStroke(AppTheme.stroke.thin, colors.borderSubtle.copy(alpha = 0.7f))
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = spacing.x1_5, vertical = spacing.x1_5),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(colors.primary.copy(alpha = 0.12f)),
-                            contentAlignment = Alignment.Center
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Text(text = template.emoji, style = MaterialTheme.typography.titleLarge)
+                            Box(
+                                modifier = Modifier
+                                    .size(46.dp)
+                                    .clip(RoundedCornerShape(13.dp))
+                                    .background(colors.primary.copy(alpha = 0.12f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(text = template.emoji, fontSize = 22.sp)
+                            }
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                Text(
+                                    text = habitName,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = colors.textPrimary
+                                )
+                                Text(
+                                    text = "${t(CreateHabitTemplateCatalog.categoryLabelKey(template.category))} · ${templateTrackingTypeLabel(template.trackingType)}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = colors.textSecondary
+                                )
+                            }
                         }
-                        Column(
-                            modifier = Modifier.weight(1f),
-                            verticalArrangement = Arrangement.spacedBy(2.dp)
+
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = colors.backgroundSurfaceMuted.copy(alpha = 0.6f),
+                            border = BorderStroke(AppTheme.stroke.thin, colors.borderSubtle.copy(alpha = 0.6f))
                         ) {
-                            Text(
-                                text = habitName,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = colors.textPrimary
-                            )
-                            Text(
-                                text = "${t(CreateHabitTemplateCatalog.categoryLabelKey(template.category))} · ${templateTrackingTypeLabel(template.trackingType)}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = colors.textSecondary
-                            )
+                            Column {
+                                val isFrequencyExpanded = expandedParam == ExpandedConfirmParam.FREQUENCY
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = t("label_frequency"),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = colors.textSecondary
+                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        if (!isFrequencyExpanded) {
+                                            Text(
+                                                text = templateFrequencyLabel(frequency),
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontWeight = FontWeight.Medium,
+                                                color = colors.primary
+                                            )
+                                        }
+                                        Text(
+                                            text = if (isFrequencyExpanded) t("action_done") else t("action_edit"),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = colors.primary.copy(alpha = if (isFrequencyExpanded) 1f else 0.75f),
+                                            fontWeight = if (isFrequencyExpanded) FontWeight.Medium else FontWeight.Normal,
+                                            modifier = Modifier.clickable {
+                                                expandedParam = if (isFrequencyExpanded) null else ExpandedConfirmParam.FREQUENCY
+                                            }
+                                        )
+                                    }
+                                }
+
+                                AnimatedVisibility(
+                                    visible = isFrequencyExpanded,
+                                    enter = expandVertically(animationSpec = tween(200)) + fadeIn(),
+                                    exit = shrinkVertically(animationSpec = tween(200)) + fadeOut()
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(start = 14.dp, end = 14.dp, bottom = 10.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        TemplateFrequencyOption(
+                                            label = t("freq_every_day"),
+                                            selected = frequency == TaskFrequency.DAILY,
+                                            onClick = { frequency = TaskFrequency.DAILY }
+                                        )
+                                        TemplateFrequencyOption(
+                                            label = t("freq_selected_days"),
+                                            selected = frequency == TaskFrequency.SELECTED_DAYS,
+                                            description = t("freq_selected_days_desc"),
+                                            onClick = {
+                                                frequency = TaskFrequency.SELECTED_DAYS
+                                                if (customDays.isEmpty()) {
+                                                    customDays = template.defaultDays.ifEmpty { setOf(1, 2, 3, 4, 5) }
+                                                }
+                                            }
+                                        )
+                                        AnimatedVisibility(visible = frequency == TaskFrequency.SELECTED_DAYS) {
+                                            WeekdaySelector(
+                                                selectedDays = customDays,
+                                                onToggle = { day ->
+                                                    val next = customDays.toMutableSet()
+                                                    if (!next.add(day)) next.remove(day)
+                                                    customDays = next
+                                                }
+                                            )
+                                        }
+                                        TemplateFrequencyOption(
+                                            label = t("freq_times_per_week"),
+                                            selected = frequency == TaskFrequency.TIMES_PER_WEEK,
+                                            description = t("freq_times_per_week_desc"),
+                                            onClick = { frequency = TaskFrequency.TIMES_PER_WEEK }
+                                        )
+                                        AnimatedVisibility(visible = frequency == TaskFrequency.TIMES_PER_WEEK) {
+                                            TimesPerWeekStepper(
+                                                value = timesPerWeek,
+                                                onValueChange = { timesPerWeek = it.coerceIn(1, 7) }
+                                            )
+                                        }
+                                    }
+                                }
+
+                                HorizontalDivider(
+                                    thickness = 0.5.dp,
+                                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+                                )
+                                TemplateParamRow(
+                                    label = t("label_start_date"),
+                                    value = startDate.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)),
+                                    action = t("action_edit"),
+                                    onAction = {
+                                        onPickStartDate(startDate) { picked ->
+                                            startDate = picked
+                                        }
+                                    }
+                                )
+                                HorizontalDivider(
+                                    thickness = 0.5.dp,
+                                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
+                                )
+                                TemplateParamRow(
+                                    label = t("label_reminder"),
+                                    value = if (reminderEnabled) {
+                                        formatTimeForDevice(LocalContext.current, reminderHour, reminderMinute)
+                                    } else {
+                                        t("label_reminder_off")
+                                    },
+                                    action = if (reminderEnabled) t("action_edit") else t("action_enable"),
+                                    onAction = {
+                                        onRequestReminderTime(reminderHour, reminderMinute) { hour, minute ->
+                                            reminderEnabled = true
+                                            reminderHour = hour
+                                            reminderMinute = minute
+                                        }
+                                    }
+                                )
+                            }
                         }
                     }
                 }
 
-                Column(verticalArrangement = Arrangement.spacedBy(spacing.x0_5)) {
-                    if (template.trackingType != TrackingType.YES_NO) {
-                        TemplateParamRow(
-                            label = t("Daily target"),
-                            value = "$dailyTarget ${if (template.unitLabelKey.isBlank()) "" else t(template.unitLabelKey)}".trim(),
-                            action = t("Edit"),
-                            onAction = { showGoalEditor = !showGoalEditor }
-                        )
-                        AnimatedVisibility(visible = showGoalEditor) {
-                            Stepper(
-                                label = t("Daily target"),
-                                value = dailyTarget,
-                                min = 1,
-                                max = if (template.trackingType == TrackingType.COUNT) 9999 else 600,
-                                onValueChange = { dailyTarget = it.coerceAtLeast(1) }
-                            )
-                        }
-                    }
-
-                    TemplateParamRow(
-                        label = t("Frequency"),
-                        value = templateFrequencyLabel(frequency),
-                        action = t("Edit"),
-                        onAction = { showFrequencySheet = true }
-                    )
-                    TemplateParamRow(
-                        label = t("Start date"),
-                        value = startDate.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)),
-                        action = t("Edit"),
-                        onAction = {
-                            onPickStartDate(startDate) { picked ->
-                                startDate = picked
-                            }
-                        }
-                    )
-                    TemplateParamRow(
-                        label = t("Reminders"),
-                        value = if (reminderEnabled) {
-                            "${formatTimeForDevice(LocalContext.current, reminderHour, reminderMinute)} ✓"
-                        } else {
-                            t("Reminder off")
-                        },
-                        action = if (reminderEnabled) t("Edit") else t("Enable"),
-                        onAction = {
-                            onRequestReminderTime(reminderHour, reminderMinute) { hour, minute ->
-                                reminderEnabled = true
-                                reminderHour = hour
-                                reminderMinute = minute
-                            }
-                        }
-                    )
-                }
-
-                Button(
-                    onClick = { onCreateHabit(currentDraft) },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(AppTheme.radius.md)
-                ) {
-                    Text(t("btn_create_habit"))
-                }
                 OutlinedButton(
                     onClick = { onConfigureMore(currentDraft) },
                     modifier = Modifier.fillMaxWidth(),
@@ -7186,9 +7391,40 @@ private fun HabitTemplateConfirmScreen(
                 ) {
                     Text(t("btn_configure_more"))
                 }
+                Button(
+                    onClick = { onCreateHabit(currentDraft) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    shape = RoundedCornerShape(AppTheme.radius.md)
+                ) {
+                    Text(
+                        text = t("btn_create_habit"),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
         }
     }
+}
+
+private enum class ExpandedConfirmParam {
+    FREQUENCY
+}
+
+@Composable
+private fun TimesPerWeekStepper(
+    value: Int,
+    onValueChange: (Int) -> Unit
+) {
+    Stepper(
+        label = t("Times per week"),
+        value = value.coerceIn(1, 7),
+        min = 1,
+        max = 7,
+        onValueChange = { onValueChange(it.coerceIn(1, 7)) }
+    )
 }
 
 @Composable
@@ -7282,10 +7518,46 @@ private fun templateTrackingTypeLabel(type: TrackingType): String = when (type) 
 }
 
 @Composable
+private fun templateMetaLabel(template: CreateHabitTemplate): String {
+    val trackingLabel = when (template.trackingType) {
+        TrackingType.YES_NO -> templateTrackingTypeLabel(template.trackingType)
+        TrackingType.COUNT, TrackingType.DURATION -> {
+            val unit = if (template.unitLabelKey.isBlank()) "" else t(template.unitLabelKey)
+            "${template.dailyTarget} $unit".trim()
+        }
+    }
+    val frequencyLabel = templateFrequencyMetaLabel(template)
+    return "$trackingLabel · $frequencyLabel"
+}
+
+@Composable
 private fun templateFrequencyLabel(frequency: TaskFrequency): String = when (frequency) {
     TaskFrequency.DAILY -> t("freq_every_day")
     TaskFrequency.SELECTED_DAYS -> t("freq_selected_days")
     TaskFrequency.TIMES_PER_WEEK -> t("freq_times_per_week")
+}
+
+@Composable
+private fun templateFrequencyMetaLabel(template: CreateHabitTemplate): String = when (template.frequency) {
+    TaskFrequency.DAILY -> t("freq_every_day")
+    TaskFrequency.SELECTED_DAYS -> selectedDaysShortLabel(template.defaultDays)
+    TaskFrequency.TIMES_PER_WEEK -> "${template.defaultTimesPerWeek} ${t("freq_times_short")}"
+}
+
+@Composable
+private fun selectedDaysShortLabel(days: Set<Int>): String {
+    val labels = weekdayLabels(LocalAppLanguage.current)
+    val normalized = days.filter { it in 1..7 }.sorted()
+    if (normalized.isEmpty()) return t("freq_selected_days")
+    if (normalized.size >= 2) {
+        val expectedRange = (normalized.first()..normalized.last()).toList()
+        if (normalized == expectedRange) {
+            val first = labels[normalized.first() - 1]
+            val last = labels[normalized.last() - 1]
+            return "$first–$last"
+        }
+    }
+    return normalized.joinToString(" ") { day -> labels[day - 1] }
 }
 
 @Composable
@@ -7387,7 +7659,7 @@ private fun TaskEditorDialog(
                 CenterAlignedTopAppBar(
                     title = {
                         Text(
-                            if (state.editingTaskId == null) t("Create Habit") else t("Edit Habit"),
+                            if (state.editingTaskId == null) t("screen_create_habit") else t("Edit Habit"),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -7625,7 +7897,7 @@ private fun TaskEditorDialog(
                     }
                 }
 
-                FormSection(title = t("Frequency")) {
+                FormSection(title = t("label_frequency")) {
                     Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
                         LazyRow(
                             horizontalArrangement = Arrangement.spacedBy(spacing.x0_5)
@@ -7688,7 +7960,7 @@ private fun TaskEditorDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = t("Start date"),
+                        text = t("label_start_date"),
                         modifier = Modifier.weight(1f),
                         style = MaterialTheme.typography.bodyMedium,
                         color = colors.textSecondary
@@ -7802,7 +8074,7 @@ private fun TaskEditorDialog(
                         }
 
                         SettingsSwitchRow(
-                            title = t("Reminders"),
+                            title = t("label_reminder"),
                             subtitle = t("Enable habit reminder notifications"),
                             checked = state.editorReminderEnabled,
                             onCheckedChange = vm::setEditorReminderEnabled

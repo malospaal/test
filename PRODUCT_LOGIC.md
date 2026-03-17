@@ -224,8 +224,8 @@ Future scope (не часть текущего канонического пов
     - локализованную дату выбранного дня внутри карточки (формат с контекстом `Today`/`Yesterday` или short weekday + localized medium date),
     - заголовок (emoji + title),
     - progress ring:
-      - для `YES_NO` — недельная стабильность `completedThisWeek / scheduledThisWeek` (ISO неделя, пн-вс);
-      - для `COUNT/DURATION` — `value/target`;
+      - для всех tracking type — rolling 7-day completion ratio `completedScheduledDays / scheduledDays` в окне `today-6 .. today`;
+      - расчёт ring всегда anchored к `today` и не зависит от `selectedDate` календаря;
     - streak/meta строку (`streak`, `best streak`, weekly percent, синхронизированный с логикой progress ring) или zero-streak fallback,
     - compact 7-day mini-track;
   - для `COUNT` / `DURATION` внутри `HeroCard` отображаются:
@@ -268,7 +268,8 @@ Future scope (не часть текущего канонического пов
 
 ### 12.4 Create/Edit Habit
 Create/Edit остаётся отдельным dialog-flow (`TaskEditorDialog`) и не является частью `HabitDetail`, но создание новой привычки теперь по умолчанию идёт через template flow:
-- `HabitTemplateScreen` (список шаблонов + категории + `+ Create custom habit`);
+- `HabitCategoryScreen` (выбор категории или переход в custom editor);
+- `HabitTemplateScreen` (список шаблонов выбранной категории + `+ Create custom habit`);
 - `HabitTemplateConfirmScreen` (быстрое подтверждение/подстройка параметров шаблона);
 - `TaskEditorDialog` открывается:
   - напрямую для `custom habit`;
@@ -280,7 +281,8 @@ Entry points create-flow:
 - `Add` action в Habits.
 
 Template flow:
-- category pills: `All / Health / Sport / Mental / Productivity`;
+- шаг 1 (`HabitCategoryScreen`): плитки категорий `Health / Sport / Mental / Productivity`;
+- шаг 2 (`HabitTemplateScreen`): без горизонтального category-filter, список только для выбранной категории;
 - tap на template при Free-limit overflow не открывает confirm и ведёт в paywall;
 - primary action в confirm создаёт привычку сразу (через prefill в editor/save pipeline), secondary — открывает расширенный editor.
 
@@ -293,7 +295,7 @@ Template flow:
 
 Advanced block:
 - End date + Reminders свёрнуты по умолчанию под expandable row;
-- если форма открыта с prefill, `showAdvanced` авто-раскрывается только когда в prefill уже есть `endDate` или `reminderEnabled = true`;
+- если форма открыта с prefill, `showAdvanced` по умолчанию остаётся `false` (пользователь открывает секцию вручную);
 - при включении End date default выставляется в `max(today + 30 days, startDate)` и сразу открывается DatePicker.
 
 Unit label UX для `COUNT`:

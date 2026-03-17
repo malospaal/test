@@ -190,6 +190,7 @@ Future scope (не часть текущего канонического пов
 
 Правила:
 - Create новой привычки на Free: только если active count < 1.
+- В template-based create flow (`HabitTemplateScreen`) tap на template при исчерпанном Free лимите не открывает confirm и переводит в paywall.
 - Unarchive:
   - если возвращаемая привычка станет `ACTIVE` и active count уже на лимите Free, операция блокируется;
   - для blocked сценария UI открывает paywall.
@@ -214,6 +215,7 @@ Future scope (не часть текущего канонического пов
   - компактный heading над selector-строкой с динамическим количеством активных привычек (`N active habits` / локализованный plural, для `0` — отдельный zero-state label);
   - видимый горизонтальный selector активных привычек в виде pill-таблеток (emoji + title) с явным selected state;
   - первый элемент selector-строки = компактный `+` action-tile (Create habit), всегда доступен как отдельный первый элемент;
+  - `+` action-tile открывает template-based create flow (`HabitTemplateScreen`), а не пустой editor по умолчанию;
   - `+` tile является action-only контролом (без текстового label внутри tile), визуально отделён от selected habit состояния;
   - selector имеет правый gradient fade-индикатор, когда список можно прокрутить вправо (`canScrollForward`);
   - под selector отображается одноразовый swipe-hint (`← → ...`) до первого реального скролла пользователем;
@@ -254,31 +256,40 @@ Future scope (не часть текущего канонического пов
   - Completed habits,
   - Archived habits.
 - Карточка показывает статус (`Active/Completed/Archived`) и reminder state.
+- Add action в Habits открывает template-based create flow.
 
 ### 12.4 Create/Edit Habit
-Create/Edit открывается отдельным dialog-flow (`TaskEditorDialog`) и не является частью `HabitDetail`.
+Create/Edit остаётся отдельным dialog-flow (`TaskEditorDialog`) и не является частью `HabitDetail`, но создание новой привычки теперь по умолчанию идёт через template flow:
+- `HabitTemplateScreen` (список шаблонов + категории + `+ Create custom habit`);
+- `HabitTemplateConfirmScreen` (быстрое подтверждение/подстройка параметров шаблона);
+- `TaskEditorDialog` открывается:
+  - напрямую для `custom habit`;
+  - из confirm через `Configure more` с prefill;
+  - как и раньше для edit существующей привычки.
 
-Визуальный top-to-bottom порядок формы может включать служебные блоки перед ядром конфигурации (например `Basic setup`, `Color`).
+Entry points create-flow:
+- `+` tile в Tracker selector;
+- `Add` action в Habits.
 
-Порядок **ключевого блока конфигурации привычки**:
-1. Tracking type
-2. Frequency
-3. Start date (mandatory, prefilled today)
-4. End date (toggle optional)
-5. Reminders
+Template flow:
+- category pills: `All / Health / Sport / Mental / Productivity`;
+- tap на template при Free-limit overflow не открывает confirm и ведёт в paywall;
+- primary action в confirm создаёт привычку сразу (через prefill в editor/save pipeline), secondary — открывает расширенный editor.
 
-Дополнительно по поведению:
-- Start date обязательна и по умолчанию = today при создании.
-- End date опциональна и управляется toggle (`OFF` = `null`, `ON` = дата доступна для выбора).
-- Reminders опциональны; запрос notification permission в Create/Edit инициируется только при сохранении, если reminder включён.
+`TaskEditorDialog` (редизайн формы):
+- tracking type карточки используют продуктовые лейблы `Сделать / Посчитать / Засечь время`;
+- frequency chips используют `Каждый день / Выбрать дни / N раз в неделю` + contextual description;
+- поле emoji встроено inline в строку названия привычки (tap opens emoji picker sheet);
+- выбор цвета — компактная inline-строка color dots под названием (без отдельной `Color` секции);
+- Start date остаётся обязательной и editable строкой.
 
-Advanced settings блок удалён, поля перенесены в основной поток формы.
-Start date отображается облегчённой строкой в одну линию:
-- label (локализованный `Start date`);
-- текущее значение даты;
-- действие `Edit`.
-На узких экранах строка может корректно переноситься в компактный двухстрочный вариант.
-Формат даты должен использовать текущую locale приложения (`localized medium date`), без хардкода формата под один язык.
+Advanced block:
+- End date + Reminders свёрнуты по умолчанию под expandable row;
+- если форма открыта с prefill, `showAdvanced` авто-раскрывается только когда в prefill уже есть `endDate` или `reminderEnabled = true`;
+- при включении End date default выставляется в `max(today + 30 days, startDate)` и сразу открывается DatePicker.
+
+Unit label UX для `COUNT`:
+- placeholder зависит от величины `dailyTarget` (small/large hint).
 
 ### 12.5 Onboarding
 - Onboarding реализован отдельным wizard-flow и активируется для нового пользователя (когда onboarding не завершён и привычек ещё нет).
@@ -357,7 +368,7 @@ Start date отображается облегчённой строкой в о�
   - task active (`isHabitActive`);
   - reminderEnabled.
 - Permission / delivery gate:
-  - перед выполнением reminder-действий (включение reminders в Settings, сохранение Create/Edit с reminder, создание из onboarding с reminder) UI проверяет доступность доставки (`canDeliverNotifications`) и runtime permission (`POST_NOTIFICATIONS`, где применимо);
+  - перед выполнением reminder-действий (включение reminders в Settings, сохранение Create/Edit с reminder, создание из onboarding с reminder, выбор reminder-time в template confirm flow) UI проверяет доступность доставки (`canDeliverNotifications`) и runtime permission (`POST_NOTIFICATIONS`, где применимо);
   - если доставка уже доступна, действие выполняется сразу.
 - Denied / blocked flow:
   - при отказе в permission или системной блокировке уведомлений показывается диалог с предложением перейти в Settings (`Open Settings`);

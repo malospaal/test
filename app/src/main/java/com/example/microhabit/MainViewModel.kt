@@ -76,6 +76,23 @@ data class CalendarBreakdownItem(
     val unitLabel: String
 )
 
+data class TaskEditorPrefill(
+    val title: String,
+    val emoji: String,
+    val colorHex: String,
+    val trackingType: TrackingType,
+    val dailyTarget: Int,
+    val unitLabel: String,
+    val frequency: TaskFrequency,
+    val customDays: Set<Int> = emptySet(),
+    val timesPerWeek: Int = 3,
+    val startDate: LocalDate = LocalDate.now(),
+    val endDate: LocalDate? = null,
+    val reminderEnabled: Boolean = false,
+    val reminderHour: Int = 8,
+    val reminderMinute: Int = 0
+)
+
 data class HabitUiState(
     val tasks: List<HabitTask> = emptyList(),
     val allTasks: List<HabitTask> = emptyList(),
@@ -411,28 +428,49 @@ class MainViewModel(
         }
     }
 
-    fun openCreateTask() {
-        val reminderHour = _state.value.defaultReminderHour
-        val reminderMinute = _state.value.defaultReminderMinute
+    fun openCreateTask(prefill: TaskEditorPrefill? = null) {
+        val now = LocalDate.now()
+        val reminderHour = prefill?.reminderHour ?: _state.value.defaultReminderHour
+        val reminderMinute = prefill?.reminderMinute ?: _state.value.defaultReminderMinute
+        val startDate = prefill?.startDate ?: now
+        val endDate = prefill?.endDate?.takeIf { !it.isBefore(startDate) }
+        val normalizedTrackingType = prefill?.trackingType ?: TrackingType.YES_NO
+        val normalizedTarget = when (normalizedTrackingType) {
+            TrackingType.YES_NO -> 1
+            TrackingType.COUNT, TrackingType.DURATION -> (prefill?.dailyTarget ?: 1).coerceAtLeast(1)
+        }
+        val normalizedFrequency = prefill?.frequency ?: TaskFrequency.DAILY
+        val normalizedCustomDays = if (normalizedFrequency == TaskFrequency.SELECTED_DAYS) {
+            prefill?.customDays?.filter { it in 1..7 }?.toSet().orEmpty().ifEmpty { setOf(1, 2, 3, 4, 5) }
+        } else {
+            setOf(1, 2, 3, 4, 5)
+        }
+        val normalizedShowAdvanced = prefill?.let {
+            it.reminderEnabled || endDate != null
+        } ?: false
         _state.update {
             it.copy(
                 showEditor = true,
                 editingTaskId = null,
-                editorTitle = "",
-                editorEmoji = "✨",
-                editorColorHex = "#1F6F64",
-                editorTrackingType = TrackingType.YES_NO,
-                editorDailyTarget = 1,
-                editorUnitLabel = "",
-                editorFrequency = TaskFrequency.DAILY,
-                editorTimesPerWeek = 3,
-                editorCustomDays = setOf(1, 2, 3, 4, 5),
+                editorTitle = prefill?.title?.trim()?.take(MAX_HABIT_TITLE_LENGTH).orEmpty(),
+                editorEmoji = prefill?.emoji?.trim()?.ifBlank { "✨" }?.take(2) ?: "✨",
+                editorColorHex = prefill?.colorHex ?: "#1F6F64",
+                editorTrackingType = normalizedTrackingType,
+                editorDailyTarget = normalizedTarget,
+                editorUnitLabel = if (normalizedTrackingType == TrackingType.COUNT) {
+                    prefill?.unitLabel?.trim()?.take(20).orEmpty()
+                } else {
+                    ""
+                },
+                editorFrequency = normalizedFrequency,
+                editorTimesPerWeek = (prefill?.timesPerWeek ?: 3).coerceIn(1, 7),
+                editorCustomDays = normalizedCustomDays,
                 editorReminderHour = reminderHour,
                 editorReminderMinute = reminderMinute,
-                editorReminderEnabled = false,
-                editorStartDate = LocalDate.now(),
-                editorEndDate = null,
-                editorShowAdvanced = false
+                editorReminderEnabled = prefill?.reminderEnabled ?: false,
+                editorStartDate = startDate,
+                editorEndDate = endDate,
+                editorShowAdvanced = normalizedShowAdvanced
             )
         }
     }
@@ -688,7 +726,7 @@ class MainViewModel(
         _state.update {
             it.copy(
                 editorEndDate = if (enabled) {
-                    it.editorEndDate ?: it.editorStartDate
+                    it.editorEndDate ?: maxOf(LocalDate.now().plusDays(30), it.editorStartDate)
                 } else {
                     null
                 }

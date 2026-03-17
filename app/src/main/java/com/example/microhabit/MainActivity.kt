@@ -22,6 +22,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -30,7 +31,6 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -96,6 +96,7 @@ import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Settings
@@ -130,6 +131,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -192,7 +194,6 @@ import com.example.microhabit.notifications.HabitReminderScheduler
 import com.example.microhabit.ui.components.ChoiceOption
 import com.example.microhabit.ui.components.CalendarDay
 import com.example.microhabit.ui.components.CalendarDayState
-import com.example.microhabit.ui.components.ColorSwatchPicker
 import com.example.microhabit.ui.components.FeatureBulletRow
 import com.example.microhabit.ui.components.FormSection
 import com.example.microhabit.ui.components.HorizontalPercentBars
@@ -202,7 +203,6 @@ import com.example.microhabit.ui.components.AnalyticsMetricTile
 import com.example.microhabit.ui.components.PlanComparisonRow
 import com.example.microhabit.ui.components.PricingCardModel
 import com.example.microhabit.ui.components.PricingPlanCard
-import com.example.microhabit.ui.components.SingleSelectChips
 import com.example.microhabit.ui.components.Stepper
 import com.example.microhabit.ui.components.VerticalPercentBars
 import com.example.microhabit.ui.components.WeekdaySelector
@@ -211,6 +211,10 @@ import com.example.microhabit.ui.components.SettingsGroup
 import com.example.microhabit.ui.components.SettingsRow
 import com.example.microhabit.ui.components.SettingsSwitchRow
 import com.example.microhabit.ui.components.parseColorHex
+import com.example.microhabit.ui.create.CreateHabitTemplate
+import com.example.microhabit.ui.create.CreateHabitTemplateCatalog
+import com.example.microhabit.ui.create.TemplateCategory
+import com.example.microhabit.ui.create.TemplateConfirmDraft
 import com.example.microhabit.ui.theme.AppTheme
 import com.example.microhabit.ui.theme.MicroHabitTheme
 import java.time.DayOfWeek
@@ -243,7 +247,8 @@ private enum class BillingCycle {
 
 private enum class NotificationPermissionAction {
     ENABLE_REMINDERS,
-    SAVE_EDITOR_REMINDER
+    SAVE_EDITOR_REMINDER,
+    PICK_TEMPLATE_REMINDER_TIME
 }
 
 private enum class DurationSheetMode {
@@ -357,19 +362,35 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
     var onboardingDismissedSession by rememberSaveable { mutableStateOf(false) }
     var showContinueCompletedHabitDialog by rememberSaveable { mutableStateOf(false) }
     var showDeleteCompletedHabitConfirm by rememberSaveable { mutableStateOf(false) }
+    var showTemplatePicker by rememberSaveable { mutableStateOf(false) }
+    var selectedTemplateId by rememberSaveable { mutableStateOf<String?>(null) }
+    var selectedTemplateCategory by rememberSaveable { mutableStateOf(TemplateCategory.ALL.name) }
+    var templateDraft by remember { mutableStateOf<TemplateConfirmDraft?>(null) }
+    var pendingTemplateReminderPicker by remember { mutableStateOf<(() -> Unit)?>(null) }
     val semantic = AppTheme.colors
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val language = state.language
+    val pickerTheme = R.style.ThemeOverlay_MicroHabit_Picker
+    val datePickerTheme = R.style.ThemeOverlay_MicroHabit_DatePicker
+    val pickerActionColor = semantic.primary.toArgb()
+    val is24HourView = android.text.format.DateFormat.is24HourFormat(context)
     val runActionWithNotifications = { action: NotificationPermissionAction ->
         when (action) {
             NotificationPermissionAction.ENABLE_REMINDERS -> vm.setNotificationsEnabled(true)
             NotificationPermissionAction.SAVE_EDITOR_REMINDER -> vm.saveEditorWithNotificationsEnabled()
+            NotificationPermissionAction.PICK_TEMPLATE_REMINDER_TIME -> {
+                pendingTemplateReminderPicker?.invoke()
+                pendingTemplateReminderPicker = null
+            }
         }
     }
     val showNotificationsBlocked = { action: NotificationPermissionAction? ->
         pendingPermissionAction = null
         pendingSettingsAction = action
+        if (action == NotificationPermissionAction.PICK_TEMPLATE_REMINDER_TIME) {
+            pendingTemplateReminderPicker = null
+        }
         if (state.notificationsEnabled) {
             vm.setNotificationsEnabled(false)
         }
@@ -415,6 +436,16 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
         settingsReturnPage = from
         previousPage = from
         page = AppPage.SETTINGS
+    }
+    val openPaywallFromCurrentPage = {
+        previousPage = page
+        page = AppPage.PAYWALL
+    }
+    val openTemplatePicker = {
+        selectedTemplateCategory = TemplateCategory.ALL.name
+        selectedTemplateId = null
+        templateDraft = null
+        showTemplatePicker = true
     }
 
     DisposableEffect(lifecycleOwner, pendingSettingsAction) {
@@ -556,7 +587,7 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                                     val canAdd = state.plan == SubscriptionPlan.PRO || state.tasks.size < 1
                                     TextButton(onClick = {
                                         if (canAdd) {
-                                            vm.openCreateTask()
+                                            openTemplatePicker()
                                         } else {
                                             previousPage = page
                                             page = AppPage.PAYWALL
@@ -618,6 +649,7 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                         AppPage.TRACKER -> TrackerPage(
                             state = state,
                             vm = vm,
+                            onOpenCreateHabit = openTemplatePicker,
                             onOpenDetails = { page = AppPage.HABIT_DETAIL },
                             highlightCompletionButton = highlightCompletionButton,
                             onHighlightConsumed = { highlightCompletionButton = false },
@@ -630,6 +662,7 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                         AppPage.HABITS -> HabitsPage(
                             state = state,
                             vm = vm,
+                            onCreateHabit = openTemplatePicker,
                             onOpenHabit = {
                                 page = AppPage.HABIT_DETAIL
                             },
@@ -706,6 +739,143 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                         )
                     }
                 }
+            }
+        }
+
+        if (showTemplatePicker) {
+            val selectedTemplate = CreateHabitTemplateCatalog.templates.firstOrNull { it.id == selectedTemplateId }
+            if (selectedTemplate == null) {
+                HabitTemplateScreen(
+                    selectedCategory = runCatching { TemplateCategory.valueOf(selectedTemplateCategory) }
+                        .getOrDefault(TemplateCategory.ALL),
+                    onCategorySelected = { selectedTemplateCategory = it.name },
+                    onTemplateSelected = { template ->
+                        if (!vm.canCreateTask()) {
+                            showTemplatePicker = false
+                            openPaywallFromCurrentPage()
+                            return@HabitTemplateScreen
+                        }
+                        selectedTemplateId = template.id
+                        templateDraft = TemplateConfirmDraft(
+                            template = template,
+                            habitName = translate(language, template.nameKey),
+                            dailyTarget = template.dailyTarget.coerceAtLeast(1),
+                            frequency = template.frequency,
+                            customDays = template.defaultDays.ifEmpty { setOf(1, 2, 3, 4, 5) },
+                            timesPerWeek = 3,
+                            startDate = LocalDate.now(),
+                            reminderEnabled = false,
+                            reminderHour = state.defaultReminderHour,
+                            reminderMinute = state.defaultReminderMinute
+                        )
+                    },
+                    onCreateCustomHabit = {
+                        if (!vm.canCreateTask()) {
+                            showTemplatePicker = false
+                            openPaywallFromCurrentPage()
+                        } else {
+                            showTemplatePicker = false
+                            vm.openCreateTask()
+                        }
+                    },
+                    onClose = {
+                        showTemplatePicker = false
+                        selectedTemplateId = null
+                        templateDraft = null
+                    }
+                )
+            } else {
+                val currentDraft = templateDraft ?: TemplateConfirmDraft(
+                    template = selectedTemplate,
+                    habitName = translate(language, selectedTemplate.nameKey),
+                    dailyTarget = selectedTemplate.dailyTarget.coerceAtLeast(1),
+                    frequency = selectedTemplate.frequency,
+                    customDays = selectedTemplate.defaultDays.ifEmpty { setOf(1, 2, 3, 4, 5) },
+                    timesPerWeek = 3,
+                    startDate = LocalDate.now(),
+                    reminderEnabled = false,
+                    reminderHour = state.defaultReminderHour,
+                    reminderMinute = state.defaultReminderMinute
+                )
+                templateDraft = currentDraft
+                HabitTemplateConfirmScreen(
+                    initial = currentDraft,
+                    onBack = { selectedTemplateId = null },
+                    onStateChange = { templateDraft = it },
+                    onCreateHabit = { draft ->
+                        val prefill = TaskEditorPrefill(
+                            title = draft.habitName,
+                            emoji = draft.template.emoji,
+                            colorHex = draft.template.colorHex,
+                            trackingType = draft.template.trackingType,
+                            dailyTarget = draft.dailyTarget.coerceAtLeast(1),
+                            unitLabel = if (draft.template.unitLabelKey.isBlank()) "" else translate(language, draft.template.unitLabelKey),
+                            frequency = draft.frequency,
+                            customDays = draft.customDays,
+                            timesPerWeek = draft.timesPerWeek,
+                            startDate = draft.startDate,
+                            reminderEnabled = draft.reminderEnabled,
+                            reminderHour = draft.reminderHour,
+                            reminderMinute = draft.reminderMinute
+                        )
+                        showTemplatePicker = false
+                        selectedTemplateId = null
+                        templateDraft = null
+                        vm.openCreateTask(prefill)
+                        if (draft.reminderEnabled) {
+                            ensureNotificationPermissionAndRun(NotificationPermissionAction.SAVE_EDITOR_REMINDER)
+                        } else {
+                            vm.saveEditor()
+                        }
+                    },
+                    onConfigureMore = { draft ->
+                        val prefill = TaskEditorPrefill(
+                            title = draft.habitName,
+                            emoji = draft.template.emoji,
+                            colorHex = draft.template.colorHex,
+                            trackingType = draft.template.trackingType,
+                            dailyTarget = draft.dailyTarget.coerceAtLeast(1),
+                            unitLabel = if (draft.template.unitLabelKey.isBlank()) "" else translate(language, draft.template.unitLabelKey),
+                            frequency = draft.frequency,
+                            customDays = draft.customDays,
+                            timesPerWeek = draft.timesPerWeek,
+                            startDate = draft.startDate,
+                            reminderEnabled = draft.reminderEnabled,
+                            reminderHour = draft.reminderHour,
+                            reminderMinute = draft.reminderMinute
+                        )
+                        showTemplatePicker = false
+                        selectedTemplateId = null
+                        templateDraft = null
+                        vm.openCreateTask(prefill)
+                    },
+                    onPickStartDate = { startDate, onPicked ->
+                        showThemedDatePicker(
+                            context = context,
+                            themeResId = datePickerTheme,
+                            initialDate = startDate,
+                            minDate = LocalDate.now(),
+                            actionColorArgb = pickerActionColor,
+                            onDateSet = { year, month, day ->
+                                onPicked(LocalDate.of(year, month + 1, day))
+                            }
+                        )
+                    },
+                    onRequestReminderTime = { hour, minute, onPicked ->
+                        pendingTemplateReminderPicker = {
+                            showThemedTimePicker(
+                                context = context,
+                                themeResId = pickerTheme,
+                                initialHour = hour,
+                                initialMinute = minute,
+                                is24HourView = is24HourView,
+                                actionColorArgb = pickerActionColor,
+                                onTimeSet = onPicked
+                            )
+                        }
+                        ensureNotificationPermissionAndRun(NotificationPermissionAction.PICK_TEMPLATE_REMINDER_TIME)
+                    }
+                )
             }
         }
 
@@ -996,6 +1166,7 @@ private fun BottomNavigationIconItem(
 private fun TrackerPage(
     state: HabitUiState,
     vm: MainViewModel,
+    onOpenCreateHabit: () -> Unit,
     onOpenDetails: () -> Unit,
     highlightCompletionButton: Boolean,
     onHighlightConsumed: () -> Unit,
@@ -1075,7 +1246,7 @@ private fun TrackerPage(
                         habits = emptyList(),
                         selectedId = null,
                         onHabitSelected = {},
-                        onCreateHabit = vm::openCreateTask
+                        onCreateHabit = onOpenCreateHabit
                     )
                 }
                 item { OnboardingCard(vm, state) }
@@ -1085,7 +1256,7 @@ private fun TrackerPage(
                         habits = state.tasks,
                         selectedId = state.selectedTaskId,
                         onHabitSelected = { taskId -> switchToTask(taskId, 0) },
-                        onCreateHabit = vm::openCreateTask
+                        onCreateHabit = onOpenCreateHabit
                     )
                 }
                 item {
@@ -1214,6 +1385,7 @@ private fun TrackerPage(
 private fun HabitsPage(
     state: HabitUiState,
     vm: MainViewModel,
+    onCreateHabit: () -> Unit,
     onOpenHabit: () -> Unit,
     onUpgrade: () -> Unit,
     scrollToTopSignal: Int
@@ -1251,7 +1423,7 @@ private fun HabitsPage(
                             color = colors.textSecondary
                         )
                         Button(
-                            onClick = { if (canAdd) vm.openCreateTask() else onUpgrade() },
+                            onClick = { if (canAdd) onCreateHabit() else onUpgrade() },
                             shape = RoundedCornerShape(AppTheme.radius.md)
                         ) {
                             Text(if (canAdd) t("Create habit") else t("Upgrade to PRO"))
@@ -6576,6 +6748,503 @@ private fun SelectChip(title: String, selected: Boolean, onClick: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HabitTemplateScreen(
+    selectedCategory: TemplateCategory,
+    onCategorySelected: (TemplateCategory) -> Unit,
+    onTemplateSelected: (CreateHabitTemplate) -> Unit,
+    onCreateCustomHabit: () -> Unit,
+    onClose: () -> Unit
+) {
+    val spacing = AppTheme.spacing
+    val colors = AppTheme.colors
+    val templates = remember(selectedCategory) { CreateHabitTemplateCatalog.templatesFor(selectedCategory) }
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = colors.backgroundCanvas
+    ) {
+        Scaffold(
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = {
+                        Text(
+                            text = t("New habit"),
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onClose) {
+                            Icon(
+                                imageVector = Icons.Rounded.Close,
+                                contentDescription = t("Close")
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = colors.backgroundSurface
+                    )
+                )
+            }
+        ) { innerPadding ->
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                contentPadding = PaddingValues(horizontal = spacing.x2, vertical = spacing.x1_5),
+                verticalArrangement = Arrangement.spacedBy(spacing.x1)
+            ) {
+                item {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+                    ) {
+                        items(CreateHabitTemplateCatalog.categories, key = { it.name }) { category ->
+                            SelectChip(
+                                title = t(CreateHabitTemplateCatalog.categoryLabelKey(category)),
+                                selected = category == selectedCategory,
+                                onClick = { onCategorySelected(category) }
+                            )
+                        }
+                    }
+                }
+                items(templates, key = { it.id }) { template ->
+                    Surface(
+                        onClick = { onTemplateSelected(template) },
+                        shape = RoundedCornerShape(AppTheme.radius.md),
+                        color = colors.backgroundSurface,
+                        border = BorderStroke(AppTheme.stroke.thin, colors.borderSubtle.copy(alpha = 0.6f))
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = spacing.x1_5, vertical = spacing.x1),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+                        ) {
+                            Box(
+                                modifier = Modifier.size(26.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = template.emoji.ifBlank { "✨" },
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                            }
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                Text(
+                                    text = t(template.nameKey),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = colors.textPrimary
+                                )
+                                Text(
+                                    text = "${templateTrackingTypeLabel(template.trackingType)} · ${templateFrequencyLabel(template.frequency)}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = colors.textSecondary
+                                )
+                            }
+                            Text(
+                                text = "›",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = colors.textSecondary.copy(alpha = 0.4f)
+                            )
+                        }
+                    }
+                }
+                item {
+                    OutlinedButton(
+                        onClick = onCreateCustomHabit,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(AppTheme.radius.md),
+                        border = BorderStroke(AppTheme.stroke.thin, colors.borderSubtle.copy(alpha = 0.6f)),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = colors.primary
+                        )
+                    ) {
+                        Text(t("btn_create_custom"))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HabitTemplateConfirmScreen(
+    initial: TemplateConfirmDraft,
+    onBack: () -> Unit,
+    onStateChange: (TemplateConfirmDraft) -> Unit,
+    onCreateHabit: (TemplateConfirmDraft) -> Unit,
+    onConfigureMore: (TemplateConfirmDraft) -> Unit,
+    onPickStartDate: (LocalDate, (LocalDate) -> Unit) -> Unit,
+    onRequestReminderTime: (Int, Int, (Int, Int) -> Unit) -> Unit
+) {
+    val spacing = AppTheme.spacing
+    val colors = AppTheme.colors
+    val locale = appLocale()
+    val language = LocalAppLanguage.current
+    val template = initial.template
+    var habitName by rememberSaveable(template.id) { mutableStateOf(initial.habitName) }
+    var dailyTarget by rememberSaveable(template.id) { mutableStateOf(initial.dailyTarget.coerceAtLeast(1)) }
+    var frequency by rememberSaveable(template.id) { mutableStateOf(initial.frequency) }
+    var customDays by rememberSaveable(template.id) { mutableStateOf(initial.customDays) }
+    var timesPerWeek by rememberSaveable(template.id) { mutableStateOf(initial.timesPerWeek.coerceIn(1, 7)) }
+    var startDate by rememberSaveable(template.id) { mutableStateOf(initial.startDate) }
+    var reminderEnabled by rememberSaveable(template.id) { mutableStateOf(initial.reminderEnabled) }
+    var reminderHour by rememberSaveable(template.id) { mutableStateOf(initial.reminderHour.coerceIn(0, 23)) }
+    var reminderMinute by rememberSaveable(template.id) { mutableStateOf(initial.reminderMinute.coerceIn(0, 59)) }
+    var showGoalEditor by rememberSaveable(template.id) { mutableStateOf(false) }
+    var showFrequencySheet by rememberSaveable(template.id) { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val currentDraft = remember(
+        template,
+        habitName,
+        dailyTarget,
+        frequency,
+        customDays,
+        timesPerWeek,
+        startDate,
+        reminderEnabled,
+        reminderHour,
+        reminderMinute
+    ) {
+        TemplateConfirmDraft(
+            template = template,
+            habitName = habitName.trim().ifBlank { translate(language, template.nameKey) },
+            dailyTarget = dailyTarget.coerceAtLeast(1),
+            frequency = frequency,
+            customDays = customDays,
+            timesPerWeek = timesPerWeek.coerceIn(1, 7),
+            startDate = startDate,
+            reminderEnabled = reminderEnabled,
+            reminderHour = reminderHour,
+            reminderMinute = reminderMinute
+        )
+    }
+
+    LaunchedEffect(currentDraft) {
+        onStateChange(currentDraft)
+    }
+
+    if (showFrequencySheet) {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = { showFrequencySheet = false },
+            sheetState = sheetState
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = spacing.x2, vertical = spacing.x1_5),
+                verticalArrangement = Arrangement.spacedBy(spacing.x1)
+            ) {
+                Text(
+                    text = t("Frequency"),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                TemplateFrequencyOption(
+                    label = t("freq_every_day"),
+                    selected = frequency == TaskFrequency.DAILY,
+                    onClick = { frequency = TaskFrequency.DAILY }
+                )
+                TemplateFrequencyOption(
+                    label = t("freq_selected_days"),
+                    selected = frequency == TaskFrequency.SELECTED_DAYS,
+                    description = t("freq_selected_days_desc"),
+                    onClick = {
+                        frequency = TaskFrequency.SELECTED_DAYS
+                        if (customDays.isEmpty()) customDays = template.defaultDays.ifEmpty { setOf(1, 2, 3, 4, 5) }
+                    }
+                )
+                if (frequency == TaskFrequency.SELECTED_DAYS) {
+                    WeekdaySelector(
+                        selectedDays = customDays,
+                        onToggle = { day ->
+                            val next = customDays.toMutableSet()
+                            if (!next.add(day)) next.remove(day)
+                            customDays = next
+                        }
+                    )
+                }
+                TemplateFrequencyOption(
+                    label = t("freq_times_per_week"),
+                    selected = frequency == TaskFrequency.TIMES_PER_WEEK,
+                    description = t("freq_times_per_week_desc"),
+                    onClick = { frequency = TaskFrequency.TIMES_PER_WEEK }
+                )
+                if (frequency == TaskFrequency.TIMES_PER_WEEK) {
+                    Stepper(
+                        label = t("Times per week"),
+                        value = timesPerWeek,
+                        min = 1,
+                        max = 7,
+                        onValueChange = { timesPerWeek = it.coerceIn(1, 7) }
+                    )
+                }
+                Button(
+                    onClick = {
+                        scope.launch {
+                            sheetState.hide()
+                            showFrequencySheet = false
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(t("Done"))
+                }
+                Spacer(modifier = Modifier.height(spacing.x1))
+            }
+        }
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = colors.backgroundCanvas
+    ) {
+        Scaffold(
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = { Text("") },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                                contentDescription = t("Back")
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = colors.backgroundSurface
+                    )
+                )
+            }
+        ) { innerPadding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(horizontal = spacing.x2, vertical = spacing.x1_5)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(AppTheme.radius.md),
+                    color = colors.backgroundSurface,
+                    border = BorderStroke(AppTheme.stroke.thin, colors.borderSubtle.copy(alpha = 0.6f))
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = spacing.x1_5, vertical = spacing.x1_5),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(colors.primary.copy(alpha = 0.12f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(text = template.emoji, style = MaterialTheme.typography.titleLarge)
+                        }
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Text(
+                                text = habitName,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = colors.textPrimary
+                            )
+                            Text(
+                                text = "${t(CreateHabitTemplateCatalog.categoryLabelKey(template.category))} · ${templateTrackingTypeLabel(template.trackingType)}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = colors.textSecondary
+                            )
+                        }
+                    }
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(spacing.x0_5)) {
+                    if (template.trackingType != TrackingType.YES_NO) {
+                        TemplateParamRow(
+                            label = t("Daily target"),
+                            value = "$dailyTarget ${if (template.unitLabelKey.isBlank()) "" else t(template.unitLabelKey)}".trim(),
+                            action = t("Edit"),
+                            onAction = { showGoalEditor = !showGoalEditor }
+                        )
+                        AnimatedVisibility(visible = showGoalEditor) {
+                            Stepper(
+                                label = t("Daily target"),
+                                value = dailyTarget,
+                                min = 1,
+                                max = if (template.trackingType == TrackingType.COUNT) 9999 else 600,
+                                onValueChange = { dailyTarget = it.coerceAtLeast(1) }
+                            )
+                        }
+                    }
+
+                    TemplateParamRow(
+                        label = t("Frequency"),
+                        value = templateFrequencyLabel(frequency),
+                        action = t("Edit"),
+                        onAction = { showFrequencySheet = true }
+                    )
+                    TemplateParamRow(
+                        label = t("Start date"),
+                        value = startDate.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)),
+                        action = t("Edit"),
+                        onAction = {
+                            onPickStartDate(startDate) { picked ->
+                                startDate = picked
+                            }
+                        }
+                    )
+                    TemplateParamRow(
+                        label = t("Reminders"),
+                        value = if (reminderEnabled) {
+                            "${formatTimeForDevice(LocalContext.current, reminderHour, reminderMinute)} ✓"
+                        } else {
+                            t("Reminder off")
+                        },
+                        action = if (reminderEnabled) t("Edit") else t("Enable"),
+                        onAction = {
+                            onRequestReminderTime(reminderHour, reminderMinute) { hour, minute ->
+                                reminderEnabled = true
+                                reminderHour = hour
+                                reminderMinute = minute
+                            }
+                        }
+                    )
+                }
+
+                Button(
+                    onClick = { onCreateHabit(currentDraft) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(AppTheme.radius.md)
+                ) {
+                    Text(t("btn_create_habit"))
+                }
+                OutlinedButton(
+                    onClick = { onConfigureMore(currentDraft) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(AppTheme.radius.md),
+                    border = BorderStroke(AppTheme.stroke.thin, colors.borderSubtle.copy(alpha = 0.6f)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.primary)
+                ) {
+                    Text(t("btn_configure_more"))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TemplateFrequencyOption(
+    label: String,
+    selected: Boolean,
+    description: String? = null,
+    onClick: () -> Unit
+) {
+    val spacing = AppTheme.spacing
+    val colors = AppTheme.colors
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(AppTheme.radius.md))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(AppTheme.radius.md),
+        color = if (selected) colors.primary.copy(alpha = 0.12f) else colors.backgroundSurfaceMuted,
+        border = BorderStroke(
+            AppTheme.stroke.thin,
+            if (selected) colors.primary.copy(alpha = 0.5f) else colors.borderSubtle.copy(alpha = 0.6f)
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = spacing.x1, vertical = spacing.x0_5),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                color = colors.textPrimary
+            )
+            if (!description.isNullOrBlank()) {
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.textSecondary
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TemplateParamRow(
+    label: String,
+    value: String,
+    action: String,
+    onAction: () -> Unit
+) {
+    val spacing = AppTheme.spacing
+    val colors = AppTheme.colors
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+            color = colors.textSecondary
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+            color = colors.textPrimary
+        )
+        Spacer(modifier = Modifier.width(spacing.x0_5))
+        TextButton(
+            onClick = onAction,
+            contentPadding = PaddingValues(horizontal = spacing.x0_5, vertical = 0.dp)
+        ) {
+            Text(
+                text = action,
+                style = MaterialTheme.typography.labelMedium,
+                color = colors.primary
+            )
+        }
+    }
+}
+
+@Composable
+private fun templateTrackingTypeLabel(type: TrackingType): String = when (type) {
+    TrackingType.YES_NO -> t("tracking_type_yesno")
+    TrackingType.COUNT -> t("tracking_type_count")
+    TrackingType.DURATION -> t("tracking_type_duration")
+}
+
+@Composable
+private fun templateFrequencyLabel(frequency: TaskFrequency): String = when (frequency) {
+    TaskFrequency.DAILY -> t("freq_every_day")
+    TaskFrequency.SELECTED_DAYS -> t("freq_selected_days")
+    TaskFrequency.TIMES_PER_WEEK -> t("freq_times_per_week")
+}
+
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
 private fun TaskEditorDialog(
@@ -6594,30 +7263,75 @@ private fun TaskEditorDialog(
     val pickerTheme = R.style.ThemeOverlay_MicroHabit_Picker
     val datePickerTheme = R.style.ThemeOverlay_MicroHabit_DatePicker
     val pickerActionColor = colors.primary.toArgb()
-
+    var showEmojiPicker by rememberSaveable { mutableStateOf(false) }
     val trackingCards = listOf(
-        Triple(
-            TrackingType.YES_NO,
-            t("Do once"),
-            t("Just mark whether you did it today")
-        ),
-        Triple(
-            TrackingType.COUNT,
-            t("Do N times"),
-            t("Set a daily quantity target")
-        ),
-        Triple(
-            TrackingType.DURATION,
-            t("Do N minutes"),
-            t("Set a daily time target")
-        )
+        Triple(TrackingType.YES_NO, t("tracking_type_yesno"), t("tracking_type_yesno_desc")),
+        Triple(TrackingType.COUNT, t("tracking_type_count"), t("tracking_type_count_desc")),
+        Triple(TrackingType.DURATION, t("tracking_type_duration"), t("tracking_type_duration_desc"))
     )
     val frequencyOptions = listOf(
-        ChoiceOption(TaskFrequency.DAILY, t("Every day")),
-        ChoiceOption(TaskFrequency.SELECTED_DAYS, t("Selected weekdays")),
-        ChoiceOption(TaskFrequency.TIMES_PER_WEEK, t("X / week"))
+        ChoiceOption(TaskFrequency.DAILY, t("freq_every_day")),
+        ChoiceOption(TaskFrequency.SELECTED_DAYS, t("freq_selected_days")),
+        ChoiceOption(TaskFrequency.TIMES_PER_WEEK, t("freq_times_per_week"))
     )
     val palette = listOf("#1F6F64", "#3B7EA1", "#7B6BC9", "#3E8E5F", "#B36A3C", "#C65C74", "#5D6D7E")
+    val emojiSuggestions = listOf(
+        "✨", "💧", "💊", "🥗", "🌿", "😴", "🏃", "🏋️", "🚴", "🤸",
+        "👟", "🧘", "📵", "🙏", "📚", "✍️", "🎓", "💼", "🎯", "🔥",
+        "☀️", "🌙", "💡", "📈", "🍎", "🧠", "🫶", "🎵", "🧹", "🧴"
+    )
+
+    if (showEmojiPicker) {
+        ModalBottomSheet(
+            onDismissRequest = { showEmojiPicker = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = spacing.x2, vertical = spacing.x1_5),
+                verticalArrangement = Arrangement.spacedBy(spacing.x1)
+            ) {
+                Text(
+                    text = t("Choose emoji"),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                emojiSuggestions.chunked(6).forEach { row ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+                    ) {
+                        row.forEach { emoji ->
+                            Surface(
+                                onClick = {
+                                    vm.setEditorEmoji(emoji)
+                                    showEmojiPicker = false
+                                },
+                                shape = RoundedCornerShape(AppTheme.radius.md),
+                                color = colors.backgroundSurfaceMuted,
+                                border = BorderStroke(stroke.thin, colors.borderSubtle.copy(alpha = 0.6f)),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = spacing.x1),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(text = emoji, fontSize = 22.sp)
+                                }
+                            }
+                        }
+                        repeat((6 - row.size).coerceAtLeast(0)) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(spacing.x1))
+            }
+        }
+    }
 
     BackHandler(onBack = onDismiss)
     Surface(
@@ -6689,55 +7403,94 @@ private fun TaskEditorDialog(
             ) {
                 FormSection(title = t("Basic setup")) {
                     Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
-                        OutlinedTextField(
-                            value = state.editorTitle,
-                            onValueChange = vm::setEditorTitle,
-                            label = { Text(t("Habit name")) },
-                            placeholder = { Text(t("Morning meditation")) },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
-                        )
-
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(stroke.thin, colors.borderSubtle.copy(alpha = 0.7f), RoundedCornerShape(AppTheme.radius.md))
+                                .padding(horizontal = spacing.x1, vertical = spacing.x0_5),
                             horizontalArrangement = Arrangement.spacedBy(spacing.x1),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            OutlinedTextField(
-                                value = state.editorEmoji,
-                                onValueChange = vm::setEditorEmoji,
-                                label = { Text(t("Icon / emoji")) },
+                            Surface(
+                                onClick = { showEmojiPicker = true },
+                                shape = RoundedCornerShape(8.dp),
+                                color = colors.backgroundSurfaceMuted,
+                                border = BorderStroke(stroke.thin, colors.borderSubtle.copy(alpha = 0.6f)),
+                                modifier = Modifier
+                                    .size(36.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = state.editorEmoji.ifBlank { "✨" },
+                                        fontSize = 20.sp
+                                    )
+                                }
+                            }
+                            BasicTextField(
+                                value = state.editorTitle,
+                                onValueChange = vm::setEditorTitle,
                                 modifier = Modifier.weight(1f),
-                                singleLine = true
+                                textStyle = MaterialTheme.typography.bodyLarge.copy(color = colors.textPrimary),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                                singleLine = true,
+                                decorationBox = { inner ->
+                                    if (state.editorTitle.isBlank()) {
+                                        Text(
+                                            text = t("Habit name"),
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = colors.textSecondary.copy(alpha = 0.5f)
+                                        )
+                                    }
+                                    inner()
+                                }
                             )
                             Box(
                                 modifier = Modifier
-                                    .size(spacing.x5)
-                                    .clip(RoundedCornerShape(AppTheme.radius.md))
-                                    .background(selectedColor),
+                                    .size(20.dp)
+                                    .clip(RoundedCornerShape(AppTheme.radius.full))
+                                    .background(selectedColor.copy(alpha = 0.85f)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = state.editorEmoji.ifBlank { "✨" },
-                                    style = MaterialTheme.typography.titleLarge
+                                Spacer(modifier = Modifier.size(1.dp))
+                            }
+                        }
+                        Row(
+                            modifier = Modifier.padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(spacing.x1),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            palette.forEach { hex ->
+                                val color = parseColorHex(hex)
+                                val selected = hex.equals(state.editorColorHex, ignoreCase = true)
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clip(RoundedCornerShape(AppTheme.radius.full))
+                                        .background(color)
+                                        .border(
+                                            width = if (selected) 2.dp else stroke.thin,
+                                            color = if (selected) color else colors.borderSubtle.copy(alpha = 0.6f),
+                                            shape = RoundedCornerShape(AppTheme.radius.full)
+                                        )
+                                        .clickable { vm.setEditorColorHex(hex) }
                                 )
                             }
                         }
                     }
                 }
 
-                FormSection(title = t("Color")) {
-                    ColorSwatchPicker(
-                        colorsHex = palette,
-                        selectedHex = state.editorColorHex,
-                        onSelect = vm::setEditorColorHex
-                    )
-                }
-
                 FormSection(title = t("Tracking type")) {
                     Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
                         trackingCards.forEach { (type, title, description) ->
                             val selected = state.editorTrackingType == type
+                            val icon = when (type) {
+                                TrackingType.YES_NO -> "✓"
+                                TrackingType.COUNT -> "#"
+                                TrackingType.DURATION -> "⏱"
+                            }
                             Surface(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -6760,17 +7513,25 @@ private fun TaskEditorDialog(
                                         .padding(horizontal = spacing.x1_5, vertical = spacing.x1),
                                     verticalArrangement = Arrangement.spacedBy(spacing.x0_5)
                                 ) {
-                                    Text(
-                                        text = title,
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = colors.textPrimary
-                                    )
-                                    Text(
-                                        text = description,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = colors.textSecondary
-                                    )
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(spacing.x0_5),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(text = icon, style = MaterialTheme.typography.titleSmall)
+                                        Text(
+                                            text = title,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = colors.textPrimary
+                                        )
+                                    }
+                                    if (!selected) {
+                                        Text(
+                                            text = description,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = colors.textSecondary
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -6793,7 +7554,15 @@ private fun TaskEditorDialog(
                                     value = state.editorUnitLabel,
                                     onValueChange = vm::setEditorUnitLabel,
                                     label = { Text(t("Unit label")) },
-                                    placeholder = { Text(t("e.g. glasses, pages, reps")) },
+                                    placeholder = {
+                                        Text(
+                                            if (state.editorDailyTarget <= 10) {
+                                                t("unit_label_hint_small")
+                                            } else {
+                                                t("unit_label_hint_large")
+                                            }
+                                        )
+                                    },
                                     modifier = Modifier.fillMaxWidth(),
                                     singleLine = true
                                 )
@@ -6815,11 +7584,35 @@ private fun TaskEditorDialog(
 
                 FormSection(title = t("Frequency")) {
                     Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
-                        SingleSelectChips(
-                            options = frequencyOptions,
-                            selected = state.editorFrequency,
-                            onSelect = vm::setEditorFrequency
-                        )
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(spacing.x0_5)
+                        ) {
+                            items(frequencyOptions, key = { it.value }) { option ->
+                                SelectChip(
+                                    title = option.label,
+                                    selected = option.value == state.editorFrequency,
+                                    onClick = { vm.setEditorFrequency(option.value) }
+                                )
+                            }
+                        }
+
+                        when (state.editorFrequency) {
+                            TaskFrequency.SELECTED_DAYS -> {
+                                Text(
+                                    text = t("freq_selected_days_desc"),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = colors.textSecondary
+                                )
+                            }
+                            TaskFrequency.TIMES_PER_WEEK -> {
+                                Text(
+                                    text = t("freq_times_per_week_desc"),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = colors.textSecondary
+                                )
+                            }
+                            TaskFrequency.DAILY -> Unit
+                        }
 
                         if (state.editorFrequency == TaskFrequency.SELECTED_DAYS) {
                             WeekdaySelector(
@@ -6847,97 +7640,100 @@ private fun TaskEditorDialog(
                     }
                 }
 
-                val startDateLabel = t("Start date")
-                val startDateValue = state.editorStartDate.format(
-                    DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)
-                )
-                val onEditStartDate = {
-                    showThemedDatePicker(
-                        context = context,
-                        themeResId = datePickerTheme,
-                        initialDate = state.editorStartDate,
-                        actionColorArgb = pickerActionColor,
-                        onDateSet = { year, month, day ->
-                            vm.setEditorStartDate(LocalDate.of(year, month + 1, day))
-                        }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = t("Start date"),
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.textSecondary
                     )
-                }
-
-                BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                    val compactLayout = maxWidth < 360.dp
-                    if (compactLayout) {
-                        Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(spacing.x0_5)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = startDateLabel,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = colors.textSecondary
-                                )
-                                Text(
-                                    text = startDateValue,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = colors.textPrimary
-                                )
-                            }
-                            TextButton(
-                                onClick = onEditStartDate,
-                                modifier = Modifier.align(Alignment.End),
-                                contentPadding = PaddingValues(horizontal = spacing.x0_5, vertical = spacing.x0)
-                            ) {
-                                Text(t("Edit"))
-                            }
-                        }
-                    } else {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = startDateLabel,
-                                modifier = Modifier.weight(1f),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = colors.textSecondary
+                    Text(
+                        text = state.editorStartDate.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.textPrimary
+                    )
+                    TextButton(
+                        onClick = {
+                            showThemedDatePicker(
+                                context = context,
+                                themeResId = datePickerTheme,
+                                initialDate = state.editorStartDate,
+                                minDate = LocalDate.now(),
+                                actionColorArgb = pickerActionColor,
+                                onDateSet = { year, month, day ->
+                                    vm.setEditorStartDate(LocalDate.of(year, month + 1, day))
+                                }
                             )
-                            Text(
-                                text = startDateValue,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = colors.textPrimary
-                            )
-                            TextButton(
-                                onClick = onEditStartDate,
-                                contentPadding = PaddingValues(horizontal = spacing.x0_5, vertical = spacing.x0)
-                            ) {
-                                Text(t("Edit"))
-                            }
-                        }
+                        },
+                        contentPadding = PaddingValues(horizontal = spacing.x0_5, vertical = spacing.x0)
+                    ) {
+                        Text(t("Edit"))
                     }
                 }
 
-                FormSection(title = t("End date")) {
-                    Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { vm.setEditorShowAdvanced(!state.editorShowAdvanced) }
+                        .padding(vertical = spacing.x0_5),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = if (state.editorShowAdvanced) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
+                        contentDescription = null,
+                        tint = colors.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(spacing.x0_5))
+                    Text(
+                        text = if (state.editorShowAdvanced) t("hide_advanced") else t("show_advanced"),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = colors.primary
+                    )
+                }
+
+                AnimatedVisibility(
+                    visible = state.editorShowAdvanced,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(spacing.x1_5)) {
                         SettingsSwitchRow(
                             title = t("End date"),
                             subtitle = t("Optional challenge finish date"),
                             checked = state.editorEndDate != null,
-                            onCheckedChange = vm::setEditorEndDateEnabled
+                            onCheckedChange = { enabled ->
+                                vm.setEditorEndDateEnabled(enabled)
+                                if (enabled) {
+                                    val minDate = maxOf(LocalDate.now(), state.editorStartDate)
+                                    val initialDate = state.editorEndDate ?: maxOf(LocalDate.now().plusDays(30), state.editorStartDate)
+                                    showThemedDatePicker(
+                                        context = context,
+                                        themeResId = datePickerTheme,
+                                        initialDate = initialDate,
+                                        minDate = minDate,
+                                        actionColorArgb = pickerActionColor,
+                                        onDateSet = { year, month, day ->
+                                            vm.setEditorEndDate(LocalDate.of(year, month + 1, day))
+                                        }
+                                    )
+                                }
+                            }
                         )
 
                         AnimatedVisibility(visible = state.editorEndDate != null) {
                             OutlinedButton(
                                 onClick = {
+                                    val minDate = maxOf(LocalDate.now(), state.editorStartDate)
                                     showThemedDatePicker(
                                         context = context,
                                         themeResId = datePickerTheme,
-                                        initialDate = state.editorEndDate ?: state.editorStartDate,
+                                        initialDate = state.editorEndDate ?: minDate,
+                                        minDate = minDate,
                                         actionColorArgb = pickerActionColor,
                                         onDateSet = { year, month, day ->
                                             vm.setEditorEndDate(LocalDate.of(year, month + 1, day))
@@ -6961,11 +7757,7 @@ private fun TaskEditorDialog(
                                 )
                             }
                         }
-                    }
-                }
 
-                FormSection(title = t("Reminders")) {
-                    Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
                         SettingsSwitchRow(
                             title = t("Reminders"),
                             subtitle = t("Enable habit reminder notifications"),
@@ -7042,6 +7834,7 @@ private fun showThemedDatePicker(
     context: Context,
     themeResId: Int,
     initialDate: LocalDate,
+    minDate: LocalDate? = null,
     actionColorArgb: Int,
     onDateSet: (year: Int, month: Int, day: Int) -> Unit
 ) {
@@ -7063,6 +7856,10 @@ private fun showThemedDatePicker(
         }
         dialog.getButton(DatePickerDialog.BUTTON_POSITIVE)?.setTextColor(actionColorArgb)
         dialog.getButton(DatePickerDialog.BUTTON_NEGATIVE)?.setTextColor(actionColorArgb)
+    }
+    minDate?.let {
+        val minMillis = it.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+        dialog.datePicker.minDate = minMillis
     }
     dialog.show()
 }

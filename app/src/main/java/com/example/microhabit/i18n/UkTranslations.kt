@@ -356,6 +356,7 @@ internal val ukTranslations: Map<String, String> = mapOf(
     "New habit" to "Нова звичка",
     "Choose emoji" to "Обрати емодзі",
     "Done" to "Готово",
+    "More" to "Ще",
     "action_done" to "Готово",
     "action_edit" to "Змінити",
     "action_enable" to "Увімкнути",

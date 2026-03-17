@@ -72,7 +72,8 @@ data class HabitTask(
     val startDate: LocalDate = LocalDate.now(),
     val endDate: LocalDate? = null,
     val customDays: Set<Int> = emptySet(),
-    val isArchived: Boolean = false
+    val isArchived: Boolean = false,
+    val displayOrder: Int = 0
 )
 
 data class WeeklyProgressSnapshot(
@@ -155,9 +156,11 @@ class HabitRepository(private val context: Context) {
                     startDate = startDate,
                     endDate = endDate?.takeIf { !it.isBefore(startDate) },
                     customDays = custom,
-                    isArchived = obj.optBoolean("isArchived", false)
+                    isArchived = obj.optBoolean("isArchived", false),
+                    displayOrder = obj.optInt("displayOrder", i)
                 )
             }
+                .sortedBy { it.displayOrder }
         }.getOrDefault(emptyList())
     }
 
@@ -178,6 +181,7 @@ class HabitRepository(private val context: Context) {
         endDate: LocalDate?
     ): HabitTask {
         val normalizedEndDate = endDate?.takeIf { !it.isBefore(startDate) }
+        val nextOrder = getTasks().maxOfOrNull { it.displayOrder }?.plus(1) ?: 0
         val task = HabitTask(
             id = UUID.randomUUID().toString(),
             title = sanitizeTitle(title),
@@ -194,7 +198,8 @@ class HabitRepository(private val context: Context) {
             startDate = startDate,
             endDate = normalizedEndDate,
             customDays = sanitizeCustomDays(customDays),
-            isArchived = false
+            isArchived = false,
+            displayOrder = nextOrder
         )
         val tasks = getTasks().toMutableList().apply { add(task) }
         saveTasks(tasks)
@@ -284,6 +289,32 @@ class HabitRepository(private val context: Context) {
                 setSelectedTask(taskId)
             }
         }
+    }
+
+    fun reorderActiveTasks(orderedActiveIds: List<String>) {
+        if (orderedActiveIds.isEmpty()) return
+        val tasks = getTasks()
+        if (tasks.isEmpty()) return
+
+        val activeTasks = tasks.filter { lifecycleState(it) == HabitLifecycleState.ACTIVE }
+        if (activeTasks.isEmpty()) return
+
+        val activeById = activeTasks.associateBy { it.id }
+        val orderedActive = buildList {
+            orderedActiveIds.forEach { id ->
+                activeById[id]?.let { add(it) }
+            }
+            activeTasks.filterNot { it.id in orderedActiveIds }.forEach { add(it) }
+        }
+
+        val completed = tasks.filter { lifecycleState(it) == HabitLifecycleState.COMPLETED }
+            .sortedBy { it.displayOrder }
+        val archived = tasks.filter { it.isArchived }.sortedBy { it.displayOrder }
+
+        val merged = (orderedActive + completed + archived).mapIndexed { index, task ->
+            task.copy(displayOrder = index)
+        }
+        saveTasks(merged)
     }
 
     fun setSelectedTask(taskId: String?) {
@@ -898,6 +929,7 @@ class HabitRepository(private val context: Context) {
                 .put("reminderEnabled", task.reminderEnabled)
                 .put("startDate", task.startDate.format(formatter))
                 .put("isArchived", task.isArchived)
+                .put("displayOrder", task.displayOrder)
             task.endDate?.let { obj.put("endDate", it.format(formatter)) }
             val custom = JSONArray()
             task.customDays.sorted().forEach { custom.put(it) }

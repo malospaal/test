@@ -45,7 +45,8 @@ data class HabitListItem(
     val reminderHour: Int,
     val reminderMinute: Int,
     val isCompleted: Boolean,
-    val isArchived: Boolean
+    val isArchived: Boolean,
+    val displayOrder: Int
 )
 
 data class CalendarFilterOption(
@@ -874,6 +875,14 @@ class MainViewModel(
         return true
     }
 
+    fun reorderActiveHabits(orderedActiveIds: List<String>) {
+        if (orderedActiveIds.isEmpty()) return
+        viewModelScope.launch {
+            repository.reorderActiveTasks(orderedActiveIds)
+            refresh()
+        }
+    }
+
     fun dismissCompletedHabitDialog() {
         val current = _state.value
         val taskId = current.completedPromptTaskId ?: return
@@ -1055,10 +1064,11 @@ class MainViewModel(
                                 reminderHour = task.reminderHour,
                                 reminderMinute = task.reminderMinute,
                                 isCompleted = repository.lifecycleState(task) == HabitLifecycleState.COMPLETED,
-                                isArchived = task.isArchived
+                                isArchived = task.isArchived,
+                                displayOrder = task.displayOrder
                             )
                         }
-                        .sortedBy { it.isArchived },
+                        .sortedBy { it.displayOrder },
                     selectedTaskId = selectedId,
                     showEditor = state.showEditor,
                     selectedDateInFuture = isFutureDate,

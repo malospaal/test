@@ -41,6 +41,7 @@
 - `endDate: LocalDate?` (опциональная, inclusive)
 - `customDays: Set<Int>` (1..7, для `SELECTED_DAYS`)
 - `isArchived: Boolean`
+- `displayOrder: Int` (порядок отображения в management-списках)
 
 ### 3.2 Lifecycle States
 `HabitLifecycleState`:
@@ -263,8 +264,20 @@ Future scope (не часть текущего канонического пов
   - Active habits,
   - Completed habits,
   - Archived habits.
-- Карточка показывает статус (`Active/Completed/Archived`) и reminder state.
-- Add action в Habits открывает template-based create flow.
+- Habits screen сфокусирован на management-flow (CRUD + порядок), без аналитических метрик в списке.
+- Элемент списка — компактный row:
+  - emoji + title + compact meta (`frequency` + reminder time if enabled);
+  - compact right metrics (`streak`, `completion%`);
+  - тонкий progress bar под строкой.
+- Контекстные действия item открываются через `⋯` DropdownMenu:
+  - non-archived: Edit / Archive / Delete;
+  - archived: Unarchive / Delete (без Edit).
+- Delete остаётся confirm-gated (через существующий delete confirm dialog).
+- Swipe gestures для item в Habits list не используются.
+- Drag-and-drop reorder активен только в отдельном `Edit mode` и только для `ACTIVE` привычек (completed/archived не reorderable).
+- Reorder сохраняется в persistent `displayOrder`.
+- Tap по item в Habits list не открывает detail-screen.
+- Add action в Habits находится в TopBar (`Add` text button) и открывает template-based create flow.
 
 ### 12.4 Create/Edit Habit
 Create/Edit остаётся отдельным dialog-flow (`TaskEditorDialog`) и не является частью `HabitDetail`, но создание новой привычки теперь по умолчанию идёт через template flow:

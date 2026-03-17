@@ -808,6 +808,7 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "New habit" to v("Neue Gewohnheit", "Nouvelle habitude", "Nuevo habito", "Nuova abitudine", "Новая привычка"),
     "Choose emoji" to v("Emoji wahlen", "Choisir un emoji", "Elegir emoji", "Scegli emoji", "Выбрать эмодзи"),
     "Done" to v("Fertig", "Termine", "Listo", "Fatto", "Готово"),
+    "More" to v("Mehr", "Plus", "Más", "Altro", "Ещё"),
     "action_done" to (v("Fertig", "Termine", "Listo", "Fatto", "Готово") + mapOf(AppLanguage.EN to "Done", AppLanguage.CS to "Hotovo")),
     "action_edit" to (v("Bearbeiten", "Modifier", "Editar", "Modifica", "Изменить") + mapOf(AppLanguage.EN to "Edit", AppLanguage.CS to "Upravit")),
     "action_enable" to (v("Aktivieren", "Activer", "Activar", "Attiva", "Включить") + mapOf(AppLanguage.EN to "Enable", AppLanguage.CS to "Povolit")),

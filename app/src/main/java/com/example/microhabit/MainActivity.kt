@@ -50,9 +50,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -96,6 +98,7 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Checklist
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.DragHandle
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
@@ -204,7 +207,8 @@ import com.example.microhabit.ui.components.CalendarDayState
 import com.example.microhabit.ui.components.FeatureBulletRow
 import com.example.microhabit.ui.components.FormSection
 import com.example.microhabit.ui.components.HorizontalPercentBars
-import com.example.microhabit.ui.components.HabitCard
+import com.example.microhabit.ui.components.HabitEditModeCard
+import com.example.microhabit.ui.components.HabitListCard
 import com.example.microhabit.ui.components.HabitCardModel
 import com.example.microhabit.ui.components.AnalyticsMetricTile
 import com.example.microhabit.ui.components.PlanComparisonRow
@@ -237,6 +241,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.ceil
 import kotlin.math.roundToInt
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 
 private enum class AppPage {
     TRACKER,
@@ -376,6 +382,7 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
     var selectedTemplateCategory by rememberSaveable { mutableStateOf<String?>(null) }
     var templateDraft by remember { mutableStateOf<TemplateConfirmDraft?>(null) }
     var pendingTemplateReminderPicker by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var habitsEditMode by rememberSaveable { mutableStateOf(false) }
     val semantic = AppTheme.colors
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -493,6 +500,9 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
             showDeleteCompletedHabitConfirm = false
         }
     }
+    LaunchedEffect(page) {
+        if (page != AppPage.HABITS) habitsEditMode = false
+    }
 
     CompositionLocalProvider(LocalAppLanguage provides state.language) {
         if (showOnboardingWizard) {
@@ -586,28 +596,68 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                                         )
                                     }
                                 }
+                                AppPage.HABITS -> {
+                                    if (habitsEditMode) {
+                                        Spacer(Modifier.width(48.dp))
+                                    } else {
+                                        val canAdd = state.plan == SubscriptionPlan.PRO || state.tasks.size < 1
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            TextButton(
+                                                onClick = {
+                                                    if (canAdd) {
+                                                        openTemplatePicker()
+                                                    } else {
+                                                        previousPage = page
+                                                        page = AppPage.PAYWALL
+                                                    }
+                                                }
+                                            ) {
+                                                Text(
+                                                    text = if (canAdd) t("Add") else t("Upgrade"),
+                                                    color = semantic.primary,
+                                                    fontWeight = FontWeight.SemiBold
+                                                )
+                                            }
+                                            Spacer(Modifier.width(8.dp))
+                                            TextButton(onClick = { habitsEditMode = true }) {
+                                                Text(
+                                                    text = t("Edit"),
+                                                    color = semantic.primary,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
                                 else -> Unit
                             }
                         },
                         actions = {
                             val openSettings = { openSettingsPage(page) }
-                            when (page) {
-                                AppPage.HABITS -> {
-                                    val canAdd = state.plan == SubscriptionPlan.PRO || state.tasks.size < 1
-                                    TextButton(onClick = {
-                                        if (canAdd) {
-                                            openTemplatePicker()
-                                        } else {
-                                            previousPage = page
-                                            page = AppPage.PAYWALL
-                                        }
-                                    }) {
-                                        Text(if (canAdd) t("Add") else t("Upgrade"))
+                            if (page == AppPage.HABITS) {
+                                if (habitsEditMode) {
+                                    TextButton(onClick = { habitsEditMode = false }) {
+                                        Text(
+                                            text = t("Done"),
+                                            color = semantic.primary,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                    IconButton(onClick = openSettings) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Settings,
+                                            contentDescription = t("Settings")
+                                        )
+                                    }
+                                } else {
+                                    IconButton(onClick = openSettings) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.Settings,
+                                            contentDescription = t("Settings")
+                                        )
                                     }
                                 }
-                                else -> Unit
-                            }
-                            if (page in primaryPages) {
+                            } else if (page in primaryPages) {
                                 IconButton(onClick = openSettings) {
                                     Icon(
                                         imageVector = Icons.Rounded.Settings,
@@ -672,13 +722,12 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                             state = state,
                             vm = vm,
                             onCreateHabit = openTemplatePicker,
-                            onOpenHabit = {
-                                page = AppPage.HABIT_DETAIL
-                            },
                             onUpgrade = {
                                 previousPage = AppPage.HABITS
                                 page = AppPage.PAYWALL
                             },
+                            isEditMode = habitsEditMode,
+                            onEditModeChange = { habitsEditMode = it },
                             scrollToTopSignal = habitsScrollToTopSignal
                         )
                         AppPage.ANALYTICS -> AnalyticsPage(
@@ -1443,13 +1492,15 @@ private fun TrackerPage(
 
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun HabitsPage(
     state: HabitUiState,
     vm: MainViewModel,
     onCreateHabit: () -> Unit,
-    onOpenHabit: () -> Unit,
     onUpgrade: () -> Unit,
+    isEditMode: Boolean,
+    onEditModeChange: (Boolean) -> Unit,
     scrollToTopSignal: Int
 ) {
     val context = LocalContext.current
@@ -1458,18 +1509,41 @@ private fun HabitsPage(
     val listState = rememberLazyListState()
     val canAdd = state.plan == SubscriptionPlan.PRO || state.tasks.size < 1
     var pendingDeleteTaskId by rememberSaveable { mutableStateOf<String?>(null) }
+    val activeHabits = remember(state.habits) {
+        state.habits.filter { !it.isArchived && !it.isCompleted }
+    }
+    val completedHabits = remember(state.habits) {
+        state.habits.filter { !it.isArchived && it.isCompleted }
+    }
+    val archivedHabits = remember(state.habits) {
+        state.habits.filter { it.isArchived }
+    }
+    var editModeHabits by remember(state.habits) { mutableStateOf(activeHabits) }
+    val reorderListState = rememberLazyListState()
+    val reorderableListState = rememberReorderableLazyListState(reorderListState) { from, to ->
+        editModeHabits = editModeHabits.toMutableList().apply {
+            add(to.index, removeAt(from.index))
+        }
+    }
     LaunchedEffect(scrollToTopSignal) {
         if (scrollToTopSignal > 0) {
             listState.animateScrollToItem(0)
         }
     }
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        state = listState,
-        contentPadding = PaddingValues(spacing.x2),
-        verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
-    ) {
-        if (state.habits.isEmpty()) {
+    LaunchedEffect(isEditMode, activeHabits) {
+        if (isEditMode) {
+            editModeHabits = activeHabits
+            if (activeHabits.isEmpty()) onEditModeChange(false)
+        }
+    }
+
+    if (state.habits.isEmpty()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            state = listState,
+            contentPadding = PaddingValues(spacing.x2),
+            verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
+        ) {
             item {
                 GlassCard {
                     Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
@@ -1493,11 +1567,51 @@ private fun HabitsPage(
                     }
                 }
             }
-        } else {
-            val activeHabits = state.habits.filter { !it.isArchived && !it.isCompleted }
-            val completedHabits = state.habits.filter { !it.isArchived && it.isCompleted }
-            val archivedHabits = state.habits.filter { it.isArchived }
-
+        }
+    } else if (isEditMode) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            state = reorderListState,
+            contentPadding = PaddingValues(horizontal = spacing.x2, vertical = spacing.x2),
+            verticalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            item {
+                Text(
+                    text = t("Active habits"),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = colors.textPrimary
+                )
+            }
+            items(items = editModeHabits, key = { it.id }) { habit ->
+                ReorderableItem(reorderableListState, key = habit.id) { isDragging ->
+                    HabitEditModeCard(
+                        habit = HabitCardModel(
+                            emoji = habit.emoji,
+                            name = habit.name,
+                            colorHex = habit.colorHex,
+                            secondaryLine = buildHabitsMetaString(context, habit),
+                            streak = habit.streak,
+                            completionPercent = habit.completionRate,
+                            isArchived = habit.isArchived
+                        ),
+                        isDragging = isDragging,
+                        onDelete = { pendingDeleteTaskId = habit.id },
+                        onDragStopped = {
+                            vm.reorderActiveHabits(editModeHabits.map { it.id })
+                        },
+                        modifier = Modifier
+                    )
+                }
+            }
+        }
+    } else {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            state = listState,
+            contentPadding = PaddingValues(spacing.x2),
+            verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
+        ) {
             if (activeHabits.isNotEmpty()) {
                 item {
                     Text(
@@ -1508,35 +1622,19 @@ private fun HabitsPage(
                     )
                 }
                 items(items = activeHabits, key = { it.id }) { habit ->
-                    val reminderStatus = if (habit.reminderEnabled) {
-                        tf("Reminder: %s", formatTimeForDevice(context, habit.reminderHour, habit.reminderMinute))
-                    } else {
-                        t("Reminder off")
-                    }
-                    HabitCard(
+                    HabitListCard(
                         habit = HabitCardModel(
                             emoji = habit.emoji,
                             name = habit.name,
                             colorHex = habit.colorHex,
-                            trackingType = habit.trackingType,
+                            secondaryLine = buildHabitsMetaString(context, habit),
                             streak = habit.streak,
-                            frequency = habit.frequency,
-                            reminderStatus = reminderStatus,
-                            completionRate = habit.completionRate,
-                            isCompleted = habit.isCompleted,
+                            completionPercent = habit.completionRate,
                             isArchived = habit.isArchived
                         ),
-                        onOpen = {
-                            vm.selectTask(habit.id)
-                            onOpenHabit()
-                        },
                         onEdit = { vm.openEditTask(habit.id) },
                         onArchive = { vm.archiveTask(habit.id) },
-                        onUnarchive = {
-                            if (!vm.unarchiveTask(habit.id)) {
-                                onUpgrade()
-                            }
-                        },
+                        onUnarchive = { },
                         onDelete = { pendingDeleteTaskId = habit.id }
                     )
                 }
@@ -1552,32 +1650,19 @@ private fun HabitsPage(
                     )
                 }
                 items(items = completedHabits, key = { it.id }) { habit ->
-                    val reminderStatus = if (habit.reminderEnabled) {
-                        tf("Reminder: %s", formatTimeForDevice(context, habit.reminderHour, habit.reminderMinute))
-                    } else {
-                        t("Reminder off")
-                    }
-                    HabitCard(
+                    HabitListCard(
                         habit = HabitCardModel(
                             emoji = habit.emoji,
                             name = habit.name,
                             colorHex = habit.colorHex,
-                            trackingType = habit.trackingType,
+                            secondaryLine = buildHabitsMetaString(context, habit),
                             streak = habit.streak,
-                            frequency = habit.frequency,
-                            reminderStatus = reminderStatus,
-                            completionRate = habit.completionRate,
-                            isCompleted = habit.isCompleted,
+                            completionPercent = habit.completionRate,
                             isArchived = habit.isArchived
                         ),
-                        onOpen = { vm.openEditTask(habit.id) },
                         onEdit = { vm.openEditTask(habit.id) },
                         onArchive = { vm.archiveTask(habit.id) },
-                        onUnarchive = {
-                            if (!vm.unarchiveTask(habit.id)) {
-                                onUpgrade()
-                            }
-                        },
+                        onUnarchive = { },
                         onDelete = { pendingDeleteTaskId = habit.id }
                     )
                 }
@@ -1593,27 +1678,18 @@ private fun HabitsPage(
                     )
                 }
                 items(items = archivedHabits, key = { it.id }) { habit ->
-                    val reminderStatus = if (habit.reminderEnabled) {
-                        tf("Reminder: %s", formatTimeForDevice(context, habit.reminderHour, habit.reminderMinute))
-                    } else {
-                        t("Reminder off")
-                    }
-                    HabitCard(
+                    HabitListCard(
                         habit = HabitCardModel(
                             emoji = habit.emoji,
                             name = habit.name,
                             colorHex = habit.colorHex,
-                            trackingType = habit.trackingType,
+                            secondaryLine = buildHabitsMetaString(context, habit),
                             streak = habit.streak,
-                            frequency = habit.frequency,
-                            reminderStatus = reminderStatus,
-                            completionRate = habit.completionRate,
-                            isCompleted = habit.isCompleted,
+                            completionPercent = habit.completionRate,
                             isArchived = habit.isArchived
                         ),
-                        onOpen = { vm.openEditTask(habit.id) },
-                        onEdit = { vm.openEditTask(habit.id) },
-                        onArchive = { vm.archiveTask(habit.id) },
+                        onEdit = { },
+                        onArchive = { },
                         onUnarchive = {
                             if (!vm.unarchiveTask(habit.id)) {
                                 onUpgrade()
@@ -1649,6 +1725,15 @@ private fun HabitsPage(
             }
         )
     }
+}
+
+@Composable
+private fun buildHabitsMetaString(context: Context, habit: HabitListItem): String {
+    val parts = mutableListOf(habit.frequency)
+    if (habit.reminderEnabled) {
+        parts += tf("Reminder: %s", formatTimeForDevice(context, habit.reminderHour, habit.reminderMinute))
+    }
+    return parts.joinToString(" · ")
 }
 
 @Composable

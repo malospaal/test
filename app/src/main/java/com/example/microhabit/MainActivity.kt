@@ -565,11 +565,6 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                                         Text(if (canAdd) t("Add") else t("Upgrade"))
                                     }
                                 }
-                                AppPage.CALENDAR -> {
-                                    TextButton(onClick = vm::jumpToToday) {
-                                        Text(t("Today"))
-                                    }
-                                }
                                 else -> Unit
                             }
                             if (page in primaryPages) {
@@ -2122,10 +2117,13 @@ private fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
     val colors = AppTheme.colors
     val locale = appLocale()
     val today = LocalDate.now()
-    val filterScroll = rememberScrollState()
     val maxCompletedInMonth = state.calendarCompletedCountByDate.values.maxOrNull()?.coerceAtLeast(1) ?: 1
     val selectedCompletedCount = state.calendarCompletedCountByDate[state.selectedDate] ?: 0
     val selectedScheduledCount = state.calendarScheduledCountByDate[state.selectedDate] ?: 0
+    val taskById = remember(state.allTasks) { state.allTasks.associateBy { it.id } }
+    val calendarFilterHabits = remember(state.calendarFilterOptions, taskById) {
+        state.calendarFilterOptions.mapNotNull { option -> taskById[option.taskId] }
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -2133,49 +2131,24 @@ private fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
         verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
     ) {
         item {
-            GlassCard(tone = SurfaceTone.SECONDARY) {
-                Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+            if (calendarFilterHabits.isEmpty()) {
+                GlassCard(tone = SurfaceTone.SECONDARY) {
                     Text(
-                        text = t("Calendar"),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
-                        color = colors.textPrimary
-                    )
-                    Text(
-                        text = t("Global overview"),
-                        style = MaterialTheme.typography.bodySmall,
+                        text = t("No active or completed habits yet."),
+                        style = MaterialTheme.typography.bodyMedium,
                         color = colors.textSecondary
                     )
-                    if (state.calendarFilterOptions.isEmpty()) {
-                        Text(
-                            text = t("No active or completed habits yet."),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = colors.textSecondary
-                        )
-                    } else {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(filterScroll),
-                            horizontalArrangement = Arrangement.spacedBy(spacing.x0_5),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            val allSelected = state.calendarFilterTaskId == null
-                            CalendarFilterChip(
-                                label = t("All habits"),
-                                selected = allSelected,
-                                onClick = { vm.setCalendarFilterTask(null) }
-                            )
-                            state.calendarFilterOptions.forEach { option ->
-                                CalendarFilterChip(
-                                    label = "${option.emoji.ifBlank { "✨" }} ${option.title}",
-                                    selected = state.calendarFilterTaskId == option.taskId,
-                                    onClick = { vm.setCalendarFilterTask(option.taskId) }
-                                )
-                            }
-                        }
-                    }
                 }
+            } else {
+                HabitSelectorRow(
+                    habits = calendarFilterHabits,
+                    selectedId = state.calendarFilterTaskId,
+                    onHabitSelected = vm::setCalendarFilterTask,
+                    onCreateHabit = null,
+                    showAllHabitsOption = true,
+                    onSelectAll = { vm.setCalendarFilterTask(null) },
+                    showCountLabel = false
+                )
             }
         }
 
@@ -2263,24 +2236,30 @@ private fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
                             CalendarBreakdownStatus.MISSED -> t("Missed")
                             CalendarBreakdownStatus.NOT_SCHEDULED -> t("Not scheduled")
                             CalendarBreakdownStatus.TODAY_PENDING -> t("Today pending")
-                            CalendarBreakdownStatus.FUTURE -> t("Future")
+                            CalendarBreakdownStatus.FUTURE -> t("Upcoming")
                         }
                         val statusColor = when (item.status) {
                             CalendarBreakdownStatus.COMPLETED -> colors.success
-                            CalendarBreakdownStatus.PARTIAL -> colors.success
+                            CalendarBreakdownStatus.PARTIAL -> colors.textSecondary
                             CalendarBreakdownStatus.MISSED -> colors.danger
                             CalendarBreakdownStatus.NOT_SCHEDULED -> colors.textSecondary
-                            CalendarBreakdownStatus.TODAY_PENDING -> colors.primary
+                            CalendarBreakdownStatus.TODAY_PENDING -> colors.textSecondary
                             CalendarBreakdownStatus.FUTURE -> colors.textSecondary
                         }
                         val valueLabel = when (item.trackingType) {
                             TrackingType.YES_NO -> null
                             TrackingType.COUNT, TrackingType.DURATION -> {
-                                val unit = item.unitLabel.ifBlank { if (item.trackingType == TrackingType.DURATION) t("min") else "" }
-                                if (unit.isBlank()) {
-                                    tf("Value %d / %d", item.value, item.target)
+                                if (!item.scheduled) {
+                                    null
                                 } else {
-                                    tf("Value %d / %d %s", item.value, item.target, unit)
+                                    val unit = item.unitLabel.ifBlank {
+                                        if (item.trackingType == TrackingType.DURATION) t("min") else ""
+                                    }
+                                    if (unit.isBlank()) {
+                                        "${item.value} / ${item.target}"
+                                    } else {
+                                        "${item.value} / ${item.target} $unit"
+                                    }
                                 }
                             }
                         }
@@ -2295,10 +2274,16 @@ private fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(spacing.x1)
                             ) {
-                                Text(
-                                    text = item.emoji.ifBlank { "✨" },
-                                    style = MaterialTheme.typography.bodyLarge
-                                )
+                                Box(
+                                    modifier = Modifier.size(24.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = item.emoji.ifBlank { "✨" },
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontSize = 14.sp
+                                    )
+                                }
                                 Column(
                                     modifier = Modifier.weight(1f),
                                     verticalArrangement = Arrangement.spacedBy(2.dp)
@@ -2334,38 +2319,6 @@ private fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
 }
 
 @Composable
-private fun CalendarFilterChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    val spacing = AppTheme.spacing
-    val radius = AppTheme.radius
-    val stroke = AppTheme.stroke
-    val colors = AppTheme.colors
-    Surface(
-        modifier = Modifier
-            .clip(RoundedCornerShape(radius.full))
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(radius.full),
-        color = if (selected) colors.primary.copy(alpha = 0.12f) else colors.backgroundSurfaceMuted.copy(alpha = 0.82f),
-        border = BorderStroke(
-            width = stroke.thin,
-            color = if (selected) colors.primary.copy(alpha = 0.65f) else colors.borderSubtle.copy(alpha = 0.65f)
-        )
-    ) {
-        Text(
-            text = label,
-            modifier = Modifier.padding(horizontal = spacing.x1, vertical = spacing.x0_5),
-            style = MaterialTheme.typography.labelMedium,
-            color = if (selected) colors.primary else colors.textSecondary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-@Composable
 private fun GlobalCalendarHeatCell(
     date: LocalDate?,
     selected: Boolean,
@@ -2390,6 +2343,7 @@ private fun GlobalCalendarHeatCell(
     }
 
     val todayDate = LocalDate.now()
+    val isToday = date.isEqual(todayDate)
     val isFuture = date.isAfter(todayDate)
     val intensityLevel = if (completedCount <= 0 || maxCompletedInMonth <= 0) {
         0
@@ -2397,26 +2351,43 @@ private fun GlobalCalendarHeatCell(
         kotlin.math.ceil((completedCount.toFloat() / maxCompletedInMonth.toFloat()) * 4f).toInt().coerceIn(1, 4)
     }
     val fillColor = when {
-        isFuture -> colors.backgroundSurfaceMuted.copy(alpha = 0.22f)
-        scheduledCount <= 0 -> colors.neutralMuted.copy(alpha = 0.34f)
+        isToday -> Color.Transparent
+        isFuture -> Color.Transparent
+        scheduledCount <= 0 -> Color.Transparent
         completedCount <= 0 -> colors.danger.copy(alpha = 0.10f)
         intensityLevel == 1 -> colors.success.copy(alpha = 0.28f)
         intensityLevel == 2 -> colors.success.copy(alpha = 0.42f)
         intensityLevel == 3 -> colors.success.copy(alpha = 0.58f)
         else -> colors.success.copy(alpha = 0.74f)
     }
-    val borderColor = when {
-        selected -> colors.primary.copy(alpha = 0.72f)
-        isFuture -> colors.borderSubtle.copy(alpha = 0.35f)
-        scheduledCount <= 0 -> colors.borderSubtle.copy(alpha = 0.65f)
-        completedCount <= 0 -> colors.danger.copy(alpha = 0.28f)
-        else -> colors.success.copy(alpha = 0.3f)
+    val baseBorderColor = when {
+        isToday -> colors.primary
+        isFuture -> Color.Transparent
+        scheduledCount <= 0 -> Color.Transparent
+        completedCount <= 0 -> colors.danger.copy(alpha = 0.25f)
+        else -> Color.Transparent
+    }
+    val baseBorderWidth = when {
+        isToday -> 1.5.dp
+        completedCount <= 0 && scheduledCount > 0 && !isFuture -> 1.dp
+        else -> 0.dp
+    }
+    val borderColor = if (selected && !isToday) {
+        colors.primary.copy(alpha = 0.72f)
+    } else {
+        baseBorderColor
+    }
+    val borderWidth = if (selected && !isToday) {
+        stroke.medium
+    } else {
+        baseBorderWidth
     }
     val textColor = when {
-        isFuture -> colors.textTertiary
+        isToday -> colors.primary
+        isFuture -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
         completedCount > 0 -> MaterialTheme.colorScheme.onPrimary
-        scheduledCount > 0 -> colors.textPrimary
-        else -> colors.textSecondary
+        scheduledCount > 0 -> colors.danger
+        else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)
     }
 
     Box(
@@ -2424,11 +2395,17 @@ private fun GlobalCalendarHeatCell(
             .height(spacing.x5 + spacing.x0_5)
             .clip(RoundedCornerShape(radius.sm))
             .background(fillColor, RoundedCornerShape(radius.sm))
-                .border(
-                    width = if (selected) stroke.medium else stroke.thin,
-                    color = borderColor,
-                    shape = RoundedCornerShape(radius.sm)
-                )
+            .then(
+                if (borderWidth > 0.dp) {
+                    Modifier.border(
+                        width = borderWidth,
+                        color = borderColor,
+                        shape = RoundedCornerShape(radius.sm)
+                    )
+                } else {
+                    Modifier
+                }
+            )
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
@@ -2436,17 +2413,8 @@ private fun GlobalCalendarHeatCell(
             text = date.dayOfMonth.toString(),
             style = MaterialTheme.typography.bodySmall,
             color = textColor,
-            fontWeight = if (selected || today) FontWeight.SemiBold else FontWeight.Medium
+            fontWeight = if (selected || today || isToday) FontWeight.SemiBold else FontWeight.Medium
         )
-        if (today) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(3.dp)
-                    .size(4.dp)
-                    .background(colors.calendarTodayRing, RoundedCornerShape(radius.full))
-            )
-        }
     }
 }
 
@@ -4252,7 +4220,10 @@ private fun HabitSelectorRow(
     habits: List<HabitTask>,
     selectedId: String?,
     onHabitSelected: (String) -> Unit,
-    onCreateHabit: () -> Unit,
+    onCreateHabit: (() -> Unit)? = null,
+    showAllHabitsOption: Boolean = false,
+    onSelectAll: (() -> Unit)? = null,
+    showCountLabel: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val spacing = AppTheme.spacing
@@ -4269,7 +4240,10 @@ private fun HabitSelectorRow(
     val canScrollRight by remember {
         derivedStateOf { listState.canScrollForward }
     }
-    val shouldShowHint = showHint && canScrollRight && habits.size > 1
+    val selectorItemCount = habits.size +
+        (if (onCreateHabit != null) 1 else 0) +
+        (if (showAllHabitsOption) 1 else 0)
+    val shouldShowHint = showHint && canScrollRight && selectorItemCount > 1
     val fadeAlpha by animateFloatAsState(
         targetValue = if (canScrollRight) 1f else 0f,
         animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
@@ -4292,20 +4266,32 @@ private fun HabitSelectorRow(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(spacing.x0_5)
     ) {
-        Text(
-            text = activeHabitsCountLabel(habits.size, language),
-            style = MaterialTheme.typography.labelMedium,
-            color = colors.textSecondary
-        )
+        if (showCountLabel) {
+            Text(
+                text = activeHabitsCountLabel(habits.size, language),
+                style = MaterialTheme.typography.labelMedium,
+                color = colors.textSecondary
+            )
+        }
         Box(modifier = Modifier.fillMaxWidth()) {
             LazyRow(
                 state = listState,
                 modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(start = spacing.x2, end = 56.dp),
+                contentPadding = PaddingValues(start = spacing.x2, end = 32.dp),
                 horizontalArrangement = Arrangement.spacedBy(spacing.x1)
             ) {
-                item {
-                    AddHabitTile(onClick = onCreateHabit)
+                onCreateHabit?.let { onAdd ->
+                    item {
+                        AddHabitTile(onClick = onAdd)
+                    }
+                }
+                if (showAllHabitsOption) {
+                    item {
+                        AllHabitsPill(
+                            isSelected = selectedId == null,
+                            onClick = { onSelectAll?.invoke() }
+                        )
+                    }
                 }
                 items(habits, key = { it.id }) { habit ->
                     HabitPill(
@@ -4426,13 +4412,17 @@ private fun AddHabitTile(onClick: () -> Unit) {
 @Composable
 private fun FadeOverlay() {
     val backgroundColor = MaterialTheme.colorScheme.background
+    val isDark = isSystemInDarkTheme()
     Box(
         modifier = Modifier
-            .width(48.dp)
+            .width(20.dp)
             .fillMaxHeight()
             .background(
                 Brush.horizontalGradient(
-                    colors = listOf(Color.Transparent, backgroundColor)
+                    colors = listOf(
+                        Color.Transparent,
+                        backgroundColor.copy(alpha = if (isDark) 1f else 0.6f)
+                    )
                 )
             )
     )
@@ -5371,6 +5361,35 @@ private fun ProgressRing(
             fontWeight = if (centerLabel.contains("%")) FontWeight.Bold else FontWeight.Normal,
             color = centerLabelColor
         )
+    }
+}
+
+@Composable
+private fun AllHabitsPill(
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(18.dp),
+        color = if (isSelected) AppTheme.colors.primary else Color.Transparent,
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (isSelected) Color.Transparent else MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
+        ),
+        modifier = Modifier.height(36.dp)
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier.padding(horizontal = 12.dp)
+        ) {
+            Text(
+                text = t("All habits"),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
+                color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 

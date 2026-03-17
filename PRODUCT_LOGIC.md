@@ -298,6 +298,9 @@ Start date отображается облегчённой строкой в о�
 - В календаре поддерживаются фильтры:
   - `All habits` (default);
   - фильтр на одну конкретную привычку.
+- UI фильтра календаря переиспользует общий `HabitSelectorRow`:
+  - без `+` create-tile;
+  - с первым pill `All habits` для сброса фильтра.
 - Heatmap-семантика:
   - GitHub-style сетка по дням месяца;
   - интенсивность дня строится по `completed habit count` за дату (а не по completion ratio);
@@ -320,7 +323,7 @@ Start date отображается облегчённой строкой в о�
   - `Account`
 - Текстовые label в bottom bar не отображаются; выбранная вкладка определяется через визуальное выделение icon + индикатор.
 - Drawer / burger menu не используется как primary navigation паттерн для основных экранов.
-- Top app bar использует контекстные действия экрана (например, `Add` в Habits, `Today` в Calendar), без burger-кнопки primary навигации.
+- Top app bar использует контекстные действия экрана там, где это требуется (например, `Add` в Habits), без burger-кнопки primary навигации.
 - На всех primary экранах (`Tracker`, `Habits`, `Analytics`, `Calendar`, `Account`) доступен глобальный shortcut в `Settings` через иконку `gear` в top-right.
 
 ### 12.8 Account Screen

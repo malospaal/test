@@ -57,6 +57,7 @@ internal val ukTranslations: Map<String, String> = mapOf(
     "Missed" to "Пропущено",
     "Not scheduled" to "Не заплановано",
     "Future" to "Майбутнє",
+    "Upcoming" to "Попереду",
     "You are on PRO. Manage options in Premium." to "У вас PRO. Керуйте параметрами в розділі Преміум.",
     "You are on Free. Upgrade to unlock unlimited habits." to "У вас Безкоштовний. Оновіться, щоб відкрити безлімітні звички.",
     "Open Premium" to "Відкрити Преміум",

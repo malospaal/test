@@ -164,6 +164,7 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "Missed" to v("Verpasst", "Manque", "Perdido", "Saltato", "Пропущено"),
     "Not scheduled" to v("Nicht geplant", "Non planifie", "No programado", "Non pianificato", "Не запланировано"),
     "Future" to v("Zukunft", "Futur", "Futuro", "Futuro", "Будущее"),
+    "Upcoming" to v("Bevorstehend", "A venir", "Proximo", "In arrivo", "Впереди"),
     "You are on PRO. Manage options in Premium." to v(
         "Du hast PRO. Verwalte Optionen im Premium-Bereich.",
         "Vous etes sur PRO. Gere vos options dans Premium.",

@@ -26,6 +26,7 @@ const INITIAL_HABITS: HabitItem[] = [
     streak: 6,
     completionRate: 80,
     isActive: true,
+    order: 0,
   },
   {
     id: "2",
@@ -35,6 +36,7 @@ const INITIAL_HABITS: HabitItem[] = [
     streak: 3,
     completionRate: 62,
     isActive: true,
+    order: 1,
   },
 ];
 
@@ -61,6 +63,7 @@ export default function App() {
       streak: 0,
       completionRate: 0,
       isActive: true,
+      order: habits.length,
     };
 
     setHabits((prev) => [newHabit, ...prev]);
@@ -97,6 +100,7 @@ export default function App() {
               )
             }
             onDeleteHabit={(habit) => setHabits((prev) => prev.filter((h) => h.id !== habit.id))}
+            onReorderHabits={(reordered) => setHabits(reordered)}
           />
         )}
 

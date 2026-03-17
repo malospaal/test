@@ -1,8 +1,7 @@
 package com.example.microhabit.ui.tracker
 
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -21,6 +20,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.example.microhabit.DOTS_SPRING_DAMPING
+import com.example.microhabit.DOTS_SPRING_STIFFNESS
 import com.example.microhabit.ui.theme.AppTheme
 
 private data class HabitPageDotModel(
@@ -95,7 +96,10 @@ private fun buildDotItems(total: Int, current: Int): List<HabitPageDotModel> {
 private fun HabitPageDot(item: HabitPageDotModel) {
     val animatedWidth = animateFloatAsState(
         targetValue = item.widthDp,
-        animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing),
+        animationSpec = spring(
+            dampingRatio = DOTS_SPRING_DAMPING,
+            stiffness = DOTS_SPRING_STIFFNESS
+        ),
         label = "habitPageDotWidth"
     )
     Box(

@@ -2616,10 +2616,10 @@ private fun GlobalCalendarHeatCell(
         hasManualOverride -> colors.success.copy(alpha = 0.18f)
         scheduledCount <= 0 -> Color.Transparent
         completedCount <= 0 -> colors.danger.copy(alpha = 0.10f)
-        intensityLevel == 1 -> colors.success.copy(alpha = 0.28f)
-        intensityLevel == 2 -> colors.success.copy(alpha = 0.42f)
-        intensityLevel == 3 -> colors.success.copy(alpha = 0.58f)
-        else -> colors.success.copy(alpha = 0.74f)
+        intensityLevel == 1 -> colors.success.copy(alpha = 0.31f)
+        intensityLevel == 2 -> colors.success.copy(alpha = 0.46f)
+        intensityLevel == 3 -> colors.success.copy(alpha = 0.64f)
+        else -> colors.success.copy(alpha = 0.81f)
     }
     val baseBorderColor = when {
         isToday -> colors.primary

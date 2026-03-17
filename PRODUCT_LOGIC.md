@@ -211,7 +211,7 @@ Future scope (не часть текущего канонического пов
 - Показывает только `ACTIVE` привычки.
 - Основное действие: completion/value update на выбранную дату.
 - Содержит:
-  - компактный heading над selector-строкой (локализованный, спокойный тон) для явного контекста выбора привычки;
+  - компактный heading над selector-строкой с динамическим количеством активных привычек (`N active habits` / локализованный plural, для `0` — отдельный zero-state label);
   - видимый горизонтальный selector активных привычек в виде pill-таблеток (emoji + title) с явным selected state;
   - первый элемент selector-строки = компактный `+` action-tile (Create habit), всегда доступен как отдельный первый элемент;
   - `+` tile является action-only контролом (без текстового label внутри tile), визуально отделён от selected habit состояния;
@@ -223,6 +223,10 @@ Future scope (не часть текущего канонического пов
     - progress ring (YES_NO: 0/100; COUNT/DURATION: `value/target`),
     - streak/meta строку (`streak`, `best streak`, `30-day completion`) или zero-streak fallback,
     - compact 7-day mini-track;
+  - для `COUNT` / `DURATION` внутри `HeroCard` отображаются:
+    - linear progress bar по физическому прогрессу к target (`value/target`);
+    - human-readable goal status (`to go` / `goal reached` / `beyond goal`);
+    - completion-threshold (`minimumCompletionPercent`) продолжает влиять на completion-state через Repository и не меняет schedule/business семантику;
   - внутри `HeroCard` сохраняется rest-day UX для not scheduled даты (объяснение + optional next scheduled date + explicit `Mark anyway` override action);
   - отдельные standalone блоки streak tiles и 7-day chart на Tracker-экране не отображаются (их контекст перенесён в `HeroCard`);
   - calendar.

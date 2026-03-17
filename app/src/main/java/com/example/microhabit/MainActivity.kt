@@ -46,6 +46,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -218,6 +219,7 @@ import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.ceil
+import kotlin.math.roundToInt
 
 private enum class AppPage {
     TRACKER,
@@ -1130,14 +1132,11 @@ private fun TrackerPage(
                                 task = animatedTask,
                                 selectedDate = state.selectedDate,
                                 done = state.selectedDateDone,
-                                partial = state.selectedDatePartial,
                                 scheduled = state.selectedDateScheduled,
                                 nextScheduledDate = state.selectedDateNextScheduled,
                                 selectedValue = state.selectedDateValue,
                                 selectedTarget = state.selectedDateTarget,
                                 selectedUnit = state.selectedDateUnit,
-                                selectedCompletionPercent = state.selectedDateCompletionPercent,
-                                minimumCompletionPercent = state.minimumCompletionPercent,
                                 streak = state.streak,
                                 bestStreak = state.bestStreak,
                                 completionRate30 = state.completionRate30Day,
@@ -4226,6 +4225,34 @@ private fun TaskSelector(
 
 private const val SELECTOR_HINT_PREF_KEY = "pref_selector_hint_shown"
 
+private fun activeHabitsCountLabel(count: Int, language: AppLanguage): String {
+    if (count <= 0) return translate(language, "No active habits")
+    return when (language) {
+        AppLanguage.RU, AppLanguage.UK -> {
+            val mod10 = count % 10
+            val mod100 = count % 100
+            val key = when {
+                mod10 == 1 && mod100 != 11 -> "%d active habit (one)"
+                mod10 in 2..4 && mod100 !in 12..14 -> "%d active habits (few)"
+                else -> "%d active habits (many)"
+            }
+            formatTranslate(language, key, count)
+        }
+        AppLanguage.CS -> {
+            val key = when (count) {
+                1 -> "%d active habit (one)"
+                2, 3, 4 -> "%d active habits (few)"
+                else -> "%d active habits (many)"
+            }
+            formatTranslate(language, key, count)
+        }
+        else -> {
+            val key = if (count == 1) "%d active habit (one)" else "%d active habits (many)"
+            formatTranslate(language, key, count)
+        }
+    }
+}
+
 @Composable
 private fun HabitSelectorRow(
     habits: List<HabitTask>,
@@ -4236,6 +4263,7 @@ private fun HabitSelectorRow(
 ) {
     val spacing = AppTheme.spacing
     val colors = AppTheme.colors
+    val language = LocalAppLanguage.current
     val listState = rememberLazyListState()
     val context = LocalContext.current
     val prefs = remember(context) {
@@ -4271,9 +4299,8 @@ private fun HabitSelectorRow(
         verticalArrangement = Arrangement.spacedBy(spacing.x0_5)
     ) {
         Text(
-            text = t("My habits"),
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold,
+            text = activeHabitsCountLabel(habits.size, language),
+            style = MaterialTheme.typography.labelMedium,
             color = colors.textSecondary
         )
         Box(modifier = Modifier.fillMaxWidth()) {
@@ -4411,14 +4438,11 @@ private fun HeroCard(
     task: HabitTask?,
     selectedDate: LocalDate,
     done: Boolean,
-    partial: Boolean,
     scheduled: Boolean,
     nextScheduledDate: LocalDate?,
     selectedValue: Int,
     selectedTarget: Int,
     selectedUnit: String,
-    selectedCompletionPercent: Int,
-    minimumCompletionPercent: Int,
     streak: Int,
     bestStreak: Int,
     completionRate30: Int,
@@ -4565,10 +4589,28 @@ private fun HeroCard(
         TrackingType.COUNT -> "$selectedValue / $selectedTarget $unitLabel"
         TrackingType.DURATION -> "$selectedValue / $selectedTarget ${t("min")}"
     }
-    val completionStatusText = when {
-        done -> t("Completed")
-        partial -> tf("%d%% of %d%% threshold", selectedCompletionPercent, minimumCompletionPercent)
-        else -> t("In progress")
+    val rawProgress = (selectedValue.toFloat() / selectedTarget.coerceAtLeast(1).toFloat()).coerceIn(0f, 1f)
+    val animatedProgress by animateFloatAsState(
+        targetValue = rawProgress,
+        animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing),
+        label = "heroLinearProgress"
+    )
+    val displayPercent = (rawProgress * 100f).roundToInt()
+    val remaining = selectedTarget - selectedValue
+    val statusUnit = when (trackingType) {
+        TrackingType.DURATION -> t("min")
+        TrackingType.COUNT -> selectedUnit.ifBlank { t("times") }
+        TrackingType.YES_NO -> ""
+    }
+    val goalStatusText = when {
+        done && remaining >= 0 -> t("Goal reached! 🎉")
+        remaining < 0 -> tf("+%d %s beyond goal", -remaining, statusUnit)
+        else -> tf("%d %s to go", remaining, statusUnit)
+    }
+    val goalStatusColor = when {
+        done -> MaterialTheme.colorScheme.primary
+        remaining < 0 -> MaterialTheme.colorScheme.onSurfaceVariant
+        else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
     }
     val habitColor = parseColorHex(task?.colorHex.orEmpty())
     val ringProgress = when {
@@ -4861,10 +4903,38 @@ private fun HeroCard(
                                 color = semantic.textPrimary
                             )
                         }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                        ) {
+                            LinearProgressIndicator(
+                                progress = { animatedProgress },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(6.dp)
+                                    .clip(RoundedCornerShape(3.dp)),
+                                color = habitColor,
+                                trackColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                text = "$displayPercent%",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.widthIn(min = 32.dp),
+                                textAlign = TextAlign.End
+                            )
+                        }
                         Text(
-                            text = completionStatusText,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (done) semantic.success else semantic.textSecondary
+                            text = goalStatusText,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = goalStatusColor,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 8.dp)
                         )
 
                         if (isCountTracking) {
@@ -5290,7 +5360,7 @@ private fun DayDot(
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall,
-            fontSize = 9.sp,
+            fontSize = 10.sp,
             color = if (isToday) todayBorderColor else semantic.textTertiary,
             maxLines = 1,
             overflow = TextOverflow.Clip

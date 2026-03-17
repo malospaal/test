@@ -24,6 +24,22 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "Habit details" to v("Gewohnheitsdetails", "Details de l'habitude", "Detalles del habito", "Dettagli abitudine", "Детали привычки"),
     "Habits" to v("Gewohnheiten", "Habitudes", "Habitos", "Abitudini", "Привычки"),
     "My habits" to v("Meine Gewohnheiten", "Mes habitudes", "Mis habitos", "Le mie abitudini", "Мои привычки"),
+    "No active habits" to (
+        v("Keine aktiven Gewohnheiten", "Aucune habitude active", "No hay habitos activos", "Nessuna abitudine attiva", "Нет активных привычек") +
+            mapOf(AppLanguage.CS to "Žádné aktivní návyky")
+    ),
+    "%d active habit (one)" to (
+        v("%d aktive Gewohnheit", "%d habitude active", "%d habito activo", "%d abitudine attiva", "%d активная привычка") +
+            mapOf(AppLanguage.CS to "%d aktivní návyk")
+    ),
+    "%d active habits (few)" to (
+        v("%d aktive Gewohnheiten", "%d habitudes actives", "%d habitos activos", "%d abitudini attive", "%d активные привычки") +
+            mapOf(AppLanguage.CS to "%d aktivní návyky")
+    ),
+    "%d active habits (many)" to (
+        v("%d aktive Gewohnheiten", "%d habitudes actives", "%d habitos activos", "%d abitudini attive", "%d активных привычек") +
+            mapOf(AppLanguage.CS to "%d aktivních návyků")
+    ),
     "← → swipe to switch habits" to (
         v(
             "← → Gewohnheiten wischen",
@@ -508,6 +524,18 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "Mark as done" to v("Als erledigt markieren", "Marquer comme fait", "Marcar como hecho", "Segna come completata", "Отметить как выполнено"),
     "More details →" to v("Mehr Details ->", "Plus de details ->", "Mas detalles ->", "Piu dettagli ->", "Подробнее →"),
     "Great job, your streak is safe." to v("Super, deine Serie ist gesichert.", "Bravo, votre serie est preservee.", "Buen trabajo, tu racha esta a salvo.", "Ottimo lavoro, la tua serie e salva.", "Отлично, ваша серия сохранена."),
+    "Goal reached! 🎉" to (
+        v("Ziel erreicht! 🎉", "Objectif atteint ! 🎉", "Objetivo alcanzado! 🎉", "Obiettivo raggiunto! 🎉", "Цель достигнута! 🎉") +
+            mapOf(AppLanguage.CS to "Cíl splněn! 🎉")
+    ),
+    "%d %s to go" to (
+        v("noch %d %s bis zum Ziel", "encore %d %s", "quedan %d %s", "mancano %d %s", "ещё %d %s до цели") +
+            mapOf(AppLanguage.CS to "ještě %d %s do cíle")
+    ),
+    "+%d %s beyond goal" to (
+        v("+%d %s über dem Ziel", "+%d %s au-dela de l'objectif", "+%d %s por encima de la meta", "+%d %s oltre l'obiettivo", "+%d %s сверх цели") +
+            mapOf(AppLanguage.CS to "+%d %s nad cílem")
+    ),
     "Start today 🌱" to (
         v("Heute starten 🌱", "Commencez aujourd'hui 🌱", "Empieza hoy 🌱", "Inizia oggi 🌱", "Начни сегодня 🌱") +
             mapOf(AppLanguage.CS to "Začni dnes 🌱")

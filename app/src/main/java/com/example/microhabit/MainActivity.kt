@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -215,6 +216,7 @@ import com.example.microhabit.ui.create.CreateHabitTemplate
 import com.example.microhabit.ui.create.CreateHabitTemplateCatalog
 import com.example.microhabit.ui.create.TemplateCategory
 import com.example.microhabit.ui.create.TemplateConfirmDraft
+import com.example.microhabit.ui.tracker.HabitPageDots
 import com.example.microhabit.ui.theme.AppTheme
 import com.example.microhabit.ui.theme.MicroHabitTheme
 import java.time.DayOfWeek
@@ -1173,7 +1175,6 @@ private fun TrackerPage(
     scrollToTopSignal: Int
 ) {
     val spacing = AppTheme.spacing
-    val locale = appLocale()
     val listState = rememberLazyListState()
     var previousTotalCompletions by remember(state.selectedTaskId) { mutableStateOf(state.totalCompletions) }
     var streakOverlay by remember { mutableStateOf<StreakOverlayModel?>(null) }
@@ -1271,12 +1272,10 @@ private fun TrackerPage(
                             switchToTask(nextId, if (delta > 0) 1 else -1)
                         }
                     }
+                    val currentHabitIndex = state.tasks
+                        .indexOfFirst { it.id == state.selectedTaskId }
+                        .let { if (it < 0) 0 else it }
                     Column(verticalArrangement = Arrangement.spacedBy(spacing.x1_5)) {
-                        Text(
-                            text = state.selectedDate.format(DateTimeFormatter.ofPattern(t("dd MMM yyyy"), locale)),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = AppTheme.colors.textSecondary
-                        )
                         AnimatedContent(
                             targetState = state.selectedTaskId,
                             transitionSpec = {
@@ -1327,6 +1326,10 @@ private fun TrackerPage(
                                 onSwipePrevious = { switchHabitBy(-1) }
                             )
                         }
+                        HabitPageDots(
+                            total = state.tasks.size,
+                            current = currentHabitIndex
+                        )
                         Crossfade(
                             targetState = state.selectedTaskId,
                             animationSpec = tween(durationMillis = 150),
@@ -4359,6 +4362,24 @@ private fun TaskSelector(
 
 private const val SELECTOR_HINT_PREF_KEY = "pref_selector_hint_shown"
 
+@Composable
+private fun formatHeroDate(date: LocalDate, locale: Locale): String {
+    val today = LocalDate.now()
+    val formattedDate = date.format(
+        DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)
+    )
+    return when (date) {
+        today -> "${t("Today")}, $formattedDate"
+        today.minusDays(1) -> "${t("Yesterday")}, $formattedDate"
+        else -> {
+            val dayLabel = date.dayOfWeek
+                .getDisplayName(TextStyle.SHORT, locale)
+                .replaceFirstChar { if (it.isLowerCase()) it.titlecase(locale) else it.toString() }
+            "$dayLabel, $formattedDate"
+        }
+    }
+}
+
 private fun activeHabitsCountLabel(count: Int, language: AppLanguage): String {
     if (count <= 0) return translate(language, "No active habits")
     return when (language) {
@@ -4836,7 +4857,7 @@ private fun HeroCard(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 12.dp),
+            .padding(bottom = 8.dp),
         shape = RoundedCornerShape(16.dp),
         color = semantic.backgroundSurface,
         border = BorderStroke(stroke.thin, semantic.borderSubtle)
@@ -4869,6 +4890,13 @@ private fun HeroCard(
                 ),
             verticalArrangement = Arrangement.spacedBy(spacing.x1)
         ) {
+            Text(
+                text = formatHeroDate(selectedDate, locale),
+                style = MaterialTheme.typography.labelSmall,
+                fontSize = 11.sp,
+                color = semantic.textSecondary,
+                modifier = Modifier.padding(bottom = 6.dp)
+            )
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -4899,7 +4927,8 @@ private fun HeroCard(
                     centerLabel = ringCenterLabel,
                     centerLabelColor = if (trackingType == TrackingType.YES_NO) ringArcColor else semantic.textPrimary,
                     color = ringArcColor,
-                    trackColor = ringTrackColor
+                    trackColor = ringTrackColor,
+                    modifier = Modifier.offset(x = (-4).dp)
                 )
             }
             Spacer(Modifier.height(spacing.x0_5))
@@ -5502,7 +5531,8 @@ private fun ProgressRing(
     centerLabelColor: Color,
     color: Color,
     trackColor: Color,
-    size: androidx.compose.ui.unit.Dp = 76.dp,
+    modifier: Modifier = Modifier,
+    size: androidx.compose.ui.unit.Dp = 80.dp,
     strokeWidth: androidx.compose.ui.unit.Dp = 7.dp
 ) {
     val easeOutCubic = remember { androidx.compose.animation.core.CubicBezierEasing(0.33f, 1f, 0.68f, 1f) }
@@ -5512,7 +5542,7 @@ private fun ProgressRing(
         label = "heroProgressRing"
     )
     Box(
-        modifier = Modifier.size(size),
+        modifier = modifier.size(size),
         contentAlignment = Alignment.Center
     ) {
         CircularProgressIndicator(

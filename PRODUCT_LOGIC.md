@@ -221,6 +221,7 @@ Future scope (не часть текущего канонического пов
   - под selector отображается одноразовый swipe-hint (`← → ...`) до первого реального скролла пользователем;
   - флаг показа swipe-hint хранится локально (`pref_selector_hint_shown`) и не показывается повторно после первого скролла;
   - единый `HeroCard` для выбранной привычки (адаптивный по tracking type), который объединяет:
+    - локализованную дату выбранного дня внутри карточки (формат с контекстом `Today`/`Yesterday` или short weekday + localized medium date),
     - заголовок (emoji + title),
     - progress ring:
       - для `YES_NO` — недельная стабильность `completedThisWeek / scheduledThisWeek` (ISO неделя, пн-вс);
@@ -234,6 +235,10 @@ Future scope (не часть текущего канонического пов
     - для `DURATION` действие `Enter manually` использует тот же встроенный numpad-редактор (консистентно с inline `edit`);
     - completion-threshold (`minimumCompletionPercent`) продолжает влиять на completion-state через Repository и не меняет schedule/business семантику;
   - внутри `HeroCard` сохраняется rest-day UX для not scheduled даты (объяснение + optional next scheduled date + explicit `Mark anyway` override action);
+  - между `HeroCard` и calendar показывается `page dots` индикатор текущей привычки:
+    - скрыт при `<=1` активной привычке;
+    - для `2..5` отображает все точки;
+    - для `6+` использует окно из 5 точек с уменьшенными edge-fade точками;
   - отдельные standalone блоки streak tiles и 7-day chart на Tracker-экране не отображаются (их контекст перенесён в `HeroCard`);
   - calendar.
 - Канонический default для Tracker при normal open/load: selected habit = первый `ACTIVE` habit.

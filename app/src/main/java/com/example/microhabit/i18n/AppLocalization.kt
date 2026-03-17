@@ -155,6 +155,9 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
         "Выберите или создайте привычку, чтобы посмотреть историю."
     ),
     "Today" to v("Heute", "Aujourd'hui", "Hoy", "Oggi", "Сегодня"),
+    "Yesterday" to (
+        v("Gestern", "Hier", "Ayer", "Ieri", "Вчера") + mapOf(AppLanguage.CS to "Včera")
+    ),
     "Today short" to (
         v("Heute", "Auj.", "Hoy", "Oggi", "Сег.") + mapOf(AppLanguage.CS to "Dnes")
     ),

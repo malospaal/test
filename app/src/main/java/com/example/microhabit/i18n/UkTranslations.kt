@@ -50,6 +50,7 @@ internal val ukTranslations: Map<String, String> = mapOf(
     "Weekday consistency" to "Стабільність за днями тижня",
     "Select or create a habit to view completion history." to "Виберіть або створіть звичку, щоб переглянути історію виконання.",
     "Today" to "Сьогодні",
+    "Yesterday" to "Вчора",
     "Today short" to "Сьог.",
     "Completion details" to "Деталі виконання",
     "Completed" to "Виконано",

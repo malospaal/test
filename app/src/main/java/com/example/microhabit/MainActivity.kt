@@ -4380,16 +4380,28 @@ private fun HabitPill(
 
 @Composable
 private fun AddHabitTile(onClick: () -> Unit) {
+    val semantic = AppTheme.colors
     val radius = RoundedCornerShape(12.dp)
-    val outline = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+    val isDarkPalette = semantic.backgroundCanvas.red < 0.2f
+    val tintBackground = if (isDarkPalette) {
+        semantic.primary.copy(alpha = 0.18f)
+    } else {
+        semantic.primary.copy(alpha = 0.10f)
+    }
+    val outline = if (isDarkPalette) {
+        semantic.primary.copy(alpha = 0.95f)
+    } else {
+        semantic.primary.copy(alpha = 0.8f)
+    }
     val strokeWidthPx = with(LocalDensity.current) { 1.5.dp.toPx() }
-    val dashPathEffect = remember { PathEffect.dashPathEffect(floatArrayOf(10f, 7f), 0f) }
+    val dashPathEffect = remember { PathEffect.dashPathEffect(floatArrayOf(8f, 6f), 0f) }
 
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .size(36.dp)
             .clip(radius)
+            .background(tintBackground)
             .clickable(onClick = onClick)
             .drawBehind {
                 drawRoundRect(
@@ -4402,7 +4414,7 @@ private fun AddHabitTile(onClick: () -> Unit) {
         Icon(
             imageVector = Icons.Rounded.Add,
             contentDescription = t("Create habit"),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = semantic.primary,
             modifier = Modifier.size(20.dp)
         )
     }
@@ -4720,6 +4732,7 @@ private fun HeroCard(
                     trackColor = ringTrackColor
                 )
             }
+            Spacer(Modifier.height(spacing.x0_5))
 
             HeroMiniWeekRow(
                 points = last7Days,
@@ -4748,7 +4761,9 @@ private fun HeroCard(
                     }
                     Button(
                         onClick = onMarkAnyway,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
                         shape = RoundedCornerShape(radius.full)
                     ) {
                         Text(t("Mark anyway"))
@@ -4765,7 +4780,7 @@ private fun HeroCard(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 36.dp),
+                        .padding(top = 12.dp, bottom = 4.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     val showCompletedLottie = completedButtonComposition != null &&
@@ -4834,7 +4849,7 @@ private fun HeroCard(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 36.dp),
+                        .padding(top = 12.dp, bottom = 4.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Button(
@@ -5039,41 +5054,32 @@ private fun HeroCard(
                     }
                 }
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(2.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
             ) {
-                TextButton(
-                    onClick = onNavigateToDetail,
-                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
-                ) {
-                    Text(
-                        text = t("More details →"),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = semantic.primary,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
+                HeroDetailsButton(onClick = onNavigateToDetail)
             }
-            Box(
+            androidx.compose.animation.AnimatedVisibility(
+                visible = showSuccessMessage,
+                enter = fadeIn(animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing)) +
+                    slideInVertically(
+                        initialOffsetY = { it / 3 },
+                        animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing)
+                    ),
+                exit = fadeOut(animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing)) +
+                    slideOutVertically(
+                        targetOffsetY = { -it / 4 },
+                        animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing)
+                    ),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(22.dp),
-                contentAlignment = Alignment.Center
+                    .padding(top = 2.dp),
             ) {
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = showSuccessMessage,
-                    enter = fadeIn(animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing)) +
-                        slideInVertically(
-                            initialOffsetY = { it / 3 },
-                            animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing)
-                        ),
-                    exit = fadeOut(animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing)) +
-                        slideOutVertically(
-                            targetOffsetY = { -it / 4 },
-                            animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing)
-                        )
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = t("Great job, your streak is safe."),
@@ -5278,8 +5284,8 @@ private fun ProgressRing(
     centerLabelColor: Color,
     color: Color,
     trackColor: Color,
-    size: androidx.compose.ui.unit.Dp = 52.dp,
-    strokeWidth: androidx.compose.ui.unit.Dp = 5.dp
+    size: androidx.compose.ui.unit.Dp = 76.dp,
+    strokeWidth: androidx.compose.ui.unit.Dp = 7.dp
 ) {
     val easeOutCubic = remember { androidx.compose.animation.core.CubicBezierEasing(0.33f, 1f, 0.68f, 1f) }
     val animatedPercent by animateFloatAsState(
@@ -5327,7 +5333,7 @@ private fun HeroMiniWeekRow(
     val dates = (6L downTo 0L).map { offset -> anchorDate.minusDays(offset) }
 
     Row(
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
         for (index in dates.indices) {
@@ -5382,7 +5388,8 @@ private fun DayDot(
     ) {
         Box(
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxWidth(0.8f)
+                .align(Alignment.CenterHorizontally)
                 .aspectRatio(1f)
                 .clip(RoundedCornerShape(6.dp))
                 .background(fillColor)
@@ -5397,11 +5404,26 @@ private fun DayDot(
         Spacer(Modifier.height(3.dp))
         Text(
             text = label,
-            style = MaterialTheme.typography.labelSmall,
-            fontSize = 10.sp,
+            style = MaterialTheme.typography.bodySmall,
             color = if (isToday) todayBorderColor else semantic.textTertiary,
             maxLines = 1,
             overflow = TextOverflow.Clip
+        )
+    }
+}
+
+@Composable
+private fun HeroDetailsButton(onClick: () -> Unit) {
+    val semantic = AppTheme.colors
+    TextButton(
+        onClick = onClick,
+        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+    ) {
+        Text(
+            text = t("More details →"),
+            style = MaterialTheme.typography.labelMedium,
+            color = semantic.primary,
+            fontWeight = FontWeight.Medium
         )
     }
 }

@@ -12,12 +12,14 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import com.example.microhabit.ui.theme.AppTheme
 
@@ -68,7 +70,8 @@ fun SettingsRow(
     value: String? = null,
     onClick: (() -> Unit)? = null,
     enabled: Boolean = true,
-    destructive: Boolean = false
+    destructive: Boolean = false,
+    leadingIcon: ImageVector? = null
 ) {
     val spacing = AppTheme.spacing
     val colors = AppTheme.colors
@@ -81,6 +84,13 @@ fun SettingsRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(spacing.x1)
     ) {
+        if (leadingIcon != null) {
+            Icon(
+                imageVector = leadingIcon,
+                contentDescription = null,
+                tint = if (enabled) colors.textSecondary else colors.textTertiary
+            )
+        }
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(spacing.x0_5)

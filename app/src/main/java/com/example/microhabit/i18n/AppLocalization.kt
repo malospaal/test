@@ -59,6 +59,7 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     ),
     "Account" to v("Konto", "Compte", "Cuenta", "Account", "Аккаунт"),
     "Settings" to v("Einstellungen", "Parametres", "Ajustes", "Impostazioni", "Настройки"),
+    "App settings" to v("App-Einstellungen", "Parametres de l'app", "Ajustes de la app", "Impostazioni app", "Настройки приложения"),
     "Account controls" to v("Kontosteuerung", "Controles du compte", "Controles de la cuenta", "Controlli account", "Управление аккаунтом"),
     "Premium and app preferences." to v(
         "Premium und App-Einstellungen.",
@@ -138,6 +139,9 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
         "Выберите или создайте привычку, чтобы посмотреть историю."
     ),
     "Today" to v("Heute", "Aujourd'hui", "Hoy", "Oggi", "Сегодня"),
+    "Today short" to (
+        v("Heute", "Auj.", "Hoy", "Oggi", "Сег.") + mapOf(AppLanguage.CS to "Dnes")
+    ),
     "Completion details" to v("Details zur Erfullung", "Details de realisation", "Detalles de cumplimiento", "Dettagli completamento", "Детали выполнения"),
     "Completed" to v("Abgeschlossen", "Termine", "Completado", "Completato", "Выполнено"),
     "Partial" to v("Teilweise", "Partiel", "Parcial", "Parziale", "Частично"),
@@ -187,6 +191,7 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "App interface language." to v("Sprache der App-Oberflache.", "Langue de l'interface.", "Idioma de la interfaz.", "Lingua dell'interfaccia.", "Язык интерфейса приложения."),
     "Choose your preferred locale" to v("Bevorzugte Sprache wahlen", "Choisissez votre langue preferee", "Elige tu idioma preferido", "Scegli la lingua preferita", "Выберите предпочитаемый язык"),
     "Notifications" to v("Benachrichtigungen", "Notifications", "Notificaciones", "Notifiche", "Уведомления"),
+    "Enable reminders" to v("Erinnerungen aktivieren", "Activer les rappels", "Activar recordatorios", "Abilita promemoria", "Включить напоминания"),
     "Daily reminders and nudges." to v("Tagliche Erinnerungen.", "Rappels quotidiens.", "Recordatorios diarios.", "Promemoria giornalieri.", "Ежедневные напоминания."),
     "Reminders" to v("Erinnerungen", "Rappels", "Recordatorios", "Promemoria", "Напоминания"),
     "Enable habit reminder notifications" to v("Erinnerungen fur Gewohnheiten aktivieren", "Activer les rappels d'habitude", "Activar recordatorios de habitos", "Abilita promemoria abitudini", "Включить уведомления-напоминания"),
@@ -244,6 +249,7 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "PRO active: unlimited habits" to v("PRO aktiv: unbegrenzte Gewohnheiten", "PRO actif : habitudes illimitees", "PRO activo: habitos ilimitados", "PRO attivo: abitudini illimitate", "PRO активен: безлимитные привычки"),
     "Free plan: one active habit" to v("Free-Plan: eine aktive Gewohnheit", "Plan Free : une habitude active", "Plan Free: un habito activo", "Piano Free: una abitudine attiva", "План Free: одна активная привычка"),
     "Data & Privacy" to v("Daten & Datenschutz", "Donnees et confidentialite", "Datos y privacidad", "Dati e privacy", "Данные и приватность"),
+    "Data" to v("Daten", "Donnees", "Datos", "Dati", "Данные"),
     "Control your data and account lifecycle." to v(
         "Kontrolliere deine Daten und dein Konto.",
         "Controlez vos donnees et le cycle du compte.",
@@ -271,6 +277,7 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
         "Очистить историю выполнения, оставить привычки"
     ),
     "Delete account" to v("Konto loschen", "Supprimer le compte", "Eliminar cuenta", "Elimina account", "Удалить аккаунт"),
+    "Danger zone" to v("Gefahrenzone", "Zone de danger", "Zona de riesgo", "Zona pericolosa", "Опасная зона"),
     "Remove all habits and settings" to v("Alle Gewohnheiten und Einstellungen entfernen", "Supprimer toutes les habitudes et parametres", "Eliminar todos los habitos y ajustes", "Rimuovi tutte le abitudini e impostazioni", "Удалить все привычки и настройки"),
     "Support" to v("Support", "Support", "Soporte", "Supporto", "Поддержка"),
     "Get help and send feedback." to v("Hilfe erhalten und Feedback senden.", "Obtenir de l'aide et envoyer des retours.", "Obten ayuda y envia comentarios.", "Ottieni aiuto e invia feedback.", "Получить помощь и отправить отзыв."),
@@ -501,6 +508,19 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "Mark as done" to v("Als erledigt markieren", "Marquer comme fait", "Marcar como hecho", "Segna come completata", "Отметить как выполнено"),
     "More details →" to v("Mehr Details ->", "Plus de details ->", "Mas detalles ->", "Piu dettagli ->", "Подробнее →"),
     "Great job, your streak is safe." to v("Super, deine Serie ist gesichert.", "Bravo, votre serie est preservee.", "Buen trabajo, tu racha esta a salvo.", "Ottimo lavoro, la tua serie e salva.", "Отлично, ваша серия сохранена."),
+    "Start today 🌱" to (
+        v("Heute starten 🌱", "Commencez aujourd'hui 🌱", "Empieza hoy 🌱", "Inizia oggi 🌱", "Начни сегодня 🌱") +
+            mapOf(AppLanguage.CS to "Začni dnes 🌱")
+    ),
+    "🔥 Streak %dd · Best %dd · %d%% this month" to (
+        v(
+            "🔥 Serie %dT · Beste %dT · %d%% diesen Monat",
+            "🔥 Serie %dj · Meilleure %dj · %d%% ce mois-ci",
+            "🔥 Racha %dd · Mejor %dd · %d%% este mes",
+            "🔥 Serie %dg · Migliore %dg · %d%% questo mese",
+            "🔥 Серия %dд · Лучшая %dд · %d%% за месяц"
+        ) + mapOf(AppLanguage.CS to "🔥 Série %dd · Nejlepší %dd · %d%% tento měsíc")
+    ),
     "Great job" to v("Sehr gut", "Bravo", "Gran trabajo", "Ottimo lavoro", "Отлично"),
     "Keep it going" to v("Bleib dran", "Continuez", "Sigue asi", "Continua cosi", "Так держать"),
     "Streak milestone" to v("Serien-Meilenstein", "Palier de serie", "Hito de racha", "Traguardo serie", "Рубеж серии"),

@@ -218,10 +218,13 @@ Future scope (не часть текущего канонического пов
   - selector имеет правый gradient fade-индикатор, когда список можно прокрутить вправо (`canScrollForward`);
   - под selector отображается одноразовый swipe-hint (`← → ...`) до первого реального скролла пользователем;
   - флаг показа swipe-hint хранится локально (`pref_selector_hint_shown`) и не показывается повторно после первого скролла;
-  - Hero control (адаптивный по tracking type),
-  - rest-day UX для not scheduled даты (объяснение + optional next scheduled date + explicit `Mark anyway` override action),
-  - streak tiles,
-  - 7-day chart,
+  - единый `HeroCard` для выбранной привычки (адаптивный по tracking type), который объединяет:
+    - заголовок (emoji + title),
+    - progress ring (YES_NO: 0/100; COUNT/DURATION: `value/target`),
+    - streak/meta строку (`streak`, `best streak`, `30-day completion`) или zero-streak fallback,
+    - compact 7-day mini-track;
+  - внутри `HeroCard` сохраняется rest-day UX для not scheduled даты (объяснение + optional next scheduled date + explicit `Mark anyway` override action);
+  - отдельные standalone блоки streak tiles и 7-day chart на Tracker-экране не отображаются (их контекст перенесён в `HeroCard`);
   - calendar.
 - Канонический default для Tracker при normal open/load: selected habit = первый `ACTIVE` habit.
 - Переключение привычек выполняется через tiles selector-строки и обновляет текущий Tracker context.
@@ -310,16 +313,28 @@ Start date отображается облегчённой строкой в о�
 - Текстовые label в bottom bar не отображаются; выбранная вкладка определяется через визуальное выделение icon + индикатор.
 - Drawer / burger menu не используется как primary navigation паттерн для основных экранов.
 - Top app bar использует контекстные действия экрана (например, `Add` в Habits, `Today` в Calendar), без burger-кнопки primary навигации.
+- На всех primary экранах (`Tracker`, `Habits`, `Analytics`, `Calendar`, `Account`) доступен глобальный shortcut в `Settings` через иконку `gear` в top-right.
 
 ### 12.8 Account Screen
-- `Account` — primary destination для профиля/подписки и входная точка ко вторичным настройкам.
-- `Premium` и `Settings` не являются primary пунктами навигации и открываются из Account-контекста (или из контекстных flow, где это требуется продуктовой логикой).
-- В Account доступны entry points для:
-  - Premium
-  - Settings
-  - Theme
-  - Language
-  - Notifications / reminders
+- `Account` — primary destination для профиля и подписки (profile/plan screen), а не основной экран конфигурации приложения.
+- В Account используются отдельные секции:
+  - текущий план (`Plan`) + действие `Manage subscription`;
+  - entry `App settings` (переход в `Settings`);
+  - `Support` (`Help center`, `Contact support`);
+  - `Data` (`Export data`, `Reset progress`, `Delete account`).
+- `Delete account` в Account визуально оформляется как destructive action.
+- Theme / Language / Notifications не настраиваются напрямую на Account-экране и вынесены в `Settings`.
+
+### 12.9 Settings Screen
+- `Settings` — отдельный экран системных настроек приложения (application configuration).
+- Группы настроек:
+  - `Appearance` (Theme),
+  - `Language`,
+  - `Notifications` (enable reminders + reminder time),
+  - `Tracking` (completion threshold),
+  - `Subscription` (manage subscription),
+  - `Data` (export data, reset progress),
+  - `Danger zone` (delete account).
 
 ## 13. Reminder System
 Источник: `notifications/HabitReminderScheduler.kt`.

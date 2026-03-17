@@ -1,6 +1,7 @@
 package com.example.microhabit.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -14,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -66,7 +68,8 @@ fun HabitCard(
             .clickable(onClick = onOpen),
         colors = CardDefaults.cardColors(containerColor = colors.backgroundSurface),
         shape = RoundedCornerShape(radius.lg),
-        elevation = CardDefaults.cardElevation(defaultElevation = elevation.sm)
+        border = BorderStroke(stroke.thin, colors.borderSubtle.copy(alpha = 0.55f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = elevation.md)
     ) {
         Column(
             modifier = Modifier
@@ -176,7 +179,7 @@ fun HabitCard(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(radius.sm))
                     .background(colors.backgroundSurfaceMuted)
-                    .border(stroke.thin, colors.borderSubtle, RoundedCornerShape(radius.sm))
+                    .border(stroke.thin, colors.borderSubtle.copy(alpha = 0.5f), RoundedCornerShape(radius.sm))
             ) {
                 Box(
                     modifier = Modifier
@@ -190,20 +193,32 @@ fun HabitCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End
             ) {
-                TextButton(onClick = onEdit) {
+                TextButton(
+                    onClick = onEdit,
+                    colors = ButtonDefaults.textButtonColors(contentColor = colors.textSecondary)
+                ) {
                     Text(t("Edit"))
                 }
                 if (habit.isArchived) {
-                    TextButton(onClick = onUnarchive) {
+                    TextButton(
+                        onClick = onUnarchive,
+                        colors = ButtonDefaults.textButtonColors(contentColor = colors.textSecondary)
+                    ) {
                         Text(t("Unarchive"))
                     }
                 } else {
-                    TextButton(onClick = onArchive) {
+                    TextButton(
+                        onClick = onArchive,
+                        colors = ButtonDefaults.textButtonColors(contentColor = colors.textSecondary)
+                    ) {
                         Text(t("Archive"))
                     }
                 }
-                TextButton(onClick = onDelete) {
-                    Text(t("Delete"), color = colors.danger)
+                TextButton(
+                    onClick = onDelete,
+                    colors = ButtonDefaults.textButtonColors(contentColor = colors.danger)
+                ) {
+                    Text(t("Delete"))
                 }
             }
         }
@@ -232,8 +247,8 @@ private fun HabitMetricTile(
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(radius.md))
-            .background(colors.backgroundSurfaceMuted)
-            .border(stroke.thin, colors.borderSubtle, RoundedCornerShape(radius.md))
+            .background(colors.backgroundSurfaceMuted.copy(alpha = 0.82f))
+            .border(stroke.thin, colors.borderSubtle.copy(alpha = 0.5f), RoundedCornerShape(radius.md))
             .padding(horizontal = spacing.x1, vertical = spacing.x1),
         verticalArrangement = Arrangement.spacedBy(spacing.x0_5)
     ) {

@@ -34,8 +34,8 @@ fun AnalyticsMetricTile(
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(radius.md))
-            .background(colors.backgroundSurfaceMuted)
-            .border(stroke.thin, colors.borderSubtle, RoundedCornerShape(radius.md))
+            .background(colors.backgroundSurfaceMuted.copy(alpha = 0.82f))
+            .border(stroke.thin, colors.borderSubtle.copy(alpha = 0.55f), RoundedCornerShape(radius.md))
             .padding(horizontal = spacing.x2, vertical = spacing.x2),
         verticalArrangement = Arrangement.spacedBy(spacing.x0_5)
     ) {

@@ -81,6 +81,7 @@ import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.AccountCircle
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AddCircle
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircle
@@ -120,6 +121,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -128,11 +130,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -150,6 +156,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
@@ -249,6 +256,19 @@ private enum class OnboardingStep {
     TEMPLATE,
     SETUP,
     READY
+}
+
+private enum class SurfaceTone {
+    PRIMARY,
+    SECONDARY,
+    TERTIARY
+}
+
+private enum class ActionEmphasis {
+    PRIMARY,
+    SECONDARY,
+    TERTIARY,
+    DANGER
 }
 
 private data class PrimaryNavItem(
@@ -864,21 +884,25 @@ private fun PrimaryBottomNavigationBar(
         modifier = Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(horizontal = spacing.x2, vertical = spacing.x1)
+            .padding(horizontal = spacing.x1_5, vertical = spacing.x1),
+        contentAlignment = Alignment.Center
     ) {
         Surface(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth(0.9f),
             shape = RoundedCornerShape(radius.xl),
             color = colors.backgroundSurface.copy(alpha = 0.94f),
-            border = BorderStroke(stroke.thin, colors.borderSubtle.copy(alpha = 0.8f)),
+            border = BorderStroke(stroke.thin, colors.borderSubtle.copy(alpha = 0.55f)),
             tonalElevation = AppTheme.elevation.sm,
             shadowElevation = AppTheme.elevation.md
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = spacing.x1_5, vertical = spacing.x0_5),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                    .padding(horizontal = spacing.x1, vertical = spacing.x0_5),
+                horizontalArrangement = Arrangement.spacedBy(
+                    space = spacing.x0_5,
+                    alignment = Alignment.CenterHorizontally
+                ),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 items.forEach { item ->
@@ -910,7 +934,7 @@ private fun BottomNavigationIconItem(
         label = "bottomNavIconColor"
     )
     val scale by animateFloatAsState(
-        targetValue = if (selected) 1.1f else 1f,
+        targetValue = if (selected) 1.08f else 1f,
         animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
         label = "bottomNavIconScale"
     )
@@ -921,9 +945,11 @@ private fun BottomNavigationIconItem(
     )
     Column(
         modifier = Modifier
+            .width(50.dp)
+            .height(46.dp)
             .clip(RoundedCornerShape(AppTheme.radius.full))
             .clickable(onClick = onClick)
-            .padding(horizontal = spacing.x1, vertical = spacing.x0_5),
+            .padding(horizontal = spacing.x0_5, vertical = spacing.x0_5),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
@@ -934,7 +960,7 @@ private fun BottomNavigationIconItem(
             modifier = Modifier.graphicsLayer {
                 scaleX = scale
                 scaleY = scale
-            }
+            }.size(27.dp)
         )
         Box(
             modifier = Modifier
@@ -1022,14 +1048,22 @@ private fun TrackerPage(
             verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
         ) {
             if (state.tasks.isEmpty()) {
+                item {
+                    HabitSelectorRow(
+                        habits = emptyList(),
+                        selectedId = null,
+                        onHabitSelected = {},
+                        onCreateHabit = vm::openCreateTask
+                    )
+                }
                 item { OnboardingCard(vm, state) }
             } else {
                 item {
-                    TrackerHabitContextHeader(
-                        tasks = state.tasks,
-                        selectedTaskId = state.selectedTaskId,
-                        onSelect = { taskId -> switchToTask(taskId, 0) },
-                        onAddHabit = vm::openCreateTask
+                    HabitSelectorRow(
+                        habits = state.tasks,
+                        selectedId = state.selectedTaskId,
+                        onHabitSelected = { taskId -> switchToTask(taskId, 0) },
+                        onCreateHabit = vm::openCreateTask
                     )
                 }
                 item {
@@ -2026,7 +2060,7 @@ private fun AnalyticsPage(
         }
 
         item {
-            GlassCard {
+            GlassCard(tone = SurfaceTone.SECONDARY) {
                 Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
                     Text(
                         text = t("Weekly completion chart"),
@@ -2044,7 +2078,7 @@ private fun AnalyticsPage(
         }
 
         item {
-            GlassCard {
+            GlassCard(tone = SurfaceTone.SECONDARY) {
                 Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
                     Text(
                         text = t("Monthly progress chart"),
@@ -2061,7 +2095,7 @@ private fun AnalyticsPage(
         }
 
         item {
-            GlassCard {
+            GlassCard(tone = SurfaceTone.SECONDARY) {
                 Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
                     Text(
                         text = t("Weekday consistency"),
@@ -2096,7 +2130,7 @@ private fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
         verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
     ) {
         item {
-            GlassCard {
+            GlassCard(tone = SurfaceTone.SECONDARY) {
                 Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
                     Text(
                         text = t("Calendar"),
@@ -2201,7 +2235,7 @@ private fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
         }
 
         item {
-            GlassCard {
+            GlassCard(tone = SurfaceTone.SECONDARY) {
                 Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
                     Text(
                         text = t("Day breakdown"),
@@ -2311,17 +2345,17 @@ private fun CalendarFilterChip(
             .clip(RoundedCornerShape(radius.full))
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(radius.full),
-        color = if (selected) colors.primary.copy(alpha = 0.15f) else colors.backgroundSurfaceMuted,
+        color = if (selected) colors.primary.copy(alpha = 0.12f) else colors.backgroundSurfaceMuted.copy(alpha = 0.82f),
         border = BorderStroke(
-            width = if (selected) stroke.medium else stroke.thin,
-            color = if (selected) colors.primary else colors.borderSubtle
+            width = stroke.thin,
+            color = if (selected) colors.primary.copy(alpha = 0.65f) else colors.borderSubtle.copy(alpha = 0.65f)
         )
     ) {
         Text(
             text = label,
             modifier = Modifier.padding(horizontal = spacing.x1, vertical = spacing.x0_5),
             style = MaterialTheme.typography.labelMedium,
-            color = colors.textPrimary,
+            color = if (selected) colors.primary else colors.textSecondary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -2361,7 +2395,7 @@ private fun GlobalCalendarHeatCell(
     }
     val fillColor = when {
         isFuture -> colors.backgroundSurfaceMuted.copy(alpha = 0.22f)
-        scheduledCount <= 0 -> colors.neutralMuted.copy(alpha = 0.42f)
+        scheduledCount <= 0 -> colors.neutralMuted.copy(alpha = 0.34f)
         completedCount <= 0 -> colors.danger.copy(alpha = 0.10f)
         intensityLevel == 1 -> colors.success.copy(alpha = 0.28f)
         intensityLevel == 2 -> colors.success.copy(alpha = 0.42f)
@@ -2369,11 +2403,11 @@ private fun GlobalCalendarHeatCell(
         else -> colors.success.copy(alpha = 0.74f)
     }
     val borderColor = when {
-        selected -> colors.primary
-        isFuture -> colors.borderSubtle.copy(alpha = 0.45f)
-        scheduledCount <= 0 -> colors.borderSubtle
-        completedCount <= 0 -> colors.danger.copy(alpha = 0.40f)
-        else -> colors.success.copy(alpha = 0.35f)
+        selected -> colors.primary.copy(alpha = 0.72f)
+        isFuture -> colors.borderSubtle.copy(alpha = 0.35f)
+        scheduledCount <= 0 -> colors.borderSubtle.copy(alpha = 0.65f)
+        completedCount <= 0 -> colors.danger.copy(alpha = 0.28f)
+        else -> colors.success.copy(alpha = 0.3f)
     }
     val textColor = when {
         isFuture -> colors.textTertiary
@@ -2387,11 +2421,11 @@ private fun GlobalCalendarHeatCell(
             .height(spacing.x5 + spacing.x0_5)
             .clip(RoundedCornerShape(radius.sm))
             .background(fillColor, RoundedCornerShape(radius.sm))
-            .border(
-                width = if (selected) stroke.medium else stroke.thin,
-                color = borderColor,
-                shape = RoundedCornerShape(radius.sm)
-            )
+                .border(
+                    width = if (selected) stroke.medium else stroke.thin,
+                    color = borderColor,
+                    shape = RoundedCornerShape(radius.sm)
+                )
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
@@ -3912,14 +3946,16 @@ private fun TaskControlsRow(
             modifier = Modifier.weight(1f),
             label = if (canAddTask) t("New") else "PRO",
             icon = if (canAddTask) Icons.Rounded.AddCircle else Icons.Rounded.WorkspacePremium,
-            onClick = onCreate
+            onClick = onCreate,
+            emphasis = ActionEmphasis.PRIMARY
         )
         TaskControlButton(
             modifier = Modifier.weight(1f),
             label = t("Edit"),
             icon = Icons.Rounded.Edit,
             onClick = onEdit,
-            enabled = canEditDelete
+            enabled = canEditDelete,
+            emphasis = ActionEmphasis.SECONDARY
         )
         TaskControlButton(
             modifier = Modifier.weight(1f),
@@ -3927,7 +3963,7 @@ private fun TaskControlsRow(
             icon = Icons.Rounded.Delete,
             onClick = onDelete,
             enabled = canEditDelete,
-            danger = true
+            emphasis = ActionEmphasis.DANGER
         )
     }
 }
@@ -3939,20 +3975,24 @@ private fun TaskControlButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     onClick: () -> Unit,
     enabled: Boolean = true,
-    danger: Boolean = false
+    emphasis: ActionEmphasis = ActionEmphasis.SECONDARY
 ) {
     val spacing = AppTheme.spacing
     val radius = AppTheme.radius
     val semantic = AppTheme.colors
     val container = when {
         !enabled -> semantic.backgroundSurfaceMuted
-        danger -> MaterialTheme.colorScheme.errorContainer
-        else -> semantic.backgroundSurface
+        emphasis == ActionEmphasis.PRIMARY -> semantic.primary
+        emphasis == ActionEmphasis.SECONDARY -> semantic.primaryMuted.copy(alpha = 0.9f)
+        emphasis == ActionEmphasis.DANGER -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.78f)
+        else -> semantic.backgroundSurfaceMuted
     }
     val content = when {
         !enabled -> semantic.textTertiary
-        danger -> MaterialTheme.colorScheme.onErrorContainer
-        else -> semantic.textPrimary
+        emphasis == ActionEmphasis.PRIMARY -> MaterialTheme.colorScheme.onPrimary
+        emphasis == ActionEmphasis.SECONDARY -> semantic.primary
+        emphasis == ActionEmphasis.DANGER -> MaterialTheme.colorScheme.onErrorContainer
+        else -> semantic.textSecondary
     }
     Button(
         onClick = onClick,
@@ -3986,6 +4026,7 @@ private fun TaskSelector(
 ) {
     val spacing = AppTheme.spacing
     val radius = AppTheme.radius
+    val stroke = AppTheme.stroke
     val semantic = AppTheme.colors
     val density = LocalDensity.current
     val selectedTask = tasks.firstOrNull { it.id == selectedTaskId } ?: tasks.firstOrNull()
@@ -4083,8 +4124,9 @@ private fun TaskSelector(
                                 .heightIn(max = 320.dp),
                             shape = RoundedCornerShape(radius.md),
                             color = semantic.backgroundSurface,
-                            tonalElevation = 6.dp,
-                            shadowElevation = 8.dp
+                            border = BorderStroke(stroke.thin, semantic.borderSubtle.copy(alpha = 0.55f)),
+                            tonalElevation = 3.dp,
+                            shadowElevation = 4.dp
                         ) {
                             Column(
                                 modifier = Modifier
@@ -4172,102 +4214,185 @@ private fun TaskSelector(
     }
 }
 
+private const val SELECTOR_HINT_PREF_KEY = "pref_selector_hint_shown"
+
 @Composable
-private fun TrackerHabitContextHeader(
-    tasks: List<HabitTask>,
-    selectedTaskId: String?,
-    onSelect: (String) -> Unit,
-    onAddHabit: () -> Unit
+private fun HabitSelectorRow(
+    habits: List<HabitTask>,
+    selectedId: String?,
+    onHabitSelected: (String) -> Unit,
+    onCreateHabit: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val spacing = AppTheme.spacing
-    val radius = AppTheme.radius
-    val stroke = AppTheme.stroke
     val colors = AppTheme.colors
-    val tileWidth = 152.dp
-    val tileHeight = 72.dp
-    val actionTileWidth = 64.dp
+    val listState = rememberLazyListState()
+    val context = LocalContext.current
+    val prefs = remember(context) {
+        context.getSharedPreferences("habit_prefs", Context.MODE_PRIVATE)
+    }
+    var showHint by rememberSaveable {
+        mutableStateOf(!prefs.getBoolean(SELECTOR_HINT_PREF_KEY, false))
+    }
+    val canScrollRight by remember {
+        derivedStateOf { listState.canScrollForward }
+    }
+    val shouldShowHint = showHint && canScrollRight && habits.size > 1
+    val fadeAlpha by animateFloatAsState(
+        targetValue = if (canScrollRight) 1f else 0f,
+        animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+        label = "habitSelectorFadeAlpha"
+    )
 
-    Column(verticalArrangement = Arrangement.spacedBy(spacing.x0_5)) {
+    LaunchedEffect(
+        listState.firstVisibleItemIndex,
+        listState.firstVisibleItemScrollOffset,
+        showHint
+    ) {
+        val didScroll = listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0
+        if (showHint && didScroll) {
+            showHint = false
+            prefs.edit().putBoolean(SELECTOR_HINT_PREF_KEY, true).apply()
+        }
+    }
+
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(spacing.x0_5)
+    ) {
         Text(
             text = t("My habits"),
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold,
             color = colors.textSecondary
         )
-        GlassCard(contentPadding = PaddingValues(spacing.x1)) {
-            Row(
+        Box(modifier = Modifier.fillMaxWidth()) {
+            LazyRow(
+                state = listState,
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
+                contentPadding = PaddingValues(start = spacing.x2, end = 56.dp),
                 horizontalArrangement = Arrangement.spacedBy(spacing.x1)
             ) {
-                Surface(
-                    modifier = Modifier
-                        .width(actionTileWidth)
-                        .height(tileHeight)
-                        .clip(RoundedCornerShape(radius.md))
-                        .clickable(onClick = onAddHabit),
-                    shape = RoundedCornerShape(radius.md),
-                    color = colors.backgroundSurfaceMuted
-                ) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.AddCircle,
-                            contentDescription = t("Create habit"),
-                            tint = colors.primary
-                        )
-                    }
+                item {
+                    AddHabitTile(onClick = onCreateHabit)
                 }
-            LazyRow(
-                modifier = Modifier.weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(spacing.x1),
-                contentPadding = PaddingValues(end = spacing.x0_5)
-            ) {
-                items(tasks, key = { it.id }) { task ->
-                    val selected = task.id == selectedTaskId
-                    Surface(
-                        modifier = Modifier
-                            .width(tileWidth)
-                            .height(tileHeight)
-                            .clip(RoundedCornerShape(radius.md))
-                            .clickable { onSelect(task.id) },
-                        shape = RoundedCornerShape(radius.md),
-                        color = if (selected) colors.primary.copy(alpha = 0.16f) else colors.backgroundSurfaceMuted,
-                        border = BorderStroke(
-                            width = if (selected) stroke.medium else stroke.thin,
-                            color = if (selected) colors.primary else colors.borderSubtle
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(horizontal = spacing.x1, vertical = spacing.x0_5),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(spacing.x0_5)
-                        ) {
-                            Text(
-                                text = task.emoji.ifBlank { "✨" },
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                            Text(
-                                text = task.title,
-                                modifier = Modifier.weight(1f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                                color = colors.textPrimary
-                            )
-                        }
-                    }
+                items(habits, key = { it.id }) { habit ->
+                    HabitPill(
+                        habit = habit,
+                        isSelected = habit.id == selectedId,
+                        onClick = { onHabitSelected(habit.id) }
+                    )
                 }
             }
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .height(36.dp)
+                    .graphicsLayer { alpha = fadeAlpha }
+            ) {
+                if (fadeAlpha > 0f) {
+                    FadeOverlay()
+                }
+            }
+        }
+        AnimatedVisibility(
+            visible = shouldShowHint,
+            exit = fadeOut(animationSpec = tween(400))
+        ) {
+            Text(
+                text = t("← → swipe to switch habits"),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                modifier = Modifier.padding(start = spacing.x2, top = 4.dp, bottom = 2.dp)
+            )
         }
     }
 }
 
+@Composable
+private fun HabitPill(
+    habit: HabitTask,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val selectedColor = parseColorHex(habit.colorHex)
+    val backgroundColor = if (isSelected) selectedColor else Color.Transparent
+    val textColor = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+    val borderColor = if (isSelected) Color.Transparent else MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
+
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(18.dp),
+        color = backgroundColor,
+        border = BorderStroke(1.dp, borderColor),
+        modifier = Modifier.height(36.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                text = habit.emoji.ifBlank { "✨" },
+                style = MaterialTheme.typography.bodyMedium,
+                fontSize = 14.sp
+            )
+            Text(
+                text = habit.title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontSize = 14.sp,
+                fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
+                color = textColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun AddHabitTile(onClick: () -> Unit) {
+    val radius = RoundedCornerShape(12.dp)
+    val outline = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+    val strokeWidthPx = with(LocalDensity.current) { 1.5.dp.toPx() }
+    val dashPathEffect = remember { PathEffect.dashPathEffect(floatArrayOf(10f, 7f), 0f) }
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(36.dp)
+            .clip(radius)
+            .clickable(onClick = onClick)
+            .drawBehind {
+                drawRoundRect(
+                    color = outline,
+                    cornerRadius = CornerRadius(12.dp.toPx(), 12.dp.toPx()),
+                    style = Stroke(width = strokeWidthPx, pathEffect = dashPathEffect)
+                )
+            }
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Add,
+            contentDescription = t("Create habit"),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp)
+        )
+    }
+}
+
+@Composable
+private fun FadeOverlay() {
+    val backgroundColor = MaterialTheme.colorScheme.background
+    Box(
+        modifier = Modifier
+            .width(48.dp)
+            .fillMaxHeight()
+            .background(
+                Brush.horizontalGradient(
+                    colors = listOf(Color.Transparent, backgroundColor)
+                )
+            )
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -5499,9 +5624,10 @@ private fun StatTile(
 
     Card(
         modifier = modifier.fillMaxHeight(),
-        colors = CardDefaults.cardColors(containerColor = semantic.backgroundSurface),
+        colors = CardDefaults.cardColors(containerColor = semantic.backgroundSurfaceMuted.copy(alpha = 0.82f)),
         shape = RoundedCornerShape(radius.md),
-        elevation = CardDefaults.cardElevation(defaultElevation = AppTheme.elevation.sm)
+        border = BorderStroke(AppTheme.stroke.thin, semantic.borderSubtle.copy(alpha = 0.55f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = AppTheme.elevation.none)
     ) {
         Column(
             modifier = Modifier
@@ -5640,10 +5766,10 @@ private fun DayBar(
     )
     val borderColor = when (state) {
         CalendarDayState.COMPLETED -> Color.Transparent
-        CalendarDayState.PARTIAL -> semantic.success.copy(alpha = 0.35f)
-        CalendarDayState.MISSED -> semantic.danger.copy(alpha = 0.45f)
-        CalendarDayState.NOT_SCHEDULED -> semantic.borderSubtle
-        CalendarDayState.FUTURE -> semantic.borderSubtle.copy(alpha = 0.4f)
+        CalendarDayState.PARTIAL -> semantic.success.copy(alpha = 0.28f)
+        CalendarDayState.MISSED -> semantic.danger.copy(alpha = 0.3f)
+        CalendarDayState.NOT_SCHEDULED -> semantic.borderSubtle.copy(alpha = 0.7f)
+        CalendarDayState.FUTURE -> semantic.borderSubtle.copy(alpha = 0.35f)
     }
     val dayColor = when (state) {
         CalendarDayState.COMPLETED -> MaterialTheme.colorScheme.onPrimary
@@ -5851,7 +5977,7 @@ private fun CalendarHeaderRow(
                     .graphicsLayer(alpha = if (isTodaySelected) 0.55f else 1f),
                 shape = RoundedCornerShape(radius.full),
                 contentPadding = PaddingValues(horizontal = spacing.x1, vertical = spacing.x0),
-                border = BorderStroke(stroke.thin, colors.borderSubtle),
+                border = BorderStroke(stroke.thin, colors.borderSubtle.copy(alpha = 0.65f)),
                 colors = ButtonDefaults.outlinedButtonColors(
                     containerColor = Color.Transparent,
                     contentColor = colors.textSecondary,
@@ -5876,7 +6002,7 @@ private fun CalendarHeaderRow(
 private fun PlanCard(title: String, subtitle: String, selected: Boolean, actionLabel: String, onAction: () -> Unit) {
     val spacing = AppTheme.spacing
     val semantic = AppTheme.colors
-    GlassCard {
+    GlassCard(tone = SurfaceTone.SECONDARY) {
         Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
             Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             Text(subtitle, color = semantic.textSecondary)
@@ -5887,15 +6013,26 @@ private fun PlanCard(title: String, subtitle: String, selected: Boolean, actionL
 
 @Composable
 private fun SelectChip(title: String, selected: Boolean, onClick: () -> Unit) {
+    val spacing = AppTheme.spacing
+    val radius = AppTheme.radius
+    val stroke = AppTheme.stroke
     val semantic = AppTheme.colors
-    Button(
-        onClick = onClick,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = if (selected) semantic.primary else semantic.backgroundSurfaceMuted,
-            contentColor = if (selected) MaterialTheme.colorScheme.onPrimary else semantic.textPrimary
+    Surface(
+        modifier = Modifier
+            .clip(RoundedCornerShape(radius.full))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(radius.full),
+        color = if (selected) semantic.primary.copy(alpha = 0.12f) else semantic.backgroundSurfaceMuted.copy(alpha = 0.82f),
+        border = BorderStroke(
+            stroke.thin,
+            if (selected) semantic.primary.copy(alpha = 0.65f) else semantic.borderSubtle.copy(alpha = 0.65f)
         )
     ) {
-        Text(title)
+        Text(
+            text = title,
+            modifier = Modifier.padding(horizontal = spacing.x1, vertical = spacing.x0_5),
+            color = if (selected) semantic.primary else semantic.textSecondary
+        )
     }
 }
 
@@ -6438,6 +6575,7 @@ private fun localizedMonthYear(month: YearMonth, language: AppLanguage, locale: 
 @Composable
 private fun GlassCard(
     modifier: Modifier = Modifier,
+    tone: SurfaceTone = SurfaceTone.PRIMARY,
     contentPadding: PaddingValues? = null,
     content: @Composable () -> Unit
 ) {
@@ -6445,13 +6583,30 @@ private fun GlassCard(
     val semantic = AppTheme.colors
     val radius = AppTheme.radius
     val elevation = AppTheme.elevation
+    val stroke = AppTheme.stroke
     val resolvedPadding = contentPadding ?: PaddingValues(spacing.x2)
+    val containerColor = when (tone) {
+        SurfaceTone.PRIMARY -> semantic.backgroundSurface
+        SurfaceTone.SECONDARY -> semantic.backgroundSurfaceMuted.copy(alpha = 0.82f)
+        SurfaceTone.TERTIARY -> semantic.backgroundCanvas
+    }
+    val borderColor = when (tone) {
+        SurfaceTone.PRIMARY -> semantic.borderSubtle.copy(alpha = 0.5f)
+        SurfaceTone.SECONDARY -> semantic.borderSubtle.copy(alpha = 0.4f)
+        SurfaceTone.TERTIARY -> semantic.borderSubtle.copy(alpha = 0.3f)
+    }
+    val cardElevation = when (tone) {
+        SurfaceTone.PRIMARY -> elevation.md
+        SurfaceTone.SECONDARY -> elevation.sm
+        SurfaceTone.TERTIARY -> elevation.none
+    }
 
     Card(
         modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = semantic.backgroundSurface),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
         shape = RoundedCornerShape(radius.lg),
-        elevation = CardDefaults.cardElevation(defaultElevation = elevation.md)
+        border = BorderStroke(stroke.thin, borderColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = cardElevation)
     ) {
         Column(modifier = Modifier.fillMaxWidth().padding(resolvedPadding)) {
             content()

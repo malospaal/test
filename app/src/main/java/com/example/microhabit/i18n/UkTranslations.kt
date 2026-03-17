@@ -5,6 +5,7 @@ internal val ukTranslations: Map<String, String> = mapOf(
     "Habit details" to "Деталі звички",
     "Habits" to "Звички",
     "My habits" to "Мої звички",
+    "← → swipe to switch habits" to "← → гортати звички",
     "Analytics" to "Аналітика",
     "Calendar" to "Календар",
     "Premium" to "Преміум",

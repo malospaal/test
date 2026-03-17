@@ -46,16 +46,16 @@ fun PricingPlanCard(
         modifier = modifier
             .fillMaxWidth()
             .border(
-                width = if (selected) stroke.medium else stroke.thin,
-                color = if (selected) colors.primary else colors.borderSubtle,
+                width = stroke.thin,
+                color = if (selected) colors.primary.copy(alpha = 0.65f) else colors.borderSubtle.copy(alpha = 0.6f),
                 shape = RoundedCornerShape(radius.lg)
             )
             .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(
-            containerColor = if (selected) colors.primaryMuted else colors.backgroundSurface
+            containerColor = if (selected) colors.primaryMuted else colors.backgroundSurfaceMuted
         ),
         shape = RoundedCornerShape(radius.lg),
-        elevation = CardDefaults.cardElevation(defaultElevation = AppTheme.elevation.sm)
+        elevation = CardDefaults.cardElevation(defaultElevation = AppTheme.elevation.none)
     ) {
         Column(
             modifier = Modifier
@@ -78,7 +78,7 @@ fun PricingPlanCard(
                     Text(
                         text = model.badge,
                         modifier = Modifier
-                            .background(colors.successMuted, RoundedCornerShape(radius.full))
+                            .background(colors.successMuted.copy(alpha = 0.78f), RoundedCornerShape(radius.full))
                             .padding(horizontal = spacing.x1, vertical = spacing.x0_5),
                         style = MaterialTheme.typography.labelMedium,
                         color = colors.success

@@ -24,6 +24,15 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "Habit details" to v("Gewohnheitsdetails", "Details de l'habitude", "Detalles del habito", "Dettagli abitudine", "Детали привычки"),
     "Habits" to v("Gewohnheiten", "Habitudes", "Habitos", "Abitudini", "Привычки"),
     "My habits" to v("Meine Gewohnheiten", "Mes habitudes", "Mis habitos", "Le mie abitudini", "Мои привычки"),
+    "← → swipe to switch habits" to (
+        v(
+            "← → Gewohnheiten wischen",
+            "← → balayez pour changer d'habitude",
+            "← → desliza para cambiar habitos",
+            "← → scorri per cambiare abitudini",
+            "← → листать привычки"
+        ) + mapOf(AppLanguage.CS to "← → přejet pro návyky")
+    ),
     "Analytics" to v("Analysen", "Analyses", "Analitica", "Analisi", "Аналитика"),
     "Calendar" to v("Kalender", "Calendrier", "Calendario", "Calendario", "Календарь"),
     "Premium" to v("Premium", "Premium", "Premium", "Premium", "Премиум"),

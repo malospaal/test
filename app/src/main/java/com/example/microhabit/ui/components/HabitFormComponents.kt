@@ -90,8 +90,8 @@ fun <T> SingleSelectChips(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(radius.md),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isSelected) colors.primary else colors.backgroundSurfaceMuted,
-                            contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else colors.textPrimary
+                            containerColor = if (isSelected) colors.primaryMuted else colors.backgroundSurfaceMuted,
+                            contentColor = if (isSelected) colors.primary else colors.textSecondary
                         )
                     ) {
                         Text(option.label)
@@ -137,7 +137,7 @@ fun ColorSwatchPicker(
                             .clickable { onSelect(hex) }
                             .border(
                                 width = if (selected) stroke.medium else stroke.thin,
-                                color = if (selected) semantic.textPrimary else semantic.borderSubtle,
+                                color = if (selected) semantic.primary.copy(alpha = 0.75f) else semantic.borderSubtle.copy(alpha = 0.6f),
                                 shape = RoundedCornerShape(radius.md)
                             ),
                         contentAlignment = Alignment.Center
@@ -187,8 +187,8 @@ fun WeekdaySelector(
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(radius.md),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (selected) colors.primary else colors.backgroundSurfaceMuted,
-                            contentColor = if (selected) MaterialTheme.colorScheme.onPrimary else colors.textPrimary
+                            containerColor = if (selected) colors.primaryMuted else colors.backgroundSurfaceMuted,
+                            contentColor = if (selected) colors.primary else colors.textSecondary
                         )
                     ) {
                         Text(entry.value)
@@ -224,7 +224,13 @@ fun Stepper(
             Button(
                 onClick = { onValueChange((value - 1).coerceAtLeast(min)) },
                 enabled = value > min,
-                shape = RoundedCornerShape(radius.md)
+                shape = RoundedCornerShape(radius.md),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = colors.backgroundSurfaceMuted,
+                    contentColor = colors.textPrimary,
+                    disabledContainerColor = colors.backgroundSurfaceMuted.copy(alpha = 0.55f),
+                    disabledContentColor = colors.textTertiary
+                )
             ) {
                 Text("-")
             }
@@ -232,7 +238,13 @@ fun Stepper(
             Button(
                 onClick = { onValueChange((value + 1).coerceAtMost(max)) },
                 enabled = value < max,
-                shape = RoundedCornerShape(radius.md)
+                shape = RoundedCornerShape(radius.md),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = colors.backgroundSurfaceMuted,
+                    contentColor = colors.textPrimary,
+                    disabledContainerColor = colors.backgroundSurfaceMuted.copy(alpha = 0.55f),
+                    disabledContentColor = colors.textTertiary
+                )
             ) {
                 Text("+")
             }

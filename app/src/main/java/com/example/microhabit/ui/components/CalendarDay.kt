@@ -90,10 +90,10 @@ fun CalendarDay(
     }
     val borderColor = when (state) {
         CalendarDayState.COMPLETED -> Color.Transparent
-        CalendarDayState.PARTIAL -> colors.success.copy(alpha = 0.35f)
-        CalendarDayState.MISSED -> colors.danger.copy(alpha = 0.45f)
-        CalendarDayState.NOT_SCHEDULED -> colors.borderSubtle
-        CalendarDayState.FUTURE -> colors.borderSubtle.copy(alpha = 0.45f)
+        CalendarDayState.PARTIAL -> colors.success.copy(alpha = 0.28f)
+        CalendarDayState.MISSED -> colors.danger.copy(alpha = 0.28f)
+        CalendarDayState.NOT_SCHEDULED -> colors.borderSubtle.copy(alpha = 0.7f)
+        CalendarDayState.FUTURE -> colors.borderSubtle.copy(alpha = 0.35f)
     }
     val textColor = when (state) {
         CalendarDayState.COMPLETED -> MaterialTheme.colorScheme.onPrimary

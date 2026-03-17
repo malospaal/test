@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -29,6 +30,7 @@ fun SettingsGroup(
     val spacing = AppTheme.spacing
     val colors = AppTheme.colors
     val radius = AppTheme.radius
+    val stroke = AppTheme.stroke
 
     Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
         Text(
@@ -47,9 +49,10 @@ fun SettingsGroup(
 
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = colors.backgroundSurface),
+            colors = CardDefaults.cardColors(containerColor = colors.backgroundSurfaceMuted),
             shape = RoundedCornerShape(radius.lg),
-            elevation = CardDefaults.cardElevation(defaultElevation = AppTheme.elevation.sm)
+            border = BorderStroke(stroke.thin, colors.borderSubtle.copy(alpha = 0.55f)),
+            elevation = CardDefaults.cardElevation(defaultElevation = AppTheme.elevation.none)
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 content()
@@ -112,7 +115,7 @@ fun SettingsRow(
             Text(
                 text = ">",
                 style = MaterialTheme.typography.labelLarge,
-                color = if (enabled) colors.textTertiary else colors.textTertiary
+                color = if (enabled) colors.textSecondary else colors.textTertiary
             )
         }
     }
@@ -165,5 +168,5 @@ fun SettingsSwitchRow(
 @Composable
 fun SettingsDivider() {
     val colors = AppTheme.colors
-    HorizontalDivider(color = colors.borderSubtle)
+    HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.6f))
 }

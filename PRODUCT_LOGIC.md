@@ -212,9 +212,12 @@ Future scope (не часть текущего канонического пов
 - Основное действие: completion/value update на выбранную дату.
 - Содержит:
   - компактный heading над selector-строкой (локализованный, спокойный тон) для явного контекста выбора привычки;
-  - видимый горизонтальный selector активных привычек в виде фиксированных tiles (emoji + title) с явным selected state;
-  - первый фиксированный tile = `+` (Create habit), всегда доступен как отдельный первый элемент selector-строки;
-  - `+` tile является action-only контролом (без текстового label внутри tile) и не визуализируется как selected habit;
+  - видимый горизонтальный selector активных привычек в виде pill-таблеток (emoji + title) с явным selected state;
+  - первый элемент selector-строки = компактный `+` action-tile (Create habit), всегда доступен как отдельный первый элемент;
+  - `+` tile является action-only контролом (без текстового label внутри tile), визуально отделён от selected habit состояния;
+  - selector имеет правый gradient fade-индикатор, когда список можно прокрутить вправо (`canScrollForward`);
+  - под selector отображается одноразовый swipe-hint (`← → ...`) до первого реального скролла пользователем;
+  - флаг показа swipe-hint хранится локально (`pref_selector_hint_shown`) и не показывается повторно после первого скролла;
   - Hero control (адаптивный по tracking type),
   - rest-day UX для not scheduled даты (объяснение + optional next scheduled date + explicit `Mark anyway` override action),
   - streak tiles,

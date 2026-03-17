@@ -26,7 +26,7 @@ data class AppSpacing(
 data class AppRadius(
     val sm: Dp = 8.dp,
     val md: Dp = 12.dp,
-    val lg: Dp = 16.dp,
+    val lg: Dp = 18.dp,
     val xl: Dp = 24.dp,
     val full: Dp = 999.dp
 )
@@ -34,9 +34,9 @@ data class AppRadius(
 @Immutable
 data class AppElevation(
     val none: Dp = 0.dp,
-    val sm: Dp = 1.dp,
-    val md: Dp = 2.dp,
-    val lg: Dp = 4.dp
+    val sm: Dp = 0.5.dp,
+    val md: Dp = 1.5.dp,
+    val lg: Dp = 3.dp
 )
 
 @Immutable

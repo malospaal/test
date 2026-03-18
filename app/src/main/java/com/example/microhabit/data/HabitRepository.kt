@@ -1,7 +1,8 @@
 package com.example.microhabit.data
 
 import android.content.Context
-import com.example.microhabit.widget.HabitWidgetProvider
+import com.example.microhabit.widget.HabitWidgetReceiver
+import com.example.microhabit.widget.HabitWidgetUpdateScheduler
 import org.json.JSONArray
 import org.json.JSONObject
 import kotlin.math.ceil
@@ -31,6 +32,17 @@ enum class TrackingType {
 enum class SubscriptionPlan {
     FREE,
     PRO
+}
+
+enum class ProAccessSource {
+    NONE,
+    MONTHLY,
+    YEARLY,
+    LIFETIME
+}
+
+fun SubscriptionPlan.hasPremiumAccess(): Boolean {
+    return this == SubscriptionPlan.PRO
 }
 
 enum class HabitLifecycleState {
@@ -334,11 +346,34 @@ class HabitRepository(private val context: Context) {
 
     fun getPlan(): SubscriptionPlan {
         val raw = prefs.getString(KEY_PLAN, SubscriptionPlan.FREE.name) ?: SubscriptionPlan.FREE.name
+        if (raw == "LIFETIME") {
+            // Migration from the old tier model: lifetime should grant PRO entitlement.
+            setPlan(SubscriptionPlan.PRO)
+            if (getProAccessSource() == ProAccessSource.NONE) {
+                setProAccessSource(ProAccessSource.LIFETIME)
+            }
+            return SubscriptionPlan.PRO
+        }
         return runCatching { SubscriptionPlan.valueOf(raw) }.getOrDefault(SubscriptionPlan.FREE)
     }
 
     fun setPlan(plan: SubscriptionPlan) {
-        prefs.edit().putString(KEY_PLAN, plan.name).apply()
+        val editor = prefs.edit()
+            .putString(KEY_PLAN, plan.name)
+        if (plan == SubscriptionPlan.FREE) {
+            editor.putString(KEY_PRO_ACCESS_SOURCE, ProAccessSource.NONE.name)
+        }
+        editor.apply()
+    }
+
+    fun getProAccessSource(): ProAccessSource {
+        val raw = prefs.getString(KEY_PRO_ACCESS_SOURCE, ProAccessSource.NONE.name)
+            ?: ProAccessSource.NONE.name
+        return runCatching { ProAccessSource.valueOf(raw) }.getOrDefault(ProAccessSource.NONE)
+    }
+
+    fun setProAccessSource(source: ProAccessSource) {
+        prefs.edit().putString(KEY_PRO_ACCESS_SOURCE, source.name).apply()
     }
 
     fun getThemeMode(): AppThemeMode {
@@ -984,7 +1019,8 @@ class HabitRepository(private val context: Context) {
     }
 
     fun refreshWidget() {
-        HabitWidgetProvider.refreshAll(context)
+        HabitWidgetUpdateScheduler.scheduleWidgetUpdates(context)
+        HabitWidgetReceiver.refreshAll(context)
     }
 
     private fun parseTaskStartDate(taskId: String, rawValue: String): LocalDate {
@@ -1208,6 +1244,7 @@ class HabitRepository(private val context: Context) {
         private const val KEY_TASKS_JSON = "tasks_json"
         private const val KEY_SELECTED_TASK = "selected_task"
         private const val KEY_PLAN = "user_plan"
+        private const val KEY_PRO_ACCESS_SOURCE = "pro_access_source"
         private const val KEY_THEME_MODE = "theme_mode"
         private const val KEY_LANGUAGE = "app_language"
         private const val KEY_ONBOARDING_COMPLETED = "onboarding_completed"

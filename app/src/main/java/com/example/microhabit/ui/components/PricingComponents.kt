@@ -34,6 +34,7 @@ data class PricingCardModel(
 fun PricingPlanCard(
     model: PricingCardModel,
     selected: Boolean,
+    recommended: Boolean = false,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -47,7 +48,11 @@ fun PricingPlanCard(
             .fillMaxWidth()
             .border(
                 width = stroke.thin,
-                color = if (selected) colors.primary.copy(alpha = 0.65f) else colors.borderSubtle.copy(alpha = 0.6f),
+                color = when {
+                    selected -> colors.primary.copy(alpha = 0.65f)
+                    recommended -> colors.primary.copy(alpha = 0.45f)
+                    else -> colors.borderSubtle.copy(alpha = 0.6f)
+                },
                 shape = RoundedCornerShape(radius.lg)
             )
             .clickable(onClick = onClick),

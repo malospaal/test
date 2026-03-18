@@ -54,7 +54,7 @@ import androidx.compose.ui.unit.sp
 import com.example.microhabit.HabitSelectorRow
 import com.example.microhabit.HabitUiState
 import com.example.microhabit.data.AnalyticsWeekSummary
-import com.example.microhabit.data.SubscriptionPlan
+import com.example.microhabit.data.hasPremiumAccess
 import com.example.microhabit.i18n.appLocale
 import com.example.microhabit.i18n.t
 import com.example.microhabit.ui.theme.AppTheme
@@ -101,7 +101,7 @@ fun AnalyticsScreen(
     val spacing = AppTheme.spacing
     val semantic = AppTheme.colors
     val locale = appLocale()
-    val isProUser = state.plan == SubscriptionPlan.PRO
+    val isProUser = state.plan.hasPremiumAccess()
     val activeTasks = state.tasks
     var selectedHabitId by rememberSaveable { mutableStateOf<String?>(null) }
 

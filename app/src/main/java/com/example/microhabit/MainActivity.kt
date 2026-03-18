@@ -52,6 +52,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -191,9 +192,11 @@ import com.example.microhabit.data.HabitTask
 import com.example.microhabit.data.HabitTemplate
 import com.example.microhabit.data.HabitTemplateCatalog
 import com.example.microhabit.data.MAX_HABIT_TITLE_LENGTH
+import com.example.microhabit.data.ProAccessSource
 import com.example.microhabit.data.SubscriptionPlan
 import com.example.microhabit.data.TaskFrequency
 import com.example.microhabit.data.TrackingType
+import com.example.microhabit.data.hasPremiumAccess
 import com.example.microhabit.i18n.LocalAppLanguage
 import com.example.microhabit.i18n.appLocale
 import com.example.microhabit.i18n.formatTranslate
@@ -270,7 +273,28 @@ private enum class AppPage {
 
 private enum class BillingCycle {
     MONTHLY,
-    YEARLY
+    YEARLY,
+    LIFETIME
+}
+
+private const val PRODUCT_ID_MONTHLY = "micro_habit_pro_monthly"
+private const val PRODUCT_ID_YEARLY = "micro_habit_pro_yearly"
+private const val PRODUCT_ID_LIFETIME = "micro_habit_pro_lifetime"
+
+private fun billingProductIdFor(cycle: BillingCycle): String {
+    return when (cycle) {
+        BillingCycle.MONTHLY -> PRODUCT_ID_MONTHLY
+        BillingCycle.YEARLY -> PRODUCT_ID_YEARLY
+        BillingCycle.LIFETIME -> PRODUCT_ID_LIFETIME
+    }
+}
+
+private fun proAccessSourceFor(cycle: BillingCycle): ProAccessSource {
+    return when (cycle) {
+        BillingCycle.MONTHLY -> ProAccessSource.MONTHLY
+        BillingCycle.YEARLY -> ProAccessSource.YEARLY
+        BillingCycle.LIFETIME -> ProAccessSource.LIFETIME
+    }
 }
 
 private enum class NotificationPermissionAction {
@@ -611,7 +635,7 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                                     if (habitsEditMode) {
                                         Spacer(Modifier.width(48.dp))
                                     } else {
-                                        val canAdd = state.plan == SubscriptionPlan.PRO || state.tasks.size < 1
+                                        val canAdd = vm.canCreateTask()
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             TextButton(
                                                 onClick = {
@@ -755,19 +779,27 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                             selectedBilling = selectedBilling,
                             onSelectBilling = { selectedBilling = it },
                             onSubscribe = {
+                                val source = when (billingProductIdFor(selectedBilling)) {
+                                    PRODUCT_ID_MONTHLY -> ProAccessSource.MONTHLY
+                                    PRODUCT_ID_YEARLY -> ProAccessSource.YEARLY
+                                    PRODUCT_ID_LIFETIME -> ProAccessSource.LIFETIME
+                                    else -> proAccessSourceFor(selectedBilling)
+                                }
                                 vm.setPlan(SubscriptionPlan.PRO)
+                                vm.setProAccessSource(source)
                                 Toast.makeText(
                                     context,
-                                    if (selectedBilling == BillingCycle.YEARLY) {
-                                        translate(language, "PRO yearly activated (debug)")
-                                    } else {
-                                        translate(language, "PRO monthly activated (debug)")
+                                    when (selectedBilling) {
+                                        BillingCycle.YEARLY -> translate(language, "PRO yearly activated (debug)")
+                                        BillingCycle.MONTHLY -> translate(language, "PRO monthly activated (debug)")
+                                        BillingCycle.LIFETIME -> translate(language, "PRO lifetime activated (debug)")
                                     },
                                     Toast.LENGTH_SHORT
                                 ).show()
                             },
                             onRestorePurchase = {
                                 vm.setPlan(SubscriptionPlan.PRO)
+                                vm.setProAccessSource(proAccessSourceFor(selectedBilling))
                                 Toast.makeText(
                                     context,
                                     translate(language, "Purchases restored (debug)"),
@@ -1290,6 +1322,7 @@ private fun TrackerPage(
 ) {
     val spacing = AppTheme.spacing
     val listState = rememberLazyListState()
+    val selectorListState = rememberLazyListState()
     var previousTotalCompletions by remember(state.selectedTaskId) { mutableStateOf(state.totalCompletions) }
     var streakOverlay by remember { mutableStateOf<StreakOverlayModel?>(null) }
     var overlayVisible by remember { mutableStateOf(false) }
@@ -1345,6 +1378,24 @@ private fun TrackerPage(
             listState.animateScrollToItem(0)
         }
     }
+    val selectedHabitIndex = state.tasks
+        .indexOfFirst { it.id == state.selectedTaskId }
+        .let { if (it < 0) 0 else it }
+    LaunchedEffect(selectedHabitIndex, state.tasks.size) {
+        if (state.tasks.isEmpty()) return@LaunchedEffect
+        val targetIndex = selectedHabitIndex + 1 // + tile is first item in tracker selector.
+        val layoutInfo = selectorListState.layoutInfo
+        val visibleItem = layoutInfo.visibleItemsInfo.firstOrNull { item -> item.index == targetIndex }
+        val isFullyVisible = visibleItem != null &&
+            visibleItem.offset >= layoutInfo.viewportStartOffset &&
+            visibleItem.offset + visibleItem.size <= layoutInfo.viewportEndOffset
+        if (!isFullyVisible) {
+            selectorListState.animateScrollToItem(
+                index = targetIndex,
+                scrollOffset = -40
+            )
+        }
+    }
 
     fun switchToTask(taskId: String, direction: Int = 0) {
         if (taskId == state.selectedTaskId) return
@@ -1365,17 +1416,19 @@ private fun TrackerPage(
                         habits = emptyList(),
                         selectedId = null,
                         onHabitSelected = {},
-                        onCreateHabit = onOpenCreateHabit
+                        onCreateHabit = onOpenCreateHabit,
+                        listState = selectorListState
                     )
                 }
-                item { OnboardingCard(vm, state) }
+                item { OnboardingCard(vm) }
             } else {
                 item {
                     HabitSelectorRow(
                         habits = state.tasks,
                         selectedId = state.selectedTaskId,
                         onHabitSelected = { taskId -> switchToTask(taskId, 0) },
-                        onCreateHabit = onOpenCreateHabit
+                        onCreateHabit = onOpenCreateHabit,
+                        listState = selectorListState
                     )
                 }
                 item {
@@ -1532,7 +1585,7 @@ private fun HabitsPage(
     val spacing = AppTheme.spacing
     val colors = AppTheme.colors
     val listState = rememberLazyListState()
-    val canAdd = state.plan == SubscriptionPlan.PRO || state.tasks.size < 1
+    val canAdd = vm.canCreateTask()
     var pendingDeleteTaskId by rememberSaveable { mutableStateOf<String?>(null) }
     val activeHabits = remember(state.habits) {
         state.habits.filter { !it.isArchived && !it.isCompleted }
@@ -2730,7 +2783,7 @@ private fun AccountPage(
                 Text(t("Current plan"), style = MaterialTheme.typography.labelLarge, color = semantic.textSecondary)
                 Spacer(Modifier.height(spacing.x0_5))
                 Text(
-                    if (state.plan == SubscriptionPlan.PRO) {
+                    if (state.plan.hasPremiumAccess()) {
                         t("Plan: PRO")
                     } else {
                         t("Plan: Free")
@@ -2740,10 +2793,10 @@ private fun AccountPage(
                 )
                 Spacer(Modifier.height(spacing.x0_5))
                 Text(
-                    text = if (state.plan == SubscriptionPlan.PRO) {
+                    text = if (state.plan.hasPremiumAccess()) {
                         t("Unlimited habits")
                     } else {
-                        t("Free plan: one active habit")
+                        t("Free plan: 3 active habits")
                     },
                     color = semantic.textSecondary
                 )
@@ -2954,7 +3007,7 @@ private fun SettingsPage(
             SettingsGroup(title = t("Subscription")) {
                 SettingsRow(
                     title = t("Manage subscription"),
-                    value = if (state.plan == SubscriptionPlan.PRO) "PRO" else t("FREE"),
+                    value = if (state.plan.hasPremiumAccess()) "PRO" else t("FREE"),
                     onClick = onOpenPaywall
                 )
             }
@@ -3203,7 +3256,7 @@ private fun PaywallPage(
                         shape = RoundedCornerShape(AppTheme.radius.md)
                     ) {
                         Text(
-                            text = if (currentPlan == SubscriptionPlan.PRO) {
+                            text = if (currentPlan.hasPremiumAccess()) {
                                 t("You already have Premium access.")
                             } else {
                                 t("Unlock unlimited habits and deeper insights.")
@@ -3268,7 +3321,7 @@ private fun PaywallPage(
                         premiumIncluded = true
                     )
                     PlanComparisonRow(
-                        feature = t("More than one habit"),
+                        feature = t("More than three habits"),
                         freeIncluded = false,
                         premiumIncluded = true
                     )
@@ -3290,22 +3343,37 @@ private fun PaywallPage(
             Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
                 PricingPlanCard(
                     model = PricingCardModel(
+                        title = t("Lifetime"),
+                        priceLabel = "\$59.99",
+                        subtitle = t("Pay once — keep it forever.")
+                    ),
+                    selected = selectedBilling == BillingCycle.LIFETIME,
+                    onClick = { onSelectBilling(BillingCycle.LIFETIME) }
+                )
+                PricingPlanCard(
+                    model = PricingCardModel(
+                        title = t("Yearly"),
+                        priceLabel = "\$24.99 / year",
+                        subtitle = t("Equivalent to \$2.08 / month"),
+                        badge = t("Recommended")
+                    ),
+                    selected = selectedBilling == BillingCycle.YEARLY,
+                    recommended = true,
+                    onClick = { onSelectBilling(BillingCycle.YEARLY) }
+                )
+                PricingPlanCard(
+                    model = PricingCardModel(
                         title = t("Monthly"),
-                        priceLabel = "\$4.99 / month",
+                        priceLabel = "\$3.99 / month",
                         subtitle = t("Flexible monthly billing")
                     ),
                     selected = selectedBilling == BillingCycle.MONTHLY,
                     onClick = { onSelectBilling(BillingCycle.MONTHLY) }
                 )
-                PricingPlanCard(
-                    model = PricingCardModel(
-                        title = t("Yearly"),
-                        priceLabel = "\$39.99 / year",
-                        subtitle = t("Equivalent to \$3.33 / month"),
-                        badge = t("Recommended")
-                    ),
-                    selected = selectedBilling == BillingCycle.YEARLY,
-                    onClick = { onSelectBilling(BillingCycle.YEARLY) }
+                Text(
+                    text = t("One-time forever · \$2.08/mo equivalent over 2 years"),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = colors.textSecondary
                 )
             }
         }
@@ -3316,15 +3384,19 @@ private fun PaywallPage(
                     Button(
                         onClick = onSubscribe,
                         modifier = Modifier.fillMaxWidth(),
-                        enabled = currentPlan != SubscriptionPlan.PRO
+                        enabled = !currentPlan.hasPremiumAccess()
                     ) {
                         Text(
-                            if (currentPlan == SubscriptionPlan.PRO) {
+                            if (currentPlan.hasPremiumAccess()) {
                                 t("Premium active")
                             } else {
                                 tf(
                                     "Continue with %s",
-                                    if (selectedBilling == BillingCycle.YEARLY) t("Yearly") else t("Monthly")
+                                    when (selectedBilling) {
+                                        BillingCycle.YEARLY -> t("Yearly")
+                                        BillingCycle.MONTHLY -> t("Monthly")
+                                        BillingCycle.LIFETIME -> t("Lifetime")
+                                    }
                                 )
                             }
                         )
@@ -3415,10 +3487,10 @@ private fun <T> SelectionDialog(
 }
 
 @Composable
-private fun OnboardingCard(vm: MainViewModel, state: HabitUiState) {
+private fun OnboardingCard(vm: MainViewModel) {
     val spacing = AppTheme.spacing
     val colors = AppTheme.colors
-    val canAdd = state.plan == SubscriptionPlan.PRO || state.tasks.size < 1
+    val canAdd = vm.canCreateTask()
     GlassCard {
         Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
             Text(t("Create your first habit"), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
@@ -4476,12 +4548,12 @@ fun HabitSelectorRow(
     showAllHabitsOption: Boolean = false,
     onSelectAll: (() -> Unit)? = null,
     showCountLabel: Boolean = true,
+    listState: LazyListState = rememberLazyListState(),
     modifier: Modifier = Modifier
 ) {
     val spacing = AppTheme.spacing
     val colors = AppTheme.colors
     val language = LocalAppLanguage.current
-    val listState = rememberLazyListState()
     val context = LocalContext.current
     val prefs = remember(context) {
         context.getSharedPreferences("habit_prefs", Context.MODE_PRIVATE)

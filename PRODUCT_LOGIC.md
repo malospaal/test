@@ -190,14 +190,24 @@ Future scope (не часть текущего канонического пов
 Источник: `MainViewModel.canCreateTask`, `unarchiveTask`.
 
 Текущий лимит Free:
-- `FREE_ACTIVE_HABIT_LIMIT = 1`.
+- `FREE_ACTIVE_HABIT_LIMIT = 3`.
+
+Модель entitlement (доменный уровень доступа):
+- `FREE`
+- `PRO`
+
+Paywall billing sources (способ получить `PRO`, не отдельный app-tier):
+- `Monthly` (subscription);
+- `Yearly` (subscription, recommended);
+- `Lifetime` (one-time purchase, INAPP).
 
 Правила:
-- Create новой привычки на Free: только если active count < 1.
+- Create новой привычки на Free: только если active count < 3.
 - В template-based create flow (`HabitTemplateScreen`) tap на template при исчерпанном Free лимите не открывает confirm и переводит в paywall.
 - Unarchive:
   - если возвращаемая привычка станет `ACTIVE` и active count уже на лимите Free, операция блокируется;
   - для blocked сценария UI открывает paywall.
+- Lifetime-покупка даёт permanent `PRO` entitlement (без срока истечения) и проходит те же premium-gates, что и активная подписка.
 - Если привычка после unarchive останется `COMPLETED`, лимит активных не нарушается.
 - Продление completed привычки (`endDate` update) не считается созданием новой привычки.
 - Continue completed habit (через completed-prompt) и edit completed habit с изменением `endDate` следуют тому же правилу:
@@ -412,6 +422,30 @@ Unit label UX для `COUNT`:
   - `Week over week` показывает реальные `completed/scheduled` для трёх последних недель.
 - Подпись в score card не показывает числовой pseudo-delta (`+N pts this week`) и не выдаёт synthetic значение за реальную score-дельту.
 
+### 12.11 Home Screen Widget (PRO)
+- Виджет доступен только пользователям с `PRO` entitlement.
+- В paywall-терминах `Monthly`/`Yearly`/`Lifetime` — это billing-sources, которые дают один и тот же entitlement `PRO`.
+- Поддерживаются 3 форм-фактора:
+  - small (2x2),
+  - medium (4x2),
+  - large (4x4).
+- При добавлении виджета выполняется конфигурация:
+  - если активная привычка одна — она привязывается автоматически;
+  - если активных привычек несколько — пользователь выбирает привычку;
+  - связь хранится как `widget_habit_id_<appWidgetId> -> habitId`.
+- Данные виджета считаются по выбранной привычке:
+  - current streak,
+  - completed-today state,
+  - текущая неделя (Пн..Вс) со статусами дней,
+  - completion % за текущую неделю по scheduled дням.
+- Кнопка `Mark done` в виджете:
+  - `YES_NO` -> ставит значение дня `1`,
+  - `COUNT`/`DURATION` -> ставит значение дня в `dailyTarget`,
+  - после действия виджет обновляется без обязательного открытия приложения.
+- Обновление виджета выполняется:
+  - при изменениях данных в приложении (через `refreshWidget()`),
+  - периодически через WorkManager (15 минут, `KEEP` policy).
+
 ## 13. Reminder System
 Источник: `notifications/HabitReminderScheduler.kt`.
 
@@ -468,6 +502,7 @@ Unit label UX для `COUNT`:
 - Timestamp фактического completion-action хранится ключами `habit_done_time_<taskId>_<date>` (epoch seconds).
 - Связанные данные привычки (notes, streak saver, saved missed dates, completed prompt marker) хранятся отдельными pref-ключами с префиксами.
 - Пользовательские настройки (plan, theme, language, onboarding, minimum completion percent, selected task) также хранятся в тех же `SharedPreferences`.
+- Для paywall entitlement дополнительно хранится `pro_access_source` (`NONE`/`MONTHLY`/`YEARLY`/`LIFETIME`) как источник получения `PRO`.
 
 ### 15.2 Derived Analytics
 - Аналитика и статистики не хранятся отдельной БД/таблицей.

@@ -109,6 +109,13 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
         "PRO mensile attivato (debug)",
         "PRO на месяц активирован (debug)"
     ),
+    "PRO lifetime activated (debug)" to v(
+        "PRO-Lifetime aktiviert (Debug)",
+        "PRO a vie active (debug)",
+        "PRO de por vida activado (debug)",
+        "PRO a vita attivato (debug)",
+        "PRO навсегда активирован (debug)"
+    ),
     "Purchases restored (debug)" to v(
         "Kaufe wiederhergestellt (Debug)",
         "Achats restaures (debug)",
@@ -372,6 +379,10 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "Manage subscription" to v("Abo verwalten", "Gerer l'abonnement", "Gestionar suscripcion", "Gestisci abbonamento", "Управление подпиской"),
     "PRO active: unlimited habits" to v("PRO aktiv: unbegrenzte Gewohnheiten", "PRO actif : habitudes illimitees", "PRO activo: habitos ilimitados", "PRO attivo: abitudini illimitate", "PRO активен: безлимитные привычки"),
     "Free plan: one active habit" to v("Free-Plan: eine aktive Gewohnheit", "Plan Free : une habitude active", "Plan Free: un habito activo", "Piano Free: una abitudine attiva", "План Free: одна активная привычка"),
+    "Free plan: 3 active habits" to (
+        v("Free-Plan: 3 aktive Gewohnheiten", "Plan Free : 3 habitudes actives", "Plan Free: 3 habitos activos", "Piano Free: 3 abitudini attive", "План Free: 3 активные привычки") +
+            mapOf(AppLanguage.CS to "Free plán: 3 aktivní návyky")
+    ),
     "Data & Privacy" to v("Daten & Datenschutz", "Donnees et confidentialite", "Datos y privacidad", "Dati e privacy", "Данные и приватность"),
     "Data" to v("Daten", "Donnees", "Datos", "Dati", "Данные"),
     "Control your data and account lifecycle." to v(
@@ -506,12 +517,37 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "Plan comparison" to v("Tarifvergleich", "Comparaison des offres", "Comparacion de planes", "Confronto piani", "Сравнение планов"),
     "Feature" to v("Funktion", "Fonctionnalite", "Funcion", "Funzionalita", "Функция"),
     "More than one habit" to v("Mehr als eine Gewohnheit", "Plus d'une habitude", "Mas de un habito", "Piu di un'abitudine", "Больше одной привычки"),
+    "More than three habits" to (
+        v("Mehr als drei Gewohnheiten", "Plus de trois habitudes", "Mas de tres habitos", "Piu di tre abitudini", "Больше трех привычек") +
+            mapOf(AppLanguage.CS to "Více než tři návyky")
+    ),
     "Advanced analytics" to v("Erweiterte Analysen", "Analyses avancees", "Analitica avanzada", "Analisi avanzate", "Расширенная аналитика"),
     "Priority support" to v("Priorisierter Support", "Support prioritaire", "Soporte prioritario", "Supporto prioritario", "Приоритетная поддержка"),
+    "Lifetime" to (
+        v("Lebenslang", "A vie", "De por vida", "A vita", "Навсегда") +
+            mapOf(AppLanguage.CS to "Doživotně")
+    ),
     "Monthly" to v("Monatlich", "Mensuel", "Mensual", "Mensile", "Ежемесячно"),
     "Flexible monthly billing" to v("Flexible monatliche Abrechnung", "Facturation mensuelle flexible", "Facturacion mensual flexible", "Fatturazione mensile flessibile", "Гибкая ежемесячная оплата"),
     "Yearly" to v("Jahrlich", "Annuel", "Anual", "Annuale", "Ежегодно"),
+    "Pay once — keep it forever." to (
+        v("Einmal zahlen, fur immer nutzen.", "Payez une fois, gardez-le pour toujours.", "Paga una vez y usalo para siempre.", "Paga una volta e usalo per sempre.", "Платишь один раз — пользуешься всегда.") +
+            mapOf(AppLanguage.CS to "Zaplať jednou a používej navždy.")
+    ),
+    "Equivalent to \$2.08 / month" to (
+        v("Entspricht \$2.08 / Monat", "Equivalent a \$2.08 / mois", "Equivale a \$2.08 / mes", "Equivalente a \$2.08 / mese", "Эквивалент \$2.08 / месяц") +
+            mapOf(AppLanguage.CS to "Ekvivalent \$2.08 / měsíc")
+    ),
     "Equivalent to \$3.33 / month" to v("Entspricht \$3.33 / Monat", "Equivalent a \$3.33 / mois", "Equivale a \$3.33 / mes", "Equivalente a \$3.33 / mese", "Эквивалент \$3.33 / месяц"),
+    "One-time forever · \$2.08/mo equivalent over 2 years" to (
+        v(
+            "Einmalig fur immer · \$2.08/Monat uber 2 Jahre",
+            "Paiement unique a vie · \$2.08/mois sur 2 ans",
+            "Pago unico para siempre · \$2.08/mes en 2 anos",
+            "Una volta per sempre · \$2.08/mese su 2 anni",
+            "Один раз навсегда · \$2.08/мес в эквиваленте за 2 года"
+        ) + mapOf(AppLanguage.CS to "Jednorázově navždy · \$2.08/měs v přepočtu za 2 roky")
+    ),
     "Recommended" to v("Empfohlen", "Recommande", "Recomendado", "Consigliato", "Рекомендуется"),
     "Premium active" to v("Premium aktiv", "Premium actif", "Premium activo", "Premium attivo", "Премиум активен"),
     "Continue with %s" to v("Fortfahren mit %s", "Continuer avec %s", "Continuar con %s", "Continua con %s", "Продолжить с %s"),

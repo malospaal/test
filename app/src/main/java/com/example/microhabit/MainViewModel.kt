@@ -13,9 +13,11 @@ import com.example.microhabit.data.HabitRepository
 import com.example.microhabit.data.HabitTask
 import com.example.microhabit.data.HabitTemplate
 import com.example.microhabit.data.HabitTemplateCatalog
+import com.example.microhabit.data.ProAccessSource
 import com.example.microhabit.data.SubscriptionPlan
 import com.example.microhabit.data.TaskFrequency
 import com.example.microhabit.data.TrackingType
+import com.example.microhabit.data.hasPremiumAccess
 import com.example.microhabit.i18n.localeForLanguage
 import com.example.microhabit.i18n.translate
 import com.example.microhabit.notifications.HabitReminderScheduler
@@ -175,6 +177,7 @@ data class HabitUiState(
     val editorEndDate: LocalDate? = null,
     val editorShowAdvanced: Boolean = false,
     val plan: SubscriptionPlan = SubscriptionPlan.FREE,
+    val proAccessSource: ProAccessSource = ProAccessSource.NONE,
     val themeMode: AppThemeMode = AppThemeMode.SYSTEM,
     val language: AppLanguage = AppLanguage.RU,
     val minimumCompletionPercent: Int = 100,
@@ -257,6 +260,13 @@ class MainViewModel(
     fun setPlan(plan: SubscriptionPlan) {
         viewModelScope.launch {
             repository.setPlan(plan)
+            refresh()
+        }
+    }
+
+    fun setProAccessSource(source: ProAccessSource) {
+        viewModelScope.launch {
+            repository.setProAccessSource(source)
             refresh()
         }
     }
@@ -657,7 +667,7 @@ class MainViewModel(
         val current = _state.value
         val task = current.tasks.firstOrNull { it.id == current.selectedTaskId } ?: return false
         if (task.trackingType != TrackingType.DURATION) return false
-        if (current.plan != SubscriptionPlan.PRO) return false
+        if (!current.plan.hasPremiumAccess()) return false
         if (durationTimerJob != null) return true
         timerTaskId = task.id
         timerDate = current.selectedDate
@@ -843,7 +853,7 @@ class MainViewModel(
         val current = _state.value
         val task = current.allTasks.firstOrNull { it.id == taskId } ?: return false
         val willBeActive = repository.lifecycleState(task.copy(isArchived = false)) == HabitLifecycleState.ACTIVE
-        if (current.plan != SubscriptionPlan.PRO && willBeActive) {
+        if (!current.plan.hasPremiumAccess() && willBeActive) {
             val activeCount = current.allTasks.count { repository.lifecycleState(it) == HabitLifecycleState.ACTIVE }
             if (activeCount >= FREE_ACTIVE_HABIT_LIMIT) {
                 return false
@@ -930,6 +940,7 @@ class MainViewModel(
             val allTasks = repository.getTasks()
             val tasks = allTasks.filter { repository.lifecycleState(it) == HabitLifecycleState.ACTIVE }
             val plan = repository.getPlan()
+            val proAccessSource = repository.getProAccessSource()
             val themeMode = repository.getThemeMode()
             val language = repository.getLanguage()
             val minimumCompletionPercent = repository.getMinimumCompletionPercent()
@@ -1137,6 +1148,7 @@ class MainViewModel(
                     calendarBreakdownScheduledCount = calendarBreakdownScheduledCount,
                     calendarBreakdownItems = calendarBreakdownItems,
                     plan = plan,
+                    proAccessSource = proAccessSource,
                     themeMode = themeMode,
                     language = language,
                     minimumCompletionPercent = minimumCompletionPercent,
@@ -1474,7 +1486,7 @@ class MainViewModel(
     }
 
     private fun canCreateTask(taskCount: Int, plan: SubscriptionPlan): Boolean {
-        return plan == SubscriptionPlan.PRO || taskCount < FREE_ACTIVE_HABIT_LIMIT
+        return plan.hasPremiumAccess() || taskCount < FREE_ACTIVE_HABIT_LIMIT
     }
 
     private fun maybeAwardStreakSaver(taskId: String, previousStreak: Int) {
@@ -1525,7 +1537,7 @@ class MainViewModel(
     }
 
     companion object {
-        private const val FREE_ACTIVE_HABIT_LIMIT = 1
+        private const val FREE_ACTIVE_HABIT_LIMIT = 3
         private const val DEFAULT_REMINDER_HOUR = 8
         private const val DEFAULT_REMINDER_MINUTE = 0
     }

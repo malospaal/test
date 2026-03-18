@@ -41,17 +41,20 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.microhabit.HabitListItem
 import com.example.microhabit.HabitSelectorRow
 import com.example.microhabit.HabitUiState
-import com.example.microhabit.data.HabitTask
+import com.example.microhabit.data.AnalyticsWeekSummary
 import com.example.microhabit.data.SubscriptionPlan
-import com.example.microhabit.data.TaskFrequency
 import com.example.microhabit.i18n.appLocale
 import com.example.microhabit.i18n.t
 import com.example.microhabit.ui.theme.AppTheme
@@ -139,46 +142,45 @@ fun AnalyticsScreen(
         return
     }
 
-    val summariesById = remember(state.habits) { state.habits.associateBy { it.id } }
-    val activeSummaries = remember(activeTasks, summariesById) {
-        activeTasks.mapNotNull { summariesById[it.id] }
-    }
-    val selectedTask = activeTasks.firstOrNull { it.id == selectedHabitId }
-    val selectedSummary = selectedTask?.let { summariesById[it.id] }
     val aggregateMode = selectedHabitId == null
 
     val completion30 = if (aggregateMode) {
-        activeSummaries.map { it.completionRate }.average().takeIf { !it.isNaN() }?.roundToInt() ?: 0
+        state.analyticsAggregateCompletionRate30Day
     } else {
-        selectedSummary?.completionRate ?: state.completionRate30Day
+        state.completionRate30Day
     }.coerceIn(0, 100)
 
     val completion7 = if (aggregateMode) {
-        estimateSevenDayRate(activeSummaries, completion30)
+        state.analyticsAggregateCompletionRate7Day
     } else {
         state.completionRate7Day.coerceIn(0, 100)
     }
 
     val currentStreak = if (aggregateMode) {
-        activeSummaries.maxOfOrNull { it.streak } ?: 0
+        state.analyticsAggregateCurrentStreak
     } else {
-        selectedSummary?.streak ?: state.streak
+        state.streak
     }
 
     val bestStreak = if (aggregateMode) {
-        activeSummaries.maxOfOrNull { it.streak } ?: 0
+        state.analyticsAggregateBestStreak
     } else {
         state.bestStreak
     }.coerceAtLeast(currentStreak)
 
     val estimatedTotalCompletions = if (aggregateMode) {
-        activeSummaries.sumOf { ((it.completionRate / 100f) * 30f).roundToInt().coerceAtLeast(0) }
+        state.analyticsAggregateTotalCompletions
     } else {
         state.totalCompletions
     }
 
-    val thisWeekCompletions = ((completion7 / 100f) * 7f).roundToInt().coerceAtLeast(0)
-    val weekDelta = completion7 - completion30
+    val weekComparisons = buildWeekComparisons(
+        summaries = if (aggregateMode) state.analyticsAggregateWeekSummaries else state.analyticsSelectedWeekSummaries,
+        minus2Label = t("−2 wk"),
+        minus1Label = t("Last wk"),
+        currentLabel = t("This wk")
+    )
+    val thisWeekCompletions = weekComparisons.lastOrNull()?.completed ?: 0
     val score = calculateStabilityScore(completion30, currentStreak, bestStreak)
     val daysToRecord = calculateDaysToRecord(currentStreak, bestStreak)
     val forecastDate = daysToRecord?.let { LocalDate.now().plusDays(it.toLong()) }
@@ -202,21 +204,12 @@ fun AnalyticsScreen(
         baseRate = completion7,
         selectedLast7 = state.last7Days
     )
-    val hourlyData = buildHourlyData(if (aggregateMode) activeTasks else listOfNotNull(selectedTask))
+    val hourlyCounts = if (aggregateMode) state.analyticsAggregateHourlyCounts else state.analyticsSelectedHourlyCounts
+    val hourlyData = buildHourlyData(hourlyCounts)
+    val hasTimeData = hourlyCounts.any { it > 0 }
     val weekdayData = buildWeekdayScores(
-        aggregateMode = aggregateMode,
-        selectedWeekdayConsistency = state.weekdayConsistency,
-        tasks = if (aggregateMode) activeTasks else listOfNotNull(selectedTask),
+        consistency = if (aggregateMode) state.analyticsAggregateWeekdayConsistency else state.weekdayConsistency,
         locale = locale
-    )
-    val weekComparisons = buildWeekComparisons(
-        aggregateMode = aggregateMode,
-        completion7 = completion7,
-        completion30 = completion30,
-        taskCount = activeTasks.size,
-        minus2Label = t("−2 wk"),
-        minus1Label = t("Last wk"),
-        currentLabel = t("This wk")
     )
 
     LazyColumn(
@@ -238,17 +231,19 @@ fun AnalyticsScreen(
                 showCountLabel = false
             )
         }
-        item { StabilityScoreCard(score = score, weekDelta = weekDelta) }
+        item { StabilityScoreCard(score = score) }
         item { StatGrid(items = statItems) }
         item { ForecastCard(daysToRecord = daysToRecord, bestStreak = bestStreak, recordDate = forecastDate) }
         item { WeeklyBarChart(weekData = weekData) }
-        item {
-            ProBlurOverlay(
-                isProUser = isProUser,
-                lockedLabel = t("Best time of day\navailable in PRO"),
-                onUpgrade = onUpgrade
-            ) {
-                BestTimeOfDayCard(hourlyData = hourlyData)
+        if (hasTimeData) {
+            item {
+                ProBlurOverlay(
+                    isProUser = isProUser,
+                    lockedLabel = t("Best time of day\navailable in PRO"),
+                    onUpgrade = onUpgrade
+                ) {
+                    BestTimeOfDayCard(hourlyData = hourlyData)
+                }
             }
         }
         item {
@@ -282,12 +277,6 @@ private fun calculateStabilityScore(completion30Rate: Int, currentStreak: Int, b
 private fun calculateDaysToRecord(currentStreak: Int, bestStreak: Int): Int? {
     if (bestStreak <= 0 || currentStreak >= bestStreak) return null
     return (bestStreak - currentStreak).coerceAtLeast(0)
-}
-
-private fun estimateSevenDayRate(summaries: List<HabitListItem>, fallback: Int): Int {
-    if (summaries.isEmpty()) return fallback
-    val adjusted = summaries.map { (it.completionRate + (it.streak.coerceAtMost(14) * 0.8f)).roundToInt() }
-    return (adjusted.average().takeIf { !it.isNaN() }?.roundToInt() ?: fallback).coerceIn(0, 100)
 }
 
 private fun formatDelta(current: Int, previous: Int): Pair<String, Boolean> {
@@ -335,40 +324,24 @@ private fun buildWeekCompletionData(aggregateMode: Boolean, baseRate: Int, selec
     }
 }
 
-private fun buildHourlyData(tasks: List<HabitTask>): List<Float> {
-    val buckets = MutableList(12) { 0f }
-    val reminderTasks = tasks.filter { it.reminderEnabled }
-    if (reminderTasks.isEmpty()) return List(12) { 0.08f }
-    reminderTasks.forEach { task ->
-        val bucket = (task.reminderHour.coerceIn(0, 23) / 2).coerceIn(0, 11)
-        buckets[bucket] += 1f
-    }
-    val max = buckets.maxOrNull()?.takeIf { it > 0f } ?: 1f
-    return buckets.map { (it / max).coerceAtLeast(0.04f) }
+private fun buildHourlyData(hourlyCounts: List<Int>): List<Float> {
+    val max = hourlyCounts.maxOrNull()?.takeIf { it > 0 } ?: return List(12) { 0f }
+    return hourlyCounts
+        .take(12)
+        .map { count -> (count.toFloat() / max.toFloat()).coerceIn(0f, 1f) }
+        .let { values ->
+            if (values.size >= 12) values else values + List(12 - values.size) { 0f }
+        }
 }
 
 private fun buildWeekdayScores(
-    aggregateMode: Boolean,
-    selectedWeekdayConsistency: List<Int>,
-    tasks: List<HabitTask>,
+    consistency: List<Int>,
     locale: java.util.Locale
 ): List<WeekdayScore> {
-    val scores = if (!aggregateMode) {
-        normalizeIntScores(selectedWeekdayConsistency)
-    } else {
-        val totals = MutableList(7) { 0f }
-        tasks.forEach { task ->
-            when (task.frequency) {
-                TaskFrequency.DAILY -> (0..6).forEach { day -> totals[day] += 1f }
-                TaskFrequency.SELECTED_DAYS -> task.customDays.forEach { dayValue -> if (dayValue in 1..7) totals[dayValue - 1] += 1f }
-                TaskFrequency.TIMES_PER_WEEK -> {
-                    val spread = task.timesPerWeek.coerceIn(1, 7) / 7f
-                    (0..6).forEach { day -> totals[day] += spread }
-                }
-            }
-        }
-        normalizeFloatScores(totals)
-    }
+    val scores = consistency
+        .take(7)
+        .map { percent -> percent.coerceIn(0, 100) / 100f }
+        .let { values -> if (values.size >= 7) values else values + List(7 - values.size) { 0f } }
     return (1..7).map { day ->
         WeekdayScore(
             dayLabel = DayOfWeek.of(day).getDisplayName(TextStyle.SHORT, locale).take(2),
@@ -377,51 +350,34 @@ private fun buildWeekdayScores(
     }
 }
 
-private fun normalizeIntScores(values: List<Int>): List<Float> {
-    val normalized = values.take(7).map { it.coerceAtLeast(0).toFloat() }
-    return normalizeFloatScores(normalized)
-}
-
-private fun normalizeFloatScores(values: List<Float>): List<Float> {
-    if (values.isEmpty()) return List(7) { 0f }
-    val max = values.maxOrNull()?.takeIf { it > 0f } ?: 1f
-    return values.map { (it / max).coerceIn(0f, 1f) }.let { list ->
-        if (list.size >= 7) list.take(7) else list + List(7 - list.size) { 0f }
-    }
-}
-
 private fun buildWeekComparisons(
-    aggregateMode: Boolean,
-    completion7: Int,
-    completion30: Int,
-    taskCount: Int,
+    summaries: List<AnalyticsWeekSummary>,
     minus2Label: String,
     minus1Label: String,
     currentLabel: String
 ): List<WeekSummary> {
-    val scheduledBase = if (aggregateMode) taskCount.coerceAtLeast(1) * 7 else 7
-    val thisWeekCompleted = ((completion7 / 100f) * scheduledBase).roundToInt().coerceIn(0, scheduledBase)
-    val prevWeekRate = ((completion7 * 0.9f + completion30 * 0.1f).roundToInt()).coerceIn(0, 100)
-    val prevWeekCompleted = ((prevWeekRate / 100f) * scheduledBase).roundToInt().coerceIn(0, scheduledBase)
-    val minus2Rate = ((completion30 * 0.92f).roundToInt()).coerceIn(0, 100)
-    val minus2Completed = ((minus2Rate / 100f) * scheduledBase).roundToInt().coerceIn(0, scheduledBase)
+    val source = summaries.takeLast(3)
+    val padded = when {
+        source.size >= 3 -> source
+        source.isEmpty() -> List(3) { AnalyticsWeekSummary(completed = 0, scheduled = 0, weekStart = LocalDate.now()) }
+        else -> List(3 - source.size) { source.first() } + source
+    }
     return listOf(
-        WeekSummary(minus2Label, minus2Completed, scheduledBase),
-        WeekSummary(minus1Label, prevWeekCompleted, scheduledBase),
-        WeekSummary(currentLabel, thisWeekCompleted, scheduledBase)
+        WeekSummary(minus2Label, padded[0].completed, padded[0].scheduled),
+        WeekSummary(minus1Label, padded[1].completed, padded[1].scheduled),
+        WeekSummary(currentLabel, padded[2].completed, padded[2].scheduled)
     )
 }
 
 @Composable
-private fun StabilityScoreCard(score: Int, weekDelta: Int) {
+private fun StabilityScoreCard(score: Int) {
     Surface(shape = RoundedCornerShape(18.dp), color = AppTheme.colors.backgroundSurface, border = BorderStroke(1.dp, AppTheme.colors.borderSubtle)) {
         Column(Modifier.padding(16.dp)) {
             Text(text = t("Stability score"), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium, color = AppTheme.colors.primary)
             Spacer(Modifier.height(4.dp))
             Text(text = score.toString(), style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onSurface)
-            val sign = if (weekDelta > 0) "+" else ""
             Text(
-                text = if (weekDelta == 0) t("out of 100") else "${t("out of 100")} · $sign$weekDelta ${t("pts this week")}",
+                text = t("out of 100"),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -453,12 +409,15 @@ private fun StabilityScoreCard(score: Int, weekDelta: Int) {
 
 @Composable
 private fun StatGrid(items: List<StatItem>) {
+    val rows = ((items.size + 1) / 2).coerceAtLeast(1)
+    // Each tile can have up to 4 text lines; 112dp row height avoids clipping on small screens.
+    val gridHeight = (rows * 112 + (rows - 1) * 8).dp
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
         userScrollEnabled = false,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.height(180.dp)
+        modifier = Modifier.height(gridHeight)
     ) {
         items(items) { item -> StatTile(item) }
     }
@@ -467,10 +426,17 @@ private fun StatGrid(items: List<StatItem>) {
 @Composable
 private fun StatTile(item: StatItem) {
     Surface(shape = RoundedCornerShape(14.dp), color = AppTheme.colors.backgroundSurface, border = BorderStroke(1.dp, AppTheme.colors.borderSubtle)) {
-        Column(Modifier.padding(12.dp)) {
+        Column(Modifier.padding(10.dp)) {
             Text(text = item.icon, fontSize = 14.sp)
             Spacer(Modifier.height(4.dp))
-            Text(text = item.value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+            Text(
+                text = item.value,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
             Text(text = item.label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             item.delta?.let { delta ->
                 Text(
@@ -536,7 +502,7 @@ private fun WeeklyBarChart(weekData: List<DayCompletion>) {
                     Text(
                         text = day.date.dayOfWeek.getDisplayName(TextStyle.SHORT, locale).take(2),
                         style = MaterialTheme.typography.labelSmall,
-                        fontSize = 8.sp,
+                        fontSize = 10.sp,
                         color = if (isToday) AppTheme.colors.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = if (isToday) FontWeight.SemiBold else FontWeight.Normal,
                         textAlign = TextAlign.Center,
@@ -586,6 +552,7 @@ private fun BestTimeOfDayCard(hourlyData: List<Float>) {
 private fun WeekdayRadarCard(weekdayData: List<WeekdayScore>) {
     val bestIndex = weekdayData.indices.maxByOrNull { weekdayData[it].score } ?: 0
     val weakDays = weekdayData.filter { it.score < 0.2f }.joinToString(", ") { it.dayLabel }
+    val semantic = AppTheme.colors
     Surface(shape = RoundedCornerShape(14.dp), color = AppTheme.colors.backgroundSurface, border = BorderStroke(1.dp, AppTheme.colors.borderSubtle)) {
         Column(Modifier.padding(12.dp)) {
             Text(text = t("Weekday consistency"), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
@@ -593,22 +560,15 @@ private fun WeekdayRadarCard(weekdayData: List<WeekdayScore>) {
             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 RadarChart(
                     data = weekdayData.map { it.score },
-                    sizeModifier = Modifier.size(160.dp),
-                    accentColor = AppTheme.colors.primary,
-                    fillColor = AppTheme.colors.primary.copy(alpha = 0.15f),
-                    gridColor = MaterialTheme.colorScheme.surfaceVariant
+                    labels = weekdayData.map { it.dayLabel },
+                    bestIndex = bestIndex,
+                    size = 160.dp,
+                    accentColor = semantic.primary,
+                    fillColor = semantic.primary.copy(alpha = 0.15f),
+                    gridColor = MaterialTheme.colorScheme.surfaceVariant,
+                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    bestLabelColor = semantic.primary
                 )
-            }
-            Spacer(Modifier.height(8.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                weekdayData.forEachIndexed { index, item ->
-                    Text(
-                        text = item.dayLabel,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (index == bestIndex) AppTheme.colors.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = if (index == bestIndex) FontWeight.SemiBold else FontWeight.Normal
-                    )
-                }
             }
             Spacer(Modifier.height(6.dp))
             Text(
@@ -622,31 +582,64 @@ private fun WeekdayRadarCard(weekdayData: List<WeekdayScore>) {
 }
 
 @Composable
-private fun RadarChart(data: List<Float>, sizeModifier: Modifier, accentColor: Color, fillColor: Color, gridColor: Color) {
-    Canvas(modifier = sizeModifier) {
-        val cx = size.width / 2f
-        val cy = size.height / 2f
-        val rMax = size.minDimension * 0.38f
-        val rMin = size.minDimension * 0.08f
+private fun RadarChart(
+    data: List<Float>,
+    labels: List<String>,
+    bestIndex: Int,
+    size: androidx.compose.ui.unit.Dp = 160.dp,
+    accentColor: Color,
+    fillColor: Color,
+    gridColor: Color,
+    labelColor: Color,
+    bestLabelColor: Color
+) {
+    val density = LocalDensity.current
+    Canvas(modifier = Modifier.size(size)) {
         val count = data.size.coerceAtLeast(1)
+        val cx = size.toPx() / 2f
+        val cy = size.toPx() / 2f
+        val radiusMax = size.toPx() * 0.36f
+        val radiusMin = size.toPx() * 0.06f
+        val labelOffset = size.toPx() * 0.13f
+
+        fun pointAngle(index: Int): Float = (2f * PI.toFloat() * index / count) - PI.toFloat() / 2f
+        fun dataPoint(index: Int): androidx.compose.ui.geometry.Offset {
+            val value = data.getOrElse(index) { 0f }.coerceIn(0f, 1f)
+            val radius = radiusMin + value * (radiusMax - radiusMin)
+            return androidx.compose.ui.geometry.Offset(
+                x = cx + radius * cos(pointAngle(index)),
+                y = cy + radius * sin(pointAngle(index))
+            )
+        }
+        fun labelPoint(index: Int): androidx.compose.ui.geometry.Offset {
+            val radius = radiusMax + labelOffset
+            return androidx.compose.ui.geometry.Offset(
+                x = cx + radius * cos(pointAngle(index)),
+                y = cy + radius * sin(pointAngle(index))
+            )
+        }
 
         listOf(0.33f, 0.66f, 1f).forEach { step ->
-            drawCircle(color = gridColor, radius = rMin + step * (rMax - rMin), center = androidx.compose.ui.geometry.Offset(cx, cy), style = Stroke(width = 1.dp.toPx()))
+            drawCircle(
+                color = gridColor,
+                radius = radiusMin + step * (radiusMax - radiusMin),
+                center = androidx.compose.ui.geometry.Offset(cx, cy),
+                style = Stroke(width = 1.dp.toPx())
+            )
         }
         repeat(count) { index ->
-            val angle = (2f * PI.toFloat() * index / count) - PI.toFloat() / 2f
             drawLine(
                 color = gridColor,
                 start = androidx.compose.ui.geometry.Offset(cx, cy),
-                end = androidx.compose.ui.geometry.Offset(cx + rMax * cos(angle), cy + rMax * sin(angle)),
+                end = androidx.compose.ui.geometry.Offset(
+                    x = cx + radiusMax * cos(pointAngle(index)),
+                    y = cy + radiusMax * sin(pointAngle(index))
+                ),
                 strokeWidth = 1.dp.toPx()
             )
         }
-        val points = data.mapIndexed { index, score ->
-            val angle = (2f * PI.toFloat() * index / count) - PI.toFloat() / 2f
-            val radius = rMin + score.coerceAtLeast(0.05f) * (rMax - rMin)
-            androidx.compose.ui.geometry.Offset(cx + radius * cos(angle), cy + radius * sin(angle))
-        }
+
+        val points = List(count) { index -> dataPoint(index) }
         if (points.isNotEmpty()) {
             val path = Path().apply {
                 moveTo(points.first().x, points.first().y)
@@ -654,8 +647,47 @@ private fun RadarChart(data: List<Float>, sizeModifier: Modifier, accentColor: C
                 close()
             }
             drawPath(path, color = fillColor)
-            drawPath(path, color = accentColor, style = Stroke(width = 1.5.dp.toPx()))
-            points.forEach { point -> drawCircle(color = accentColor, radius = 2.8.dp.toPx(), center = point) }
+            drawPath(
+                path = path,
+                color = accentColor,
+                style = Stroke(width = 1.5.dp.toPx(), join = StrokeJoin.Round)
+            )
+            points.forEachIndexed { index, point ->
+                val alpha = if (data.getOrElse(index) { 0f } < 0.05f) 0.25f else 1f
+                drawCircle(
+                    color = accentColor.copy(alpha = alpha),
+                    radius = 3.dp.toPx(),
+                    center = point
+                )
+            }
+        }
+
+        val textPaint = android.graphics.Paint().apply {
+            isAntiAlias = true
+            textAlign = android.graphics.Paint.Align.CENTER
+            typeface = android.graphics.Typeface.DEFAULT
+        }
+        repeat(count) { index ->
+            val text = labels.getOrElse(index) { "" }
+            val isBest = index == bestIndex
+            val color = if (isBest) bestLabelColor else labelColor
+            textPaint.textSize = with(density) { if (isBest) 11.5.sp.toPx() else 10.5.sp.toPx() }
+            textPaint.color = android.graphics.Color.argb(
+                (color.alpha * 255).toInt(),
+                (color.red * 255).toInt(),
+                (color.green * 255).toInt(),
+                (color.blue * 255).toInt()
+            )
+            textPaint.isFakeBoldText = isBest
+            val label = labelPoint(index)
+            drawIntoCanvas { canvas ->
+                canvas.nativeCanvas.drawText(
+                    text,
+                    label.x,
+                    label.y + textPaint.textSize / 3f,
+                    textPaint
+                )
+            }
         }
     }
 }

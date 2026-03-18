@@ -326,6 +326,15 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
         "Promemoria abitudini",
         "Напоминания о привычках"
     ),
+    "Habit reminders" to (
+        v(
+            "Gewohnheits-Erinnerungen",
+            "Rappels d'habitude",
+            "Recordatorios de habitos",
+            "Promemoria abitudini",
+            "Напоминания о привычках"
+        ) + mapOf(AppLanguage.CS to "Připomínky návyků")
+    ),
     "Daily reminders channel description" to v(
         "Tagliche Erinnerungen fur Micro Habit Aufgaben",
         "Rappels quotidiens pour les taches Micro Habit",
@@ -333,12 +342,30 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
         "Promemoria giornalieri per le attivita Micro Habit",
         "Ежедневные напоминания для задач Micro Habit"
     ),
+    "Daily habit reminders" to (
+        v(
+            "Tagliche Erinnerungen fur Gewohnheiten",
+            "Rappels quotidiens d'habitude",
+            "Recordatorios diarios de habitos",
+            "Promemoria quotidiani delle abitudini",
+            "Ежедневные напоминания о привычках"
+        ) + mapOf(AppLanguage.CS to "Denní připomínky návyků")
+    ),
     "Notification permission denied. Reminders are disabled." to v(
         "Benachrichtigungsberechtigung verweigert. Erinnerungen sind deaktiviert.",
         "Autorisation de notification refusee. Les rappels sont desactives.",
         "Permiso de notificaciones denegado. Los recordatorios estan desactivados.",
         "Permesso notifiche negato. I promemoria sono disattivati.",
         "Разрешение на уведомления отклонено. Напоминания отключены."
+    ),
+    "Time to complete your habit!" to (
+        v(
+            "Zeit, deine Gewohnheit zu erledigen!",
+            "Il est temps de terminer votre habitude !",
+            "Hora de completar tu habito!",
+            "E il momento di completare la tua abitudine!",
+            "Время выполнить привычку!"
+        ) + mapOf(AppLanguage.CS to "Čas splnit svůj návyk!")
     ),
     "Subscription" to v("Abonnement", "Abonnement", "Suscripcion", "Abbonamento", "Подписка"),
     "Manage Free and PRO plans." to v("Free- und PRO-Plane verwalten.", "Gerer les offres Free et PRO.", "Gestiona planes Free y PRO.", "Gestisci i piani Free e PRO.", "Управляйте тарифами Free и PRO."),
@@ -880,6 +907,9 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "Completion consistency" to v("Erfullungs-Konstanz", "Regularite d'execution", "Consistencia de cumplimiento", "Costanza di completamento", "Стабильность выполнения"),
     "Habit notes" to v("Notizen zur Gewohnheit", "Notes d'habitude", "Notas de habito", "Note abitudine", "Заметки о привычке"),
     "Why did you miss today?" to v("Warum hast du heute ausgesetzt?", "Pourquoi avez-vous manque aujourd'hui ?", "Por que fallaste hoy?", "Perche hai saltato oggi?", "Почему вы пропустили сегодня?"),
+    "notes_placeholder_done" to (v("Wie lief es heute?", "Comment cela s'est-il passé aujourd'hui ?", "Como te fue hoy?", "Com'è andata oggi?", "Как прошло сегодня?") + mapOf(AppLanguage.EN to "How did it go today?", AppLanguage.CS to "Jak to dnes šlo?")),
+    "notes_placeholder_missed" to (v("Warum hast du heute ausgesetzt?", "Pourquoi avez-vous manque aujourd'hui ?", "Por que fallaste hoy?", "Perche hai saltato oggi?", "Почему пропустил сегодня?") + mapOf(AppLanguage.EN to "Why did you miss today?", AppLanguage.CS to "Proč jsi dnes vynechal?")),
+    "notes_placeholder_default" to (v("Notizen zur Gewohnheit", "Notes d'habitude", "Notas del habito", "Note sull'abitudine", "Заметки о привычке") + mapOf(AppLanguage.EN to "Habit notes", AppLanguage.CS to "Poznámky ke zvyku")),
     "Save note" to v("Notiz speichern", "Enregistrer la note", "Guardar nota", "Salva nota", "Сохранить заметку"),
     "New habit" to v("Neue Gewohnheit", "Nouvelle habitude", "Nuevo habito", "Nuova abitudine", "Новая привычка"),
     "Choose emoji" to v("Emoji wahlen", "Choisir un emoji", "Elegir emoji", "Scegli emoji", "Выбрать эмодзи"),

@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.microhabit.data.AppLanguage
 import com.example.microhabit.data.AppThemeMode
+import com.example.microhabit.data.AnalyticsWeekSummary
 import com.example.microhabit.data.HabitCategory
 import com.example.microhabit.data.HabitLifecycleState
 import com.example.microhabit.data.MAX_HABIT_TITLE_LENGTH
@@ -118,6 +119,16 @@ data class HabitUiState(
     val bestStreak: Int = 0,
     val completionRate7Day: Int = 0,
     val completionRate30Day: Int = 0,
+    val analyticsAggregateCompletionRate7Day: Int = 0,
+    val analyticsAggregateCompletionRate30Day: Int = 0,
+    val analyticsAggregateTotalCompletions: Int = 0,
+    val analyticsAggregateCurrentStreak: Int = 0,
+    val analyticsAggregateBestStreak: Int = 0,
+    val analyticsAggregateWeekdayConsistency: List<Int> = List(7) { 0 },
+    val analyticsSelectedWeekSummaries: List<AnalyticsWeekSummary> = emptyList(),
+    val analyticsAggregateWeekSummaries: List<AnalyticsWeekSummary> = emptyList(),
+    val analyticsSelectedHourlyCounts: List<Int> = List(12) { 0 },
+    val analyticsAggregateHourlyCounts: List<Int> = List(12) { 0 },
     val weeklyRingProgress: Float = 0f,
     val weeklyRingCompleted: Int = 0,
     val weeklyRingScheduled: Int = 0,
@@ -166,10 +177,7 @@ data class HabitUiState(
     val plan: SubscriptionPlan = SubscriptionPlan.FREE,
     val themeMode: AppThemeMode = AppThemeMode.SYSTEM,
     val language: AppLanguage = AppLanguage.RU,
-    val notificationsEnabled: Boolean = true,
     val minimumCompletionPercent: Int = 100,
-    val defaultReminderHour: Int = 8,
-    val defaultReminderMinute: Int = 0,
     val durationTimerRunning: Boolean = false,
     val durationTimerElapsedSeconds: Int = 0,
     val onboardingCompleted: Boolean = false,
@@ -264,26 +272,6 @@ class MainViewModel(
         viewModelScope.launch {
             repository.setLanguage(language)
             refresh()
-        }
-    }
-
-    fun setNotificationsEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            repository.setNotificationsEnabled(enabled)
-            reminderScheduler.syncAllReminders()
-            _state.update { it.copy(notificationsEnabled = enabled) }
-        }
-    }
-
-    fun setDefaultReminder(hour: Int, minute: Int) {
-        viewModelScope.launch {
-            repository.setDefaultReminder(hour, minute)
-            _state.update {
-                it.copy(
-                    defaultReminderHour = hour.coerceIn(0, 23),
-                    defaultReminderMinute = minute.coerceIn(0, 59)
-                )
-            }
         }
     }
 
@@ -451,8 +439,8 @@ class MainViewModel(
 
     fun openCreateTask(prefill: TaskEditorPrefill? = null) {
         val now = LocalDate.now()
-        val reminderHour = prefill?.reminderHour ?: _state.value.defaultReminderHour
-        val reminderMinute = prefill?.reminderMinute ?: _state.value.defaultReminderMinute
+        val reminderHour = prefill?.reminderHour ?: DEFAULT_REMINDER_HOUR
+        val reminderMinute = prefill?.reminderMinute ?: DEFAULT_REMINDER_MINUTE
         val startDate = prefill?.startDate ?: now
         val endDate = prefill?.endDate?.takeIf { !it.isBefore(startDate) }
         val normalizedTrackingType = prefill?.trackingType ?: TrackingType.YES_NO
@@ -760,11 +748,6 @@ class MainViewModel(
     fun saveEditorWithNotificationsEnabled() {
         val payload = editorSavePayloadOrNull() ?: return
         viewModelScope.launch {
-            if (!repository.getNotificationsEnabled()) {
-                repository.setNotificationsEnabled(true)
-                reminderScheduler.syncAllReminders()
-                _state.update { it.copy(notificationsEnabled = true) }
-            }
             persistEditor(payload)
         }
     }
@@ -949,10 +932,7 @@ class MainViewModel(
             val plan = repository.getPlan()
             val themeMode = repository.getThemeMode()
             val language = repository.getLanguage()
-            val notificationsEnabled = repository.getNotificationsEnabled()
             val minimumCompletionPercent = repository.getMinimumCompletionPercent()
-            val defaultReminderHour = repository.getDefaultReminderHour()
-            val defaultReminderMinute = repository.getDefaultReminderMinute()
             val onboardingCompleted = repository.isOnboardingCompleted()
 
             val selectedId = _state.value.selectedTaskId
@@ -1016,6 +996,24 @@ class MainViewModel(
             }
             val heroRolling7Snapshot = buildHeroRolling7Snapshot(selectedTask, metricsAnchorDate)
             val weekdayConsistency = selectedTask?.let { repository.weekdayConsistency(it, 84, metricsAnchorDate) } ?: List(7) { 0 }
+            val selectedWeekSummaries = selectedTask?.let { task ->
+                repository.getWeekSummaries(listOf(task), weeksBack = 3)
+            } ?: emptyList()
+            val aggregateWeekSummaries = repository.getWeekSummaries(tasks, weeksBack = 3)
+            val selectedHourlyCounts = selectedTask?.let { task ->
+                repository.getHourlyCompletionData(listOf(task), days = 30).toList()
+            } ?: List(12) { 0 }
+            val aggregateHourlyCounts = repository.getHourlyCompletionData(tasks, days = 30).toList()
+            val aggregateCompletionRate7Day = (repository.aggregateCompletionRate(tasks, 7) * 100f)
+                .roundToInt()
+                .coerceIn(0, 100)
+            val aggregateCompletionRate30Day = (repository.aggregateCompletionRate(tasks, 30) * 100f)
+                .roundToInt()
+                .coerceIn(0, 100)
+            val aggregateWeekdayConsistency = repository.aggregateWeekdayConsistency(tasks, 84).toList()
+            val aggregateTotalCompletions = tasks.sumOf { task -> repository.totalCompletions(task) }
+            val aggregateCurrentStreak = tasks.maxOfOrNull { task -> repository.calculateStreak(task) } ?: 0
+            val aggregateBestStreak = tasks.maxOfOrNull { task -> repository.bestStreak(task) } ?: 0
             val consistencyNonZero = weekdayConsistency
                 .mapIndexed { index, value -> index to value }
                 .filter { (_, value) -> value > 0 }
@@ -1099,6 +1097,16 @@ class MainViewModel(
                     selectedTaskNote = selectedTask?.let { repository.getTaskNote(it.id) }.orEmpty(),
                     completionRate7Day = selectedTask?.let { repository.completionRate(it, 7, metricsAnchorDate) } ?: 0,
                     completionRate30Day = selectedTask?.let { repository.completionRate(it, 30, metricsAnchorDate) } ?: 0,
+                    analyticsAggregateCompletionRate7Day = aggregateCompletionRate7Day,
+                    analyticsAggregateCompletionRate30Day = aggregateCompletionRate30Day,
+                    analyticsAggregateTotalCompletions = aggregateTotalCompletions,
+                    analyticsAggregateCurrentStreak = aggregateCurrentStreak,
+                    analyticsAggregateBestStreak = aggregateBestStreak,
+                    analyticsAggregateWeekdayConsistency = aggregateWeekdayConsistency,
+                    analyticsSelectedWeekSummaries = selectedWeekSummaries,
+                    analyticsAggregateWeekSummaries = aggregateWeekSummaries,
+                    analyticsSelectedHourlyCounts = selectedHourlyCounts,
+                    analyticsAggregateHourlyCounts = aggregateHourlyCounts,
                     weeklyRingProgress = heroRolling7Snapshot.progress,
                     weeklyRingCompleted = heroRolling7Snapshot.completedScheduled,
                     weeklyRingScheduled = heroRolling7Snapshot.scheduledCount,
@@ -1131,10 +1139,7 @@ class MainViewModel(
                     plan = plan,
                     themeMode = themeMode,
                     language = language,
-                    notificationsEnabled = notificationsEnabled,
                     minimumCompletionPercent = minimumCompletionPercent,
-                    defaultReminderHour = defaultReminderHour,
-                    defaultReminderMinute = defaultReminderMinute,
                     onboardingCompleted = onboardingCompleted,
                     isLoaded = true,
                     completedPromptTaskId = completedPromptTask?.id,
@@ -1202,6 +1207,24 @@ class MainViewModel(
         }
         val heroRolling7Snapshot = buildHeroRolling7Snapshot(selectedTask, metricsAnchorDate)
         val weekdayConsistency = selectedTask?.let { repository.weekdayConsistency(it, 84, metricsAnchorDate) } ?: List(7) { 0 }
+        val selectedWeekSummaries = selectedTask?.let { task ->
+            repository.getWeekSummaries(listOf(task), weeksBack = 3)
+        } ?: emptyList()
+        val aggregateWeekSummaries = repository.getWeekSummaries(current.tasks, weeksBack = 3)
+        val selectedHourlyCounts = selectedTask?.let { task ->
+            repository.getHourlyCompletionData(listOf(task), days = 30).toList()
+        } ?: List(12) { 0 }
+        val aggregateHourlyCounts = repository.getHourlyCompletionData(current.tasks, days = 30).toList()
+        val aggregateCompletionRate7Day = (repository.aggregateCompletionRate(current.tasks, 7) * 100f)
+            .roundToInt()
+            .coerceIn(0, 100)
+        val aggregateCompletionRate30Day = (repository.aggregateCompletionRate(current.tasks, 30) * 100f)
+            .roundToInt()
+            .coerceIn(0, 100)
+        val aggregateWeekdayConsistency = repository.aggregateWeekdayConsistency(current.tasks, 84).toList()
+        val aggregateTotalCompletions = current.tasks.sumOf { task -> repository.totalCompletions(task) }
+        val aggregateCurrentStreak = current.tasks.maxOfOrNull { task -> repository.calculateStreak(task) } ?: 0
+        val aggregateBestStreak = current.tasks.maxOfOrNull { task -> repository.bestStreak(task) } ?: 0
         val consistencyNonZero = weekdayConsistency
             .mapIndexed { index, value -> index to value }
             .filter { (_, value) -> value > 0 }
@@ -1259,6 +1282,16 @@ class MainViewModel(
                 completionConsistency = completionConsistency,
                 completionRate7Day = selectedTask?.let { repository.completionRate(it, 7, metricsAnchorDate) } ?: 0,
                 completionRate30Day = selectedTask?.let { repository.completionRate(it, 30, metricsAnchorDate) } ?: 0,
+                analyticsAggregateCompletionRate7Day = aggregateCompletionRate7Day,
+                analyticsAggregateCompletionRate30Day = aggregateCompletionRate30Day,
+                analyticsAggregateTotalCompletions = aggregateTotalCompletions,
+                analyticsAggregateCurrentStreak = aggregateCurrentStreak,
+                analyticsAggregateBestStreak = aggregateBestStreak,
+                analyticsAggregateWeekdayConsistency = aggregateWeekdayConsistency,
+                analyticsSelectedWeekSummaries = selectedWeekSummaries,
+                analyticsAggregateWeekSummaries = aggregateWeekSummaries,
+                analyticsSelectedHourlyCounts = selectedHourlyCounts,
+                analyticsAggregateHourlyCounts = aggregateHourlyCounts,
                 weeklyRingProgress = heroRolling7Snapshot.progress,
                 weeklyRingCompleted = heroRolling7Snapshot.completedScheduled,
                 weeklyRingScheduled = heroRolling7Snapshot.scheduledCount,
@@ -1493,5 +1526,7 @@ class MainViewModel(
 
     companion object {
         private const val FREE_ACTIVE_HABIT_LIMIT = 1
+        private const val DEFAULT_REMINDER_HOUR = 8
+        private const val DEFAULT_REMINDER_MINUTE = 0
     }
 }

@@ -16,7 +16,6 @@ import com.example.microhabit.MainActivity
 import com.example.microhabit.data.HabitRepository
 import com.example.microhabit.data.HabitTask
 import com.example.microhabit.data.TaskFrequency
-import com.example.microhabit.i18n.formatTranslate
 import com.example.microhabit.i18n.translate
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -34,20 +33,16 @@ class HabitReminderScheduler(
         val language = repository.getLanguage()
         val channel = NotificationChannel(
             CHANNEL_ID,
-            translate(language, "Habit reminders channel"),
+            translate(language, "Habit reminders"),
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
-            description = translate(language, "Daily reminders channel description")
+            description = translate(language, "Daily habit reminders")
         }
         notificationManager.createNotificationChannel(channel)
     }
 
     fun syncAllReminders() {
         val tasks = repository.getTasks()
-        if (!repository.getNotificationsEnabled()) {
-            tasks.forEach { cancelReminder(it.id) }
-            return
-        }
         tasks.forEach { task ->
             if (!repository.isHabitActive(task) || !task.reminderEnabled) {
                 cancelReminder(task.id)
@@ -59,7 +54,7 @@ class HabitReminderScheduler(
 
     fun syncReminderForTask(taskId: String) {
         val task = repository.getTasks().firstOrNull { it.id == taskId }
-        if (task == null || !repository.isHabitActive(task) || !task.reminderEnabled || !repository.getNotificationsEnabled()) {
+        if (task == null || !repository.isHabitActive(task) || !task.reminderEnabled) {
             cancelReminder(taskId)
             return
         }
@@ -75,7 +70,7 @@ class HabitReminderScheduler(
 
     fun onReminderTriggered(taskId: String) {
         val task = repository.getTasks().firstOrNull { it.id == taskId }
-        if (task == null || !repository.isHabitActive(task) || !task.reminderEnabled || !repository.getNotificationsEnabled()) {
+        if (task == null || !repository.isHabitActive(task) || !task.reminderEnabled) {
             cancelReminder(taskId)
             return
         }
@@ -152,14 +147,15 @@ class HabitReminderScheduler(
             notificationId(task.id),
             Intent(context, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                putExtra(EXTRA_OPEN_HABIT_ID, task.id)
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_popup_reminder)
-            .setContentTitle(translate(language, "Habit reminder"))
-            .setContentText(formatTranslate(language, "Time to complete: %s", task.title))
+            .setContentTitle("${task.emoji.ifBlank { "" }} ${task.title}".trim())
+            .setContentText(translate(language, "Time to complete your habit!"))
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setContentIntent(contentIntent)
@@ -188,11 +184,12 @@ class HabitReminderScheduler(
 
     private fun reminderRequestCode(taskId: String): Int = taskId.hashCode()
 
-    private fun notificationId(taskId: String): Int = 100_000 + taskId.hashCode()
+    private fun notificationId(taskId: String): Int = taskId.hashCode()
 
     companion object {
         const val ACTION_REMINDER = "com.example.microhabit.ACTION_REMINDER"
         const val EXTRA_TASK_ID = "extra_task_id"
+        const val EXTRA_OPEN_HABIT_ID = "extra_open_habit_id"
         private const val CHANNEL_ID = "habit_reminders"
 
         fun hasNotificationPermission(context: Context): Boolean {

@@ -253,6 +253,8 @@ internal const val HABIT_TRANSITION_MS = 220
 internal val HABIT_EASING: Easing = EaseInOutQuart
 internal const val DOTS_SPRING_DAMPING = 0.7f
 internal const val DOTS_SPRING_STIFFNESS = 500f
+private const val DEFAULT_REMINDER_HOUR = 8
+private const val DEFAULT_REMINDER_MINUTE = 0
 // ──────────────────────────────────────────────────────────────────────────────
 
 private enum class AppPage {
@@ -272,7 +274,6 @@ private enum class BillingCycle {
 }
 
 private enum class NotificationPermissionAction {
-    ENABLE_REMINDERS,
     SAVE_EDITOR_REMINDER,
     PICK_TEMPLATE_REMINDER_TIME
 }
@@ -404,7 +405,6 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
     val is24HourView = android.text.format.DateFormat.is24HourFormat(context)
     val runActionWithNotifications = { action: NotificationPermissionAction ->
         when (action) {
-            NotificationPermissionAction.ENABLE_REMINDERS -> vm.setNotificationsEnabled(true)
             NotificationPermissionAction.SAVE_EDITOR_REMINDER -> vm.saveEditorWithNotificationsEnabled()
             NotificationPermissionAction.PICK_TEMPLATE_REMINDER_TIME -> {
                 pendingTemplateReminderPicker?.invoke()
@@ -418,9 +418,6 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
         if (action == NotificationPermissionAction.PICK_TEMPLATE_REMINDER_TIME) {
             pendingTemplateReminderPicker = null
         }
-        if (state.notificationsEnabled) {
-            vm.setNotificationsEnabled(false)
-        }
         showNotificationsBlockedDialog = true
     }
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
@@ -433,15 +430,6 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
             if (action != null) runActionWithNotifications(action)
         } else {
             showNotificationsBlocked(action)
-        }
-    }
-
-    LaunchedEffect(state.notificationsEnabled) {
-        if (
-            state.notificationsEnabled &&
-            !HabitReminderScheduler.canDeliverNotifications(context)
-        ) {
-            vm.setNotificationsEnabled(false)
         }
     }
 
@@ -473,6 +461,18 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
         selectedTemplateId = null
         templateDraft = null
         showTemplatePicker = true
+    }
+
+    LaunchedEffect(state.isLoaded, state.tasks, state.allTasks) {
+        val activity = context.findActivity() ?: return@LaunchedEffect
+        val openHabitId = activity.intent?.getStringExtra(HabitReminderScheduler.EXTRA_OPEN_HABIT_ID)
+            ?: return@LaunchedEffect
+        activity.intent?.removeExtra(HabitReminderScheduler.EXTRA_OPEN_HABIT_ID)
+        if (state.tasks.any { it.id == openHabitId }) {
+            vm.selectTask(openHabitId)
+        }
+        previousPage = AppPage.TRACKER
+        page = AppPage.TRACKER
     }
 
     DisposableEffect(lifecycleOwner, pendingSettingsAction) {
@@ -793,14 +793,6 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                             state = state,
                             onSetTheme = vm::setThemeMode,
                             onSetLanguage = vm::setLanguage,
-                            onSetNotificationsEnabled = { enabled ->
-                                if (!enabled) {
-                                    vm.setNotificationsEnabled(false)
-                                } else {
-                                    ensureNotificationPermissionAndRun(NotificationPermissionAction.ENABLE_REMINDERS)
-                                }
-                            },
-                            onSetDefaultReminder = vm::setDefaultReminder,
                             onSetMinimumCompletionPercent = vm::setMinimumCompletionPercent,
                             onOpenPaywall = {
                                 previousPage = AppPage.SETTINGS
@@ -877,8 +869,8 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                                 timesPerWeek = template.defaultTimesPerWeek.coerceIn(1, 7),
                                 startDate = LocalDate.now(),
                                 reminderEnabled = false,
-                                reminderHour = state.defaultReminderHour,
-                                reminderMinute = state.defaultReminderMinute
+                                reminderHour = DEFAULT_REMINDER_HOUR,
+                                reminderMinute = DEFAULT_REMINDER_MINUTE
                             )
                         },
                         onCreateCustomHabit = {
@@ -914,8 +906,8 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                             timesPerWeek = selectedTemplate.defaultTimesPerWeek.coerceIn(1, 7),
                             startDate = LocalDate.now(),
                             reminderEnabled = false,
-                            reminderHour = state.defaultReminderHour,
-                            reminderMinute = state.defaultReminderMinute
+                            reminderHour = DEFAULT_REMINDER_HOUR,
+                            reminderMinute = DEFAULT_REMINDER_MINUTE
                         )
                         templateDraft = currentDraft
                         HabitTemplateConfirmScreen(
@@ -1869,8 +1861,14 @@ private fun HabitDetailPage(
                     )
                 }
                 item {
+                    val notePlaceholder = when {
+                        state.todayDone -> t("notes_placeholder_done")
+                        state.todayScheduled && !state.todayDone -> t("notes_placeholder_missed")
+                        else -> t("notes_placeholder_default")
+                    }
                     HabitNotesCard(
                         note = noteDraft,
+                        placeholder = notePlaceholder,
                         onNoteChange = { value ->
                             noteDraft = value
                             vm.setSelectedTaskNote(value)
@@ -2150,9 +2148,8 @@ private fun HabitStreakHistoryCard(
 ) {
     val spacing = AppTheme.spacing
     val semantic = AppTheme.colors
-    val previous = remember(bestStreak, history) {
-        val normalized = history.filter { it > 0 }.sortedDescending()
-        if (normalized.firstOrNull() == bestStreak) normalized.drop(1).take(3) else normalized.take(3)
+    val previous = remember(history) {
+        history.filter { it > 0 }.take(3)
     }
 
     GlassCard(contentPadding = PaddingValues(spacing.x2)) {
@@ -2258,6 +2255,7 @@ private fun HabitInsightsCard(
 @Composable
 private fun HabitNotesCard(
     note: String,
+    placeholder: String,
     onNoteChange: (String) -> Unit,
     onSave: () -> Unit
 ) {
@@ -2278,7 +2276,7 @@ private fun HabitNotesCard(
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 2,
                 maxLines = 4,
-                label = { Text(t("Why did you miss today?")) },
+                label = { Text(placeholder) },
                 supportingText = {
                     Text(
                         text = "${note.length}/180",
@@ -2888,8 +2886,6 @@ private fun SettingsPage(
     state: HabitUiState,
     onSetTheme: (AppThemeMode) -> Unit,
     onSetLanguage: (AppLanguage) -> Unit,
-    onSetNotificationsEnabled: (Boolean) -> Unit,
-    onSetDefaultReminder: (Int, Int) -> Unit,
     onSetMinimumCompletionPercent: (Int) -> Unit,
     onOpenPaywall: () -> Unit,
     onExportData: () -> Result<String>,
@@ -2937,32 +2933,6 @@ private fun SettingsPage(
                     title = t("Language"),
                     value = languageNativeLabel(state.language),
                     onClick = { showLanguageDialog = true }
-                )
-            }
-        }
-
-        item {
-            SettingsGroup(title = t("Notifications")) {
-                SettingsSwitchRow(
-                    title = t("Enable reminders"),
-                    checked = state.notificationsEnabled,
-                    onCheckedChange = onSetNotificationsEnabled
-                )
-                SettingsDivider()
-                SettingsRow(
-                    title = t("Reminder time"),
-                    value = formatTimeForDevice(context, state.defaultReminderHour, state.defaultReminderMinute),
-                    enabled = state.notificationsEnabled,
-                    onClick = {
-                        val is24HourView = android.text.format.DateFormat.is24HourFormat(context)
-                        TimePickerDialog(
-                            context,
-                            { _, hour, minute -> onSetDefaultReminder(hour, minute) },
-                            state.defaultReminderHour,
-                            state.defaultReminderMinute,
-                            is24HourView
-                        ).show()
-                    }
                 )
             }
         }
@@ -3493,11 +3463,11 @@ private fun OnboardingWizard(
     var frequency by rememberSaveable { mutableStateOf(TaskFrequency.DAILY) }
     var customDays by rememberSaveable { mutableStateOf(listOf(1, 2, 3, 4, 5)) }
     var reminderEnabled by rememberSaveable { mutableStateOf(false) }
-    var reminderHour by rememberSaveable(state.defaultReminderHour, state.defaultReminderMinute) {
-        mutableStateOf(state.defaultReminderHour)
+    var reminderHour by rememberSaveable {
+        mutableStateOf(DEFAULT_REMINDER_HOUR)
     }
-    var reminderMinute by rememberSaveable(state.defaultReminderHour, state.defaultReminderMinute) {
-        mutableStateOf(state.defaultReminderMinute)
+    var reminderMinute by rememberSaveable {
+        mutableStateOf(DEFAULT_REMINDER_MINUTE)
     }
     var miniCalendarFill by remember(step) { mutableStateOf(0) }
     var templateRevealCount by remember(step, selectedCategory) { mutableStateOf(0) }

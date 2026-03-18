@@ -139,9 +139,12 @@
 - `completionRate(days)`:
   - для `TIMES_PER_WEEK`: target масштабируется по effective days.
   - для остальных: completed/scheduled.
+- aggregate completion rate в режиме `All habits` считается как `sum(completed scheduled days) / sum(scheduled days)` по окну дней (без эвристик).
 - Для `COUNT` и `DURATION` completed-дни в аналитике определяются через `minimumCompletionPercent`.
 - `progressPercentForWidget` возвращает 0 для not scheduled.
 - `totalCompletions` считает до `min(today, endDate)` для конечных привычек.
+- `Week over week` в аналитике использует реальные недельные срезы (ISO Пн–Вс), где и числитель, и знаменатель формируются через `isScheduledOn`/`isCompletedOn`.
+- `Best time of day` строится по фактическим completion timestamps (`habit_done_time_*`) за последние 30 дней; если данных нет, блок скрывается.
 - Manual override на not scheduled дате сохраняет day value/mark, но не меняет schedule-статус даты; scheduled-only метрики остаются основанными на `isScheduledOn`.
 
 ## 10. Habit End Date and Completion Flow
@@ -258,6 +261,10 @@ Future scope (не часть текущего канонического пов
   - streak + weekly completion,
   - level block,
   - analytics/insights/notes.
+- Placeholder в заметках контекстный:
+  - completed today → «Как прошло сегодня?»;
+  - scheduled + not completed today → «Почему пропустил сегодня?»;
+  - иначе → «Заметки о привычке».
 
 ### 12.3 Habits List
 - Разделы:
@@ -375,7 +382,6 @@ Unit label UX для `COUNT`:
 - Группы настроек:
   - `Appearance` (Theme),
   - `Language`,
-  - `Notifications` (enable reminders + reminder time),
   - `Tracking` (completion threshold),
   - `Subscription` (manage subscription),
   - `Data` (export data, reset progress),
@@ -400,30 +406,35 @@ Unit label UX для `COUNT`:
   - 70% вклад `completion30`,
   - 30% вклад отношения `currentStreak / bestStreak`,
   - итог клампится в диапазон `0..100`.
+- В режиме `All habits`:
+  - `7-day rate`/`30-day rate` считаются по aggregate scheduled/completed данным из Repository;
+  - `Weekday consistency` использует абсолютные weekday percentages (без max-нормализации формы);
+  - `Week over week` показывает реальные `completed/scheduled` для трёх последних недель.
+- Подпись в score card не показывает числовой pseudo-delta (`+N pts this week`) и не выдаёт synthetic значение за реальную score-дельту.
 
 ## 13. Reminder System
 Источник: `notifications/HabitReminderScheduler.kt`.
 
 Правила:
 - Локальные уведомления через `AlarmManager`.
-- Напоминания планируются только если:
-  - notifications enabled;
+- Напоминания планируются per-habit только если:
   - task active (`isHabitActive`);
-  - reminderEnabled.
+  - reminderEnabled в самой привычке.
+- Глобальный reminder-toggle и global reminder-time в Settings отсутствуют.
+- Идентификаторы alarm/notification уникальны для каждой привычки (`task.id.hashCode()`), поэтому привычки с разным временем не перезаписывают друг друга.
 - Permission / delivery gate:
-  - перед выполнением reminder-действий (включение reminders в Settings, сохранение Create/Edit с reminder, создание из onboarding с reminder, выбор reminder-time в template confirm flow) UI проверяет доступность доставки (`canDeliverNotifications`) и runtime permission (`POST_NOTIFICATIONS`, где применимо);
+  - перед выполнением reminder-действий (сохранение Create/Edit с reminder, создание из onboarding с reminder, выбор reminder-time в template confirm flow) UI проверяет доступность доставки (`canDeliverNotifications`) и runtime permission (`POST_NOTIFICATIONS`, где применимо);
   - если доставка уже доступна, действие выполняется сразу.
 - Denied / blocked flow:
   - при отказе в permission или системной блокировке уведомлений показывается диалог с предложением перейти в Settings (`Open Settings`);
   - используется redirect в notification settings, с fallback в app details settings.
 - Resume / retry:
   - при возврате из Settings и восстановлении доступности доставки pending reminder-action автоматически повторяется.
-- Consistency safeguard:
-  - если app state хранит `notifications enabled = true`, но OS больше не разрешает доставку (`canDeliverNotifications = false`), глобальный флаг уведомлений сбрасывается в `false`.
 - Для задач с `endDate`:
   - после последнего допустимого reminder-времени напоминание отменяется;
   - `shouldRemindOn` учитывает start/end date.
 - При изменении/архиве/удалении sync/cancel выполняется через ViewModel.
+- После reboot/package replace reminders пересинхронизируются через `HabitReminderRescheduleReceiver`.
 - UI:
   - в Habits list карточки показывают статус напоминания (`Reminder: time` / `Reminder off`);
   - отображение времени напоминания использует формат устройства (12h/24h).
@@ -454,8 +465,9 @@ Unit label UX для `COUNT`:
 - Runtime-данные приложения хранятся локально в `SharedPreferences` (файл `habit_prefs`).
 - Привычки хранятся в ключе `tasks_json` как JSON-массив задач.
 - Прогресс по дням хранится ключами `done_...` и `value_...`.
+- Timestamp фактического completion-action хранится ключами `habit_done_time_<taskId>_<date>` (epoch seconds).
 - Связанные данные привычки (notes, streak saver, saved missed dates, completed prompt marker) хранятся отдельными pref-ключами с префиксами.
-- Пользовательские настройки (plan, theme, language, notifications, default reminder, onboarding, minimum completion percent, selected task) также хранятся в тех же `SharedPreferences`.
+- Пользовательские настройки (plan, theme, language, onboarding, minimum completion percent, selected task) также хранятся в тех же `SharedPreferences`.
 
 ### 15.2 Derived Analytics
 - Аналитика и статистики не хранятся отдельной БД/таблицей.
@@ -485,6 +497,7 @@ Unit label UX для `COUNT`:
 При удалении привычки удаляются:
 - сама запись задачи;
 - day progress keys (`done_...`, `value_...`);
+- completion time keys (`habit_done_time_...`);
 - notes;
 - streak saver data;
 - saved missed dates;

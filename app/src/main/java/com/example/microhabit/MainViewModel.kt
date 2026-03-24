@@ -935,6 +935,10 @@ class MainViewModel(
         return true
     }
 
+    fun onHostResumed() {
+        refresh()
+    }
+
     private fun refresh() {
         viewModelScope.launch {
             val allTasks = repository.getTasks()

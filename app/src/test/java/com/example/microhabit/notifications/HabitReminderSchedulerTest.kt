@@ -41,7 +41,6 @@ class HabitReminderSchedulerTest {
 
     @Test
     fun syncAllReminders_schedulesOnlyActiveAndEnabledTasks() {
-        repository.setNotificationsEnabled(true)
         val activeEnabled = createTask("Active enabled", reminderEnabled = true, endDate = null)
         createTask("Active disabled", reminderEnabled = false, endDate = null)
         createTask("Completed enabled", reminderEnabled = true, endDate = LocalDate.now().minusDays(1))
@@ -54,20 +53,18 @@ class HabitReminderSchedulerTest {
     }
 
     @Test
-    fun syncAllReminders_whenNotificationsDisabled_cancelsEverything() {
-        repository.setNotificationsEnabled(true)
-        createTask("Active enabled", reminderEnabled = true, endDate = null)
+    fun syncAllReminders_afterArchive_cancelsArchivedTaskReminder() {
+        val task = createTask("Archive via syncAll", reminderEnabled = true, endDate = null)
         scheduler.syncAllReminders()
-        assertFalse(scheduledTaskIds().isEmpty())
+        assertTrue(scheduledTaskIds().contains(task.id))
 
-        repository.setNotificationsEnabled(false)
+        repository.archiveTask(task.id, true)
         scheduler.syncAllReminders()
-        assertTrue(scheduledTaskIds().isEmpty())
+        assertFalse(scheduledTaskIds().contains(task.id))
     }
 
     @Test
     fun syncReminderForTask_endDateWithPastReminderTime_isCancelled() {
-        repository.setNotificationsEnabled(true)
         val todayTask = createTask(
             title = "Ends today at midnight",
             reminderEnabled = true,
@@ -82,7 +79,6 @@ class HabitReminderSchedulerTest {
 
     @Test
     fun syncReminderForTask_archivedTask_isCancelled() {
-        repository.setNotificationsEnabled(true)
         val task = createTask("Archive me", reminderEnabled = true, endDate = null)
         scheduler.syncReminderForTask(task.id)
         assertTrue(scheduledTaskIds().contains(task.id))
@@ -94,7 +90,6 @@ class HabitReminderSchedulerTest {
 
     @Test
     fun syncReminderForTask_reminderDisabledAfterScheduling_cancelsReminder() {
-        repository.setNotificationsEnabled(true)
         val task = createTask("Toggle reminder", reminderEnabled = true, endDate = null)
         scheduler.syncReminderForTask(task.id)
         assertTrue(scheduledTaskIds().contains(task.id))
@@ -122,7 +117,6 @@ class HabitReminderSchedulerTest {
 
     @Test
     fun syncReminderForTask_startDateInFuture_schedulesNotEarlierThanStartDate() {
-        repository.setNotificationsEnabled(true)
         val futureStart = LocalDate.now().plusDays(2)
         val task = createTask(
             title = "Future start",
@@ -143,7 +137,6 @@ class HabitReminderSchedulerTest {
 
     @Test
     fun syncReminderForTask_selectedDaysWithoutCustomDays_doesNotSchedule() {
-        repository.setNotificationsEnabled(true)
         val task = createTask(
             title = "No selected days",
             reminderEnabled = true,

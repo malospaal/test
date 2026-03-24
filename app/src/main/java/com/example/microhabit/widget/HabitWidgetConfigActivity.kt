@@ -54,6 +54,9 @@ class HabitWidgetConfigActivity : ComponentActivity() {
         val dataProvider = WidgetDataProvider(this)
         val isProUser = dataProvider.isProUser()
         val activeHabits = dataProvider.getActiveHabits()
+        WidgetDebugLog.d(
+            "ConfigActivity onCreate appWidgetId=$appWidgetId isPro=$isProUser activeHabits=${activeHabits.size}"
+        )
 
         if (!isProUser) {
             setContent {
@@ -92,8 +95,9 @@ class HabitWidgetConfigActivity : ComponentActivity() {
     }
 
     private fun bindHabitAndFinish(habitId: String) {
+        WidgetDebugLog.d("ConfigActivity bindHabit appWidgetId=$appWidgetId habitId=$habitId")
         WidgetBindingStore.setHabitId(this, appWidgetId, habitId)
-        HabitWidgetReceiver.refreshAll(this)
+        WidgetUpdateTrigger.triggerUpdate(this)
         HabitWidgetUpdateScheduler.scheduleWidgetUpdates(this)
         val result = Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
         setResult(RESULT_OK, result)

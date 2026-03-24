@@ -236,6 +236,9 @@ import com.example.microhabit.ui.calendar.BreakdownCard
 import com.example.microhabit.ui.tracker.HabitPageDots
 import com.example.microhabit.ui.theme.AppTheme
 import com.example.microhabit.ui.theme.MicroHabitTheme
+import com.example.microhabit.widget.HabitWidgetUpdateScheduler
+import com.example.microhabit.widget.WidgetDebugLog
+import com.example.microhabit.widget.WidgetUpdateTrigger
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
@@ -366,6 +369,7 @@ class MainActivity : ComponentActivity() {
         val reminderScheduler = HabitReminderScheduler(applicationContext, repository)
         reminderScheduler.ensureNotificationChannel()
         reminderScheduler.syncAllReminders()
+        HabitWidgetUpdateScheduler.scheduleWidgetUpdates(applicationContext)
 
         setContent {
             val vm: MainViewModel = viewModel(
@@ -379,6 +383,12 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        WidgetDebugLog.d("MainActivity.onResume trigger widget refresh")
+        WidgetUpdateTrigger.triggerUpdate(this)
     }
 }
 
@@ -501,6 +511,9 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
 
     DisposableEffect(lifecycleOwner, pendingSettingsAction) {
         val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                vm.onHostResumed()
+            }
             if (
                 event == Lifecycle.Event.ON_RESUME &&
                 pendingSettingsAction != null &&
@@ -6074,6 +6087,7 @@ private fun ValueNumpad(
             }
         }
     }
+
 }
 
 @Composable
@@ -7093,6 +7107,7 @@ private fun HabitCategoryScreen(
             }
         }
     }
+
 }
 
 @Composable

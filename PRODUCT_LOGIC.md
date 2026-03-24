@@ -441,10 +441,13 @@ Unit label UX для `COUNT`:
 - Кнопка `Mark done` в виджете:
   - `YES_NO` -> ставит значение дня `1`,
   - `COUNT`/`DURATION` -> ставит значение дня в `dailyTarget`,
+  - если день уже отмечен в виджете (`Completed`) повторный tap снимает отметку (`value = 0`) — toggle-поведение доступно в обоих состояниях кнопки;
+  - для not scheduled дня состояние кнопки в виджете определяется по `day value > 0` (manual override), а не только по `isCompletedOn`;
   - после действия виджет обновляется без обязательного открытия приложения.
 - Обновление виджета выполняется:
-  - при изменениях данных в приложении (через `refreshWidget()`),
-  - периодически через WorkManager (15 минут, `KEEP` policy).
+  - немедленно при изменениях данных в приложении (через `refreshWidget()` / `WidgetUpdateTrigger`);
+  - при возврате приложения в foreground (`MainActivity.onResume`);
+  - в полночь через `MidnightWidgetWorker` (one-time schedule с переносом на следующую полночь).
 
 ## 13. Reminder System
 Источник: `notifications/HabitReminderScheduler.kt`.

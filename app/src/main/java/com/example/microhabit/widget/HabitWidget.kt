@@ -1,12 +1,15 @@
 package com.example.microhabit.widget
 
 import android.content.Context
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
+import androidx.glance.LocalState
 import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionParametersOf
 import androidx.glance.action.actionStartActivity
@@ -16,7 +19,7 @@ import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.action.ActionCallback
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.provideContent
-import androidx.glance.appwidget.updateAll
+import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.background
 import androidx.glance.color.ColorProvider
 import androidx.glance.layout.Alignment
@@ -33,6 +36,7 @@ import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
+import androidx.glance.state.PreferencesGlanceStateDefinition
 import com.example.microhabit.MainActivity
 import com.example.microhabit.data.HabitRepository
 import com.example.microhabit.data.TrackingType
@@ -45,17 +49,26 @@ internal enum class WidgetLayoutSize {
 }
 
 internal val HabitIdParamKey = ActionParameters.Key<String>("habitId")
+internal val WidgetRefreshNonceKey = longPreferencesKey("widget_refresh_nonce")
 
 internal open class HabitWidget(
     private val layoutSize: WidgetLayoutSize
 ) : GlanceAppWidget() {
+    override val stateDefinition = PreferencesGlanceStateDefinition
+
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
-        val dataProvider = WidgetDataProvider(context)
-        val habitId = WidgetBindingStore.getHabitId(context, appWidgetId)
-        val data = dataProvider.getWidgetData(habitId)
 
         provideContent {
+            val statePrefs = (LocalState.current as? Preferences)
+            val nonce = statePrefs?.get(WidgetRefreshNonceKey) ?: 0L
+            val dataProvider = WidgetDataProvider(context)
+            val habitId = WidgetBindingStore.getHabitId(context, appWidgetId)
+            val data = dataProvider.getWidgetData(habitId)
+            WidgetDebugLog.d(
+                "provideContent size=$layoutSize appWidgetId=$appWidgetId boundHabitId=$habitId " +
+                    "resolvedHabitId=${data.habitId} isCompletedToday=${data.isCompletedToday} nonce=$nonce"
+            )
             when {
                 !data.isProUser -> ProLockedContent()
                 layoutSize == WidgetLayoutSize.SMALL -> SmallWidgetContent(data)
@@ -76,19 +89,72 @@ class MarkDoneAction : ActionCallback {
         glanceId: GlanceId,
         parameters: ActionParameters
     ) {
-        val habitId = parameters[HabitIdParamKey] ?: return
-        val repository = HabitRepository(context)
-        val task = repository.getTasks().firstOrNull { it.id == habitId } ?: return
-        val today = LocalDate.now()
-        val targetValue = when (task.trackingType) {
-            TrackingType.YES_NO -> 1
-            TrackingType.COUNT, TrackingType.DURATION -> repository.dailyTarget(task)
+        runCatching {
+            val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(glanceId)
+            val paramHabitId = parameters[HabitIdParamKey]
+            val boundHabitId = WidgetBindingStore.getHabitId(context, appWidgetId)
+            val defaultHabitId = WidgetDataProvider(context).defaultHabitId()
+            val habitId = paramHabitId ?: boundHabitId ?: defaultHabitId ?: return
+
+            WidgetDebugLog.d(
+                "onAction start appWidgetId=$appWidgetId paramHabitId=$paramHabitId " +
+                    "boundHabitId=$boundHabitId defaultHabitId=$defaultHabitId resolvedHabitId=$habitId"
+            )
+
+            val repository = HabitRepository(context)
+            val task = repository.getTasks().firstOrNull { it.id == habitId }
+            if (task == null) {
+                WidgetDebugLog.e("onAction abort: task not found for habitId=$habitId")
+                return
+            }
+
+            val today = LocalDate.now()
+            val isScheduledToday = repository.isScheduledOn(task, today)
+            val isDoneToday = if (isScheduledToday) {
+                repository.isCompletedOn(task, today)
+            } else {
+                repository.getDayValue(task, today) > 0
+            }
+            val targetValue = when (task.trackingType) {
+                TrackingType.YES_NO -> 1
+                TrackingType.COUNT, TrackingType.DURATION -> repository.dailyTarget(task)
+            }
+            val newValue = if (isDoneToday) 0 else targetValue
+            WidgetDebugLog.d(
+                "onAction beforeWrite habitId=${task.id} date=$today scheduled=$isScheduledToday " +
+                    "isDoneToday=$isDoneToday targetValue=$targetValue writeValue=$newValue"
+            )
+            repository.setDayValue(task, today, newValue, refreshWidgets = false)
+
+            val postValue = repository.getDayValue(task, today)
+            val postDoneScheduled = repository.isCompletedOn(task, today)
+            val postDoneWidget = if (repository.isScheduledOn(task, today)) {
+                postDoneScheduled
+            } else {
+                postValue > 0
+            }
+            WidgetDebugLog.d(
+                "onAction afterWrite habitId=${task.id} date=$today value=$postValue " +
+                    "isCompletedOn=$postDoneScheduled widgetDoneState=$postDoneWidget"
+            )
+
+            updateAppWidgetState(context, glanceId) { prefs ->
+                prefs[WidgetRefreshNonceKey] = System.currentTimeMillis()
+            }
+            WidgetDebugLog.d("onAction nonce updated glanceId=$glanceId")
+            WidgetUpdateTrigger.updateGlanceId(context, glanceId)
+            WidgetDebugLog.d("onAction updateGlanceId done")
+            WidgetUpdateTrigger.updateAllWidgetInstances(context)
+            WidgetDebugLog.d("onAction updateAllWidgetInstances done")
+            WidgetUpdateTrigger.triggerUpdateViaBroadcast(context)
+            WidgetDebugLog.d("onAction triggerUpdateViaBroadcast done")
+            HabitWidgetUpdateScheduler.triggerNow(context)
+            WidgetDebugLog.d("onAction triggerNow done")
+            HabitWidgetUpdateScheduler.scheduleWidgetUpdates(context)
+            WidgetDebugLog.d("onAction scheduleWidgetUpdates done")
+        }.onFailure { error ->
+            WidgetDebugLog.e("onAction failed", error)
         }
-        repository.setDayValue(task, today, targetValue)
-        SmallHabitWidget().updateAll(context)
-        MediumHabitWidget().updateAll(context)
-        LargeHabitWidget().updateAll(context)
-        HabitWidgetUpdateScheduler.scheduleWidgetUpdates(context)
     }
 }
 
@@ -123,8 +189,7 @@ private fun SmallWidgetContent(data: WidgetHabitData) {
         modifier = GlanceModifier
             .fillMaxSize()
             .background(ColorProvider(day = Color(0xFFF2F7F6), night = Color(0xCC141D1A)))
-            .padding(12.dp)
-            .clickable(actionStartActivity<MainActivity>()),
+            .padding(12.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(data.emoji, style = TextStyle(fontSize = 20.sp))
@@ -332,13 +397,9 @@ private fun MarkButton(
         compact -> 10.sp
         else -> 12.sp
     }
-    val action = if (data.isCompletedToday) {
-        actionStartActivity<MainActivity>()
-    } else {
-        actionRunCallback<MarkDoneAction>(
-            actionParametersOf(HabitIdParamKey to data.habitId)
-        )
-    }
+    val action = actionRunCallback<MarkDoneAction>(
+        actionParametersOf(HabitIdParamKey to data.habitId)
+    )
     Box(
         modifier = GlanceModifier
             .fillMaxWidth()
@@ -348,7 +409,7 @@ private fun MarkButton(
         contentAlignment = Alignment.Center
     ) {
         Text(
-            text = if (data.isCompletedToday) "✓ Completed" else "Mark done",
+            text = if (data.isCompletedToday) "Completed ✓" else "Mark done",
             style = TextStyle(
                 fontSize = textSize,
                 fontWeight = FontWeight.Bold,

@@ -1,8 +1,9 @@
 package com.example.microhabit.data
 
 import android.content.Context
-import com.example.microhabit.widget.HabitWidgetReceiver
 import com.example.microhabit.widget.HabitWidgetUpdateScheduler
+import com.example.microhabit.widget.WidgetDebugLog
+import com.example.microhabit.widget.WidgetUpdateTrigger
 import org.json.JSONArray
 import org.json.JSONObject
 import kotlin.math.ceil
@@ -521,11 +522,20 @@ class HabitRepository(private val context: Context) {
         }
     }
 
-    fun setDayValue(task: HabitTask, date: LocalDate, value: Int) {
+    fun setDayValue(
+        task: HabitTask,
+        date: LocalDate,
+        value: Int,
+        refreshWidgets: Boolean = true
+    ) {
         val previousValue = getDayValue(task, date)
         val wasCompleted = isCompletedByValue(task, previousValue)
         val normalized = value.coerceAtLeast(0)
         val isCompleted = isCompletedByValue(task, normalized)
+        WidgetDebugLog.d(
+            "setDayValue start habitId=${task.id} date=$date prevValue=$previousValue " +
+                "newValue=$normalized wasCompleted=$wasCompleted nowCompleted=$isCompleted"
+        )
         val editor = prefs.edit()
         val valueKey = valueKey(task.id, date)
         if (normalized > 0) {
@@ -543,7 +553,15 @@ class HabitRepository(private val context: Context) {
         } else if (normalized <= 0) {
             editor.remove(completionTimeKey(task.id, date))
         }
-        editor.apply()
+        editor.commit()
+        val persistedValue = getDayValue(task, date)
+        WidgetDebugLog.d(
+            "setDayValue committed habitId=${task.id} date=$date persistedValue=$persistedValue " +
+                "persistedCompleted=${isCompletedOn(task, date)}"
+        )
+        if (refreshWidgets) {
+            refreshWidget()
+        }
     }
 
     fun setDayValue(taskId: String, date: LocalDate, value: Int) {
@@ -1019,8 +1037,9 @@ class HabitRepository(private val context: Context) {
     }
 
     fun refreshWidget() {
+        WidgetDebugLog.d("refreshWidget schedule+trigger")
         HabitWidgetUpdateScheduler.scheduleWidgetUpdates(context)
-        HabitWidgetReceiver.refreshAll(context)
+        WidgetUpdateTrigger.triggerUpdate(context)
     }
 
     private fun parseTaskStartDate(taskId: String, rawValue: String): LocalDate {

@@ -42,12 +42,12 @@ object WidgetBindingStore {
 
     fun setHabitId(context: Context, appWidgetId: Int, habitId: String) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().putString("$KEY_PREFIX$appWidgetId", habitId).apply()
+        prefs.edit().putString("$KEY_PREFIX$appWidgetId", habitId).commit()
     }
 
     fun clearHabitId(context: Context, appWidgetId: Int) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().remove("$KEY_PREFIX$appWidgetId").apply()
+        prefs.edit().remove("$KEY_PREFIX$appWidgetId").commit()
     }
 }
 
@@ -67,7 +67,11 @@ class WidgetDataProvider(
         val activeHabits = getActiveHabits()
         if (activeHabits.isEmpty()) return null
         val selectedId = repository.getSelectedTaskId()
-        return activeHabits.firstOrNull { it.id == selectedId }?.id ?: activeHabits.first().id
+        val resolved = activeHabits.firstOrNull { it.id == selectedId }?.id ?: activeHabits.first().id
+        WidgetDebugLog.d(
+            "defaultHabitId selectedId=$selectedId activeCount=${activeHabits.size} resolved=$resolved"
+        )
+        return resolved
     }
 
     fun getWidgetData(habitId: String?): WidgetHabitData {
@@ -96,7 +100,12 @@ class WidgetDataProvider(
             }
         }
 
-        val completedToday = repository.isCompletedOn(resolvedTask, today)
+        val isScheduledToday = repository.isScheduledOn(resolvedTask, today)
+        val completedToday = if (isScheduledToday) {
+            repository.isCompletedOn(resolvedTask, today)
+        } else {
+            repository.getDayValue(resolvedTask, today) > 0
+        }
         val scheduled = last7.count { status ->
             status != DayStatus.FUTURE && status != DayStatus.NOT_SCHEDULED
         }
@@ -104,6 +113,11 @@ class WidgetDataProvider(
             status == DayStatus.DONE || status == DayStatus.TODAY_DONE
         }
         val weekPct = if (scheduled > 0) (completed * 100 / scheduled).coerceIn(0, 100) else 0
+        WidgetDebugLog.d(
+            "getWidgetData requestedHabitId=$habitId resolvedHabitId=${resolvedTask.id} " +
+                "completedToday=$completedToday dayValueToday=${repository.getDayValue(resolvedTask, today)} " +
+                "scheduledToday=$isScheduledToday weekPct=$weekPct"
+        )
 
         return WidgetHabitData(
             habitId = resolvedTask.id,

@@ -151,6 +151,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
@@ -1611,10 +1612,21 @@ private fun HabitsPage(
     }
     var editModeHabits by remember(state.habits) { mutableStateOf(activeHabits) }
     val reorderListState = rememberLazyListState()
+    val editHeaderItemsCount = 1
     val reorderableListState = rememberReorderableLazyListState(reorderListState) { from, to ->
-        editModeHabits = editModeHabits.toMutableList().apply {
-            add(to.index, removeAt(from.index))
-        }
+        if (editModeHabits.isEmpty()) return@rememberReorderableLazyListState
+
+        val fromIndex = from.index - editHeaderItemsCount
+        val toIndex = to.index - editHeaderItemsCount
+        if (fromIndex !in editModeHabits.indices) return@rememberReorderableLazyListState
+
+        val clampedTo = toIndex.coerceIn(0, editModeHabits.lastIndex)
+        if (fromIndex == clampedTo) return@rememberReorderableLazyListState
+
+        val updated = editModeHabits.toMutableList()
+        val moved = updated.removeAt(fromIndex)
+        updated.add(clampedTo, moved)
+        editModeHabits = updated
     }
     LaunchedEffect(scrollToTopSignal) {
         if (scrollToTopSignal > 0) {
@@ -4740,9 +4752,15 @@ private fun AddHabitTile(onClick: () -> Unit) {
             .background(tintBackground)
             .clickable(onClick = onClick)
             .drawBehind {
+                val halfStroke = strokeWidthPx / 2f
                 drawRoundRect(
                     color = outline,
-                    cornerRadius = CornerRadius(12.dp.toPx(), 12.dp.toPx()),
+                    topLeft = Offset(halfStroke, halfStroke),
+                    size = Size(size.width - strokeWidthPx, size.height - strokeWidthPx),
+                    cornerRadius = CornerRadius(
+                        12.dp.toPx() - halfStroke,
+                        12.dp.toPx() - halfStroke
+                    ),
                     style = Stroke(width = strokeWidthPx, pathEffect = dashPathEffect)
                 )
             }

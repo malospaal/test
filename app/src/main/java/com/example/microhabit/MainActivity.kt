@@ -4866,7 +4866,6 @@ private fun HeroCard(
     val completionPulseScale = remember(task?.id, selectedDate) { Animatable(1f) }
     var completedAnimationPlaying by remember(task?.id, selectedDate) { mutableStateOf(false) }
     var completedLottieReady by remember(task?.id, selectedDate) { mutableStateOf(done) }
-    var showSuccessMessage by remember(task?.id, selectedDate) { mutableStateOf(false) }
     var previousDoneState by remember(task?.id, selectedDate) { mutableStateOf(done) }
     val completedAnimationProgress by animateLottieCompositionAsState(
         composition = completedButtonComposition,
@@ -4881,7 +4880,6 @@ private fun HeroCard(
     }
     LaunchedEffect(done, task?.id, selectedDate) {
         if (done && !previousDoneState) {
-            showSuccessMessage = true
             completedAnimationPlaying = false
             completedLottieReady = false
             completionPulseScale.snapTo(1f)
@@ -4895,13 +4893,10 @@ private fun HeroCard(
                 targetValue = 1f,
                 animationSpec = tween(durationMillis = 130, easing = FastOutSlowInEasing)
             )
-            delay(1400)
-            showSuccessMessage = false
         }
         if (!done) {
             completedAnimationPlaying = false
             completionPulseScale.snapTo(1f)
-            showSuccessMessage = false
             completedLottieReady = false
         }
         previousDoneState = done
@@ -5525,33 +5520,6 @@ private fun HeroCard(
                 horizontalArrangement = Arrangement.End
             ) {
                 HeroDetailsButton(onClick = onNavigateToDetail)
-            }
-            androidx.compose.animation.AnimatedVisibility(
-                visible = showSuccessMessage,
-                enter = fadeIn(animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing)) +
-                    slideInVertically(
-                        initialOffsetY = { it / 3 },
-                        animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing)
-                    ),
-                exit = fadeOut(animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing)) +
-                    slideOutVertically(
-                        targetOffsetY = { -it / 4 },
-                        animationSpec = tween(durationMillis = 170, easing = FastOutSlowInEasing)
-                    ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 2.dp),
-            ) {
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = t("Great job, your streak is safe."),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = semantic.success
-                    )
-                }
             }
         }
     }

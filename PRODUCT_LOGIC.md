@@ -447,15 +447,21 @@ Unit label UX для `COUNT`:
   - после действия виджет обновляется без обязательного открытия приложения.
 - Виджет UI зависит от `trackingType`:
   - `YES_NO`: текущий checkbox-like CTA flow без изменений;
-  - `COUNT`/`DURATION`: показываются value-progress (`todayValue / dailyTarget`), progress bar и increment-действия.
-- Increment-действия для value-привычек:
+  - `DURATION`: показываются value-progress (`todayValue / dailyTarget`), progress bar и increment-действия;
+  - `COUNT`: отдельный value-flow со stepper-контролом (`−` / `todayValue / dailyTarget` / `+`) и progress bar.
+- Increment-действия для `DURATION`-привычек:
   - small: `+5`, `+10`;
   - medium/large: `+5`, `+10`, `+20`;
   - tap по increment увеличивает `todayValue` и сразу обновляет все инстансы виджета.
-- CTA для value-привычек имеет 3 состояния:
+- Stepper-действия для `COUNT`-привычек:
+  - `+` увеличивает `todayValue` на 1;
+  - `−` уменьшает `todayValue` на 1 (нижняя граница `0`);
+  - после каждого действия виджет обновляется сразу во всех инстансах.
+- CTA для `COUNT`/`DURATION` value-flow имеет 3 состояния:
   - not started (`todayValue == 0`) -> текст "N unit до цели"/localized equivalent,
   - in progress (`todayValue > 0 && !completed`) -> текст "ещё N unit"/localized equivalent,
   - completed -> "Completed ✓"/localized equivalent.
+- Для `COUNT` в CTA unit не отображается (только число): `N до цели`, `ещё N`, `Completed ✓`.
 - Обновление виджета выполняется:
   - немедленно при изменениях данных в приложении (через `refreshWidget()` / `WidgetUpdateTrigger`);
   - при возврате приложения в foreground (`MainActivity.onResume`);

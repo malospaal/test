@@ -1010,9 +1010,17 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
         v("%d %s noch", "%d %s restants", "%d %s para la meta", "%d %s al traguardo", "%d %s до цели") +
             mapOf(AppLanguage.EN to "%d %s to go", AppLanguage.CS to "zbývá %d %s")
     ),
+    "widget_cta_not_started_no_unit" to (
+        v("noch %d", "%d restants", "faltan %d", "ancora %d", "%d до цели") +
+            mapOf(AppLanguage.EN to "%d to go", AppLanguage.CS to "zbývá %d")
+    ),
     "widget_cta_in_progress" to (
         v("noch %d %s", "encore %d %s", "faltan %d %s", "ancora %d %s", "ещё %d %s") +
             mapOf(AppLanguage.EN to "%d %s left", AppLanguage.CS to "ještě %d %s")
+    ),
+    "widget_cta_in_progress_no_unit" to (
+        v("noch %d", "encore %d", "faltan %d", "ancora %d", "ещё %d") +
+            mapOf(AppLanguage.EN to "%d left", AppLanguage.CS to "ještě %d")
     ),
     "widget_cta_done" to (
         v("Erledigt ✓", "Terminé ✓", "Completado ✓", "Completato ✓", "Выполнено ✓") +
@@ -1147,11 +1155,19 @@ fun formatTranslate(language: AppLanguage, source: String, vararg args: Any): St
 }
 
 fun widgetCtaNotStarted(language: AppLanguage, n: Int, unit: String): String {
-    return formatTranslate(language, "widget_cta_not_started", n, unit)
+    return if (unit.isBlank()) {
+        formatTranslate(language, "widget_cta_not_started_no_unit", n)
+    } else {
+        formatTranslate(language, "widget_cta_not_started", n, unit)
+    }
 }
 
 fun widgetCtaInProgress(language: AppLanguage, n: Int, unit: String): String {
-    return formatTranslate(language, "widget_cta_in_progress", n, unit)
+    return if (unit.isBlank()) {
+        formatTranslate(language, "widget_cta_in_progress_no_unit", n)
+    } else {
+        formatTranslate(language, "widget_cta_in_progress", n, unit)
+    }
 }
 
 fun widgetGoalReached(language: AppLanguage): String {

@@ -983,8 +983,8 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
             mapOf(AppLanguage.EN to "7 DAYS", AppLanguage.CS to "7 DNÍ")
     ),
     "widget_week_progress_short" to (
-        v("%d / 7 T", "%d / 7 j", "%d / 7 d", "%d / 7 g", "%d / 7 дн") +
-            mapOf(AppLanguage.EN to "%d / 7 d", AppLanguage.CS to "%d / 7 d")
+        v("%d / 7 %s", "%d / 7 %s", "%d / 7 %s", "%d / 7 %s", "%d / 7 %s") +
+            mapOf(AppLanguage.EN to "%d / 7 %s", AppLanguage.CS to "%d / 7 %s")
     ),
     "widget_current_record_days" to (
         v("Aktueller Rekord: %d Tage", "Record actuel : %d jours", "Récord actual: %d días", "Record attuale: %d giorni", "Текущий рекорд: %d дней") +

@@ -253,7 +253,7 @@ internal val ukTranslations: Map<String, String> = mapOf(
     "widget_stat_streak" to "СЕРІЯ",
     "widget_stat_record" to "РЕКОРД",
     "widget_stat_7_days" to "7 ДНІВ",
-    "widget_week_progress_short" to "%d / 7 дн",
+    "widget_week_progress_short" to "%d / 7 %s",
     "widget_current_record_days" to "Поточний рекорд: %d днів",
     "widget_insight_keep_streak" to "Сьогодні відмічено. Продовжуй серію.",
     "widget_insight_mark_today" to "Відміть сьогодні та збережи серію.",

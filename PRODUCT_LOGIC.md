@@ -428,7 +428,7 @@ Unit label UX для `COUNT`:
 - Поддерживаются 3 форм-фактора:
   - small (2x2),
   - medium (4x2),
-  - large (4x4).
+  - large (4x3).
 - При добавлении виджета выполняется конфигурация:
   - если активная привычка одна — она привязывается автоматически;
   - если активных привычек несколько — пользователь выбирает привычку;
@@ -437,13 +437,25 @@ Unit label UX для `COUNT`:
   - current streak,
   - completed-today state,
   - текущая неделя (Пн..Вс) со статусами дней,
-  - completion % за текущую неделю по scheduled дням.
+  - completion % за текущую неделю по scheduled дням,
+  - tracking metadata для value-привычек (`trackingType`, `dailyTarget`, `todayValue`, `unitLabel`).
 - Кнопка `Mark done` в виджете:
   - `YES_NO` -> ставит значение дня `1`,
   - `COUNT`/`DURATION` -> ставит значение дня в `dailyTarget`,
   - если день уже отмечен в виджете (`Completed`) повторный tap снимает отметку (`value = 0`) — toggle-поведение доступно в обоих состояниях кнопки;
   - для not scheduled дня состояние кнопки в виджете определяется по `day value > 0` (manual override), а не только по `isCompletedOn`;
   - после действия виджет обновляется без обязательного открытия приложения.
+- Виджет UI зависит от `trackingType`:
+  - `YES_NO`: текущий checkbox-like CTA flow без изменений;
+  - `COUNT`/`DURATION`: показываются value-progress (`todayValue / dailyTarget`), progress bar и increment-действия.
+- Increment-действия для value-привычек:
+  - small: `+5`, `+10`;
+  - medium/large: `+5`, `+10`, `+20`;
+  - tap по increment увеличивает `todayValue` и сразу обновляет все инстансы виджета.
+- CTA для value-привычек имеет 3 состояния:
+  - not started (`todayValue == 0`) -> текст "N unit до цели"/localized equivalent,
+  - in progress (`todayValue > 0 && !completed`) -> текст "ещё N unit"/localized equivalent,
+  - completed -> "Completed ✓"/localized equivalent.
 - Обновление виджета выполняется:
   - немедленно при изменениях данных в приложении (через `refreshWidget()` / `WidgetUpdateTrigger`);
   - при возврате приложения в foreground (`MainActivity.onResume`);

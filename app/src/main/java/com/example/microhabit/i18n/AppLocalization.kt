@@ -1006,6 +1006,26 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
         v("Markieren ✓", "Marquer ✓", "Marcar ✓", "Segna ✓", "Отметить ✓") +
             mapOf(AppLanguage.EN to "Mark ✓", AppLanguage.CS to "Označit ✓")
     ),
+    "widget_cta_not_started" to (
+        v("%d %s noch", "%d %s restants", "%d %s para la meta", "%d %s al traguardo", "%d %s до цели") +
+            mapOf(AppLanguage.EN to "%d %s to go", AppLanguage.CS to "zbývá %d %s")
+    ),
+    "widget_cta_in_progress" to (
+        v("noch %d %s", "encore %d %s", "faltan %d %s", "ancora %d %s", "ещё %d %s") +
+            mapOf(AppLanguage.EN to "%d %s left", AppLanguage.CS to "ještě %d %s")
+    ),
+    "widget_cta_done" to (
+        v("Erledigt ✓", "Terminé ✓", "Completado ✓", "Completato ✓", "Выполнено ✓") +
+            mapOf(AppLanguage.EN to "Completed ✓", AppLanguage.CS to "Splněno ✓")
+    ),
+    "widget_goal_reached" to (
+        v("Ziel erreicht", "Objectif atteint", "Objetivo alcanzado", "Obiettivo raggiunto", "Цель достигнута") +
+            mapOf(AppLanguage.EN to "Goal reached", AppLanguage.CS to "Cíl splněn")
+    ),
+    "widget_inc_btn_min" to (
+        v("+%d %s", "+%d %s", "+%d %s", "+%d %s", "+%d %s") +
+            mapOf(AppLanguage.EN to "+%d %s", AppLanguage.CS to "+%d %s")
+    ),
     "widget_upsell_title" to (
         v("Widgets sind in PRO verfügbar", "Les widgets sont disponibles dans PRO", "Los widgets están disponibles en PRO", "I widget sono disponibili in PRO", "Виджеты доступны в PRO") +
             mapOf(AppLanguage.EN to "Widgets are available in PRO", AppLanguage.CS to "Widgety jsou dostupné v PRO")
@@ -1124,6 +1144,26 @@ fun translate(language: AppLanguage, source: String): String {
 
 fun formatTranslate(language: AppLanguage, source: String, vararg args: Any): String {
     return String.format(localeForLanguage(language), translate(language, source), *args)
+}
+
+fun widgetCtaNotStarted(language: AppLanguage, n: Int, unit: String): String {
+    return formatTranslate(language, "widget_cta_not_started", n, unit)
+}
+
+fun widgetCtaInProgress(language: AppLanguage, n: Int, unit: String): String {
+    return formatTranslate(language, "widget_cta_in_progress", n, unit)
+}
+
+fun widgetGoalReached(language: AppLanguage): String {
+    return translate(language, "widget_goal_reached")
+}
+
+fun widgetCtaDone(language: AppLanguage): String {
+    return translate(language, "widget_cta_done")
+}
+
+fun widgetIncBtn(language: AppLanguage, n: Int, unit: String): String {
+    return formatTranslate(language, "widget_inc_btn_min", n, unit)
 }
 
 fun weekdayLabels(language: AppLanguage): List<String> {

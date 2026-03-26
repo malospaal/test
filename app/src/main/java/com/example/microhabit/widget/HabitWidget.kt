@@ -53,6 +53,11 @@ import com.example.microhabit.data.TrackingType
 import com.example.microhabit.i18n.formatTranslate
 import com.example.microhabit.i18n.localeForLanguage
 import com.example.microhabit.i18n.translate
+import com.example.microhabit.i18n.widgetCtaDone
+import com.example.microhabit.i18n.widgetCtaInProgress
+import com.example.microhabit.i18n.widgetCtaNotStarted
+import com.example.microhabit.i18n.widgetGoalReached
+import com.example.microhabit.i18n.widgetIncBtn
 import java.time.LocalDate
 import java.time.format.TextStyle as DateTextStyle
 import java.util.Locale
@@ -64,6 +69,7 @@ internal enum class WidgetLayoutSize {
 }
 
 internal val HabitIdParamKey = ActionParameters.Key<String>("habitId")
+internal val IncrementDeltaKey = ActionParameters.Key<Int>("incrementDelta")
 internal val WidgetRefreshNonceKey = longPreferencesKey("widget_refresh_nonce")
 
 internal open class HabitWidget(
@@ -203,6 +209,14 @@ private fun ProLockedContent(language: AppLanguage) {
 
 @Composable
 private fun SmallWidgetContent(data: WidgetHabitData, language: AppLanguage) {
+    when (data.trackingType) {
+        TrackingType.YES_NO -> SmallYesNoWidgetContent(data, language)
+        TrackingType.COUNT, TrackingType.DURATION -> SmallValueWidgetContent(data, language)
+    }
+}
+
+@Composable
+private fun SmallYesNoWidgetContent(data: WidgetHabitData, language: AppLanguage) {
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
@@ -230,6 +244,14 @@ private fun SmallWidgetContent(data: WidgetHabitData, language: AppLanguage) {
 
 @Composable
 private fun MediumWidgetContent(data: WidgetHabitData, language: AppLanguage) {
+    when (data.trackingType) {
+        TrackingType.YES_NO -> MediumYesNoWidgetContent(data, language)
+        TrackingType.COUNT, TrackingType.DURATION -> MediumValueWidgetContent(data, language)
+    }
+}
+
+@Composable
+private fun MediumYesNoWidgetContent(data: WidgetHabitData, language: AppLanguage) {
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
@@ -257,6 +279,14 @@ private fun MediumWidgetContent(data: WidgetHabitData, language: AppLanguage) {
 
 @Composable
 private fun LargeWidgetContent(data: WidgetHabitData, language: AppLanguage) {
+    when (data.trackingType) {
+        TrackingType.YES_NO -> LargeYesNoWidgetContent(data, language)
+        TrackingType.COUNT, TrackingType.DURATION -> LargeValueWidgetContent(data, language)
+    }
+}
+
+@Composable
+private fun LargeYesNoWidgetContent(data: WidgetHabitData, language: AppLanguage) {
     val daysToRecord = daysToNewRecord(data)
     Box(
         modifier = GlanceModifier
@@ -309,6 +339,309 @@ private fun LargeWidgetContent(data: WidgetHabitData, language: AppLanguage) {
             bottomInset = 9.dp,
             language = language
         )
+    }
+}
+
+@Composable
+private fun SmallValueWidgetContent(data: WidgetHabitData, language: AppLanguage) {
+    val target = data.dailyTarget.coerceAtLeast(1)
+    val unit = widgetUnitLabel(data, language)
+    Column(
+        modifier = GlanceModifier
+            .fillMaxSize()
+            .background(ImageProvider(R.drawable.widget_bg))
+            .padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 10.dp)
+    ) {
+        SmallHeader(data, language)
+        Spacer(GlanceModifier.height(4.dp))
+        Box(
+            modifier = GlanceModifier
+                .fillMaxWidth()
+                .defaultWeight(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(modifier = GlanceModifier.fillMaxWidth()) {
+                Box(modifier = GlanceModifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                    ValueProgressNumber(
+                        value = data.todayValue,
+                        target = target,
+                        unitLabel = unit,
+                        valueFont = 22.sp,
+                        valueColor = if (data.isCompletedToday) WidgetAccent else WidgetTextPrimary
+                    )
+                }
+                Spacer(GlanceModifier.height(6.dp))
+                ValueProgressBar(data = data, height = 4.dp, radius = 4.dp)
+            }
+        }
+        Spacer(GlanceModifier.height(8.dp))
+        Row(modifier = GlanceModifier.fillMaxWidth()) {
+            IncrementButton(
+                habitId = data.habitId,
+                delta = 5,
+                label = widgetIncBtn(language, 5, unit),
+                modifier = GlanceModifier.defaultWeight()
+            )
+            Spacer(GlanceModifier.width(6.dp))
+            IncrementButton(
+                habitId = data.habitId,
+                delta = 10,
+                label = widgetIncBtn(language, 10, unit),
+                modifier = GlanceModifier.defaultWeight()
+            )
+        }
+        Spacer(GlanceModifier.height(6.dp))
+        ValueCtaButton(
+            data = data,
+            language = language,
+            height = 36.dp,
+            fontSize = 13.sp
+        )
+    }
+}
+
+@Composable
+private fun MediumValueWidgetContent(data: WidgetHabitData, language: AppLanguage) {
+    val target = data.dailyTarget.coerceAtLeast(1)
+    val unit = widgetUnitLabel(data, language)
+    val remaining = valueRemaining(data)
+    Box(
+        modifier = GlanceModifier
+            .fillMaxSize()
+            .background(ImageProvider(R.drawable.widget_bg))
+            .padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 10.dp),
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        Column(
+            modifier = GlanceModifier
+                .fillMaxSize()
+                .padding(bottom = 78.dp)
+        ) {
+            Row(
+                modifier = GlanceModifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(
+                    modifier = GlanceModifier.defaultWeight(),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = data.emoji, style = TextStyle(fontSize = 18.sp))
+                        Spacer(GlanceModifier.width(6.dp))
+                        Text(
+                            text = data.title,
+                            style = TextStyle(
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = WidgetTextPrimary
+                            ),
+                            maxLines = 1
+                        )
+                    }
+                    Spacer(GlanceModifier.height(2.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = "🔥", style = TextStyle(fontSize = 11.sp))
+                        Spacer(GlanceModifier.width(3.dp))
+                        Text(
+                            text = data.currentStreak.toString(),
+                            style = TextStyle(
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = WidgetStreak
+                            )
+                        )
+                        Spacer(GlanceModifier.width(3.dp))
+                        Text(
+                            text = translate(language, "widget_streak_label"),
+                            style = TextStyle(
+                                fontSize = 13.sp,
+                                color = WidgetTextMuted
+                            )
+                        )
+                    }
+                }
+                ValueProgressNumber(
+                    value = data.todayValue,
+                    target = target,
+                    unitLabel = unit,
+                    valueFont = 20.sp,
+                    valueColor = if (data.isCompletedToday) WidgetAccent else WidgetTextPrimary
+                )
+            }
+            Spacer(GlanceModifier.height(6.dp))
+            ValueProgressBar(data = data, height = 4.dp, radius = 4.dp)
+            Spacer(GlanceModifier.height(3.dp))
+            Box(modifier = GlanceModifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                Text(
+                    text = if (data.isCompletedToday) {
+                        widgetGoalReached(language)
+                    } else {
+                        widgetCtaInProgress(language, remaining, unit)
+                    },
+                    style = TextStyle(
+                        fontSize = 11.sp,
+                        color = if (data.isCompletedToday) WidgetAccent else WidgetTextMuted
+                    ),
+                    maxLines = 1
+                )
+            }
+            Spacer(GlanceModifier.height(6.dp))
+            MediumWeekTiles(data)
+            Spacer(GlanceModifier.defaultWeight())
+        }
+        Column(
+            modifier = GlanceModifier.fillMaxWidth()
+        ) {
+            Row(modifier = GlanceModifier.fillMaxWidth()) {
+                IncrementButton(
+                    habitId = data.habitId,
+                    delta = 5,
+                    label = widgetIncBtn(language, 5, unit),
+                    modifier = GlanceModifier.defaultWeight()
+                )
+                Spacer(GlanceModifier.width(6.dp))
+                IncrementButton(
+                    habitId = data.habitId,
+                    delta = 10,
+                    label = widgetIncBtn(language, 10, unit),
+                    modifier = GlanceModifier.defaultWeight()
+                )
+                Spacer(GlanceModifier.width(6.dp))
+                IncrementButton(
+                    habitId = data.habitId,
+                    delta = 20,
+                    label = widgetIncBtn(language, 20, unit),
+                    modifier = GlanceModifier.defaultWeight()
+                )
+            }
+            Spacer(GlanceModifier.height(6.dp))
+            ValueCtaButton(
+                data = data,
+                language = language,
+                height = 36.dp,
+                fontSize = 14.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun LargeValueWidgetContent(data: WidgetHabitData, language: AppLanguage) {
+    val target = data.dailyTarget.coerceAtLeast(1)
+    val unit = widgetUnitLabel(data, language)
+    val remaining = valueRemaining(data)
+    Box(
+        modifier = GlanceModifier
+            .fillMaxSize()
+            .background(ImageProvider(R.drawable.widget_bg))
+            .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 10.dp),
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        Column(
+            modifier = GlanceModifier
+                .fillMaxSize()
+                .padding(bottom = 84.dp)
+        ) {
+            Row(
+                modifier = GlanceModifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(
+                    modifier = GlanceModifier.defaultWeight(),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = data.emoji, style = TextStyle(fontSize = 18.sp))
+                        Spacer(GlanceModifier.width(6.dp))
+                        Text(
+                            text = data.title,
+                            style = TextStyle(
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = WidgetTextPrimary
+                            ),
+                            maxLines = 1
+                        )
+                    }
+                    // Keep the same vertical rhythm as medium value header (title + streak row),
+                    // so the right-side value aligns at the same lower level.
+                    Spacer(GlanceModifier.height(15.dp))
+                }
+                Box(
+                    modifier = GlanceModifier.padding(top = 1.dp),
+                    contentAlignment = Alignment.CenterEnd
+                ) {
+                    ValueProgressNumber(
+                        value = data.todayValue,
+                        target = target,
+                        unitLabel = unit,
+                        valueFont = 20.sp,
+                        valueColor = if (data.isCompletedToday) WidgetAccent else WidgetTextPrimary
+                    )
+                }
+            }
+            Spacer(GlanceModifier.height(6.dp))
+            ValueProgressBar(data = data, height = 4.dp, radius = 4.dp)
+            Spacer(GlanceModifier.height(2.dp))
+            Box(modifier = GlanceModifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
+                Text(
+                    text = if (data.isCompletedToday) {
+                        widgetGoalReached(language)
+                    } else {
+                        widgetCtaInProgress(language, remaining, unit)
+                    },
+                    style = TextStyle(
+                        fontSize = 11.sp,
+                        color = if (data.isCompletedToday) WidgetAccent else WidgetTextMuted
+                    ),
+                    maxLines = 1
+                )
+            }
+            Spacer(GlanceModifier.height(6.dp))
+            LargeStatsRow(data, language)
+            Spacer(GlanceModifier.height(15.dp))
+            Box(
+                modifier = GlanceModifier
+                    .fillMaxWidth()
+                    .padding(bottom = 2.dp)
+            ) {
+                LargeWeekTiles(data)
+            }
+            Spacer(GlanceModifier.height(11.dp))
+        }
+        Column(
+            modifier = GlanceModifier.fillMaxWidth()
+        ) {
+            Row(modifier = GlanceModifier.fillMaxWidth()) {
+                IncrementButton(
+                    habitId = data.habitId,
+                    delta = 5,
+                    label = widgetIncBtn(language, 5, unit),
+                    modifier = GlanceModifier.defaultWeight()
+                )
+                Spacer(GlanceModifier.width(6.dp))
+                IncrementButton(
+                    habitId = data.habitId,
+                    delta = 10,
+                    label = widgetIncBtn(language, 10, unit),
+                    modifier = GlanceModifier.defaultWeight()
+                )
+                Spacer(GlanceModifier.width(6.dp))
+                IncrementButton(
+                    habitId = data.habitId,
+                    delta = 20,
+                    label = widgetIncBtn(language, 20, unit),
+                    modifier = GlanceModifier.defaultWeight()
+                )
+            }
+            Spacer(GlanceModifier.height(6.dp))
+            ValueCtaButton(
+                data = data,
+                language = language,
+                height = 36.dp,
+                fontSize = 14.sp
+            )
+        }
     }
 }
 
@@ -536,6 +869,39 @@ private fun MediumDayTile(label: String, status: DayStatus) {
     )
 }
 
+class IncrementValueAction : ActionCallback {
+    override suspend fun onAction(
+        context: Context,
+        glanceId: GlanceId,
+        parameters: ActionParameters
+    ) {
+        runCatching {
+            val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(glanceId)
+            val paramHabitId = parameters[HabitIdParamKey]
+            val boundHabitId = WidgetBindingStore.getHabitId(context, appWidgetId)
+            val defaultHabitId = WidgetDataProvider(context).defaultHabitId()
+            val habitId = paramHabitId ?: boundHabitId ?: defaultHabitId ?: return
+            val delta = parameters[IncrementDeltaKey] ?: return
+            val repository = HabitRepository(context)
+            val task = repository.getTasks().firstOrNull { it.id == habitId } ?: return
+            val today = LocalDate.now()
+            val current = repository.getDayValue(task, today)
+            repository.setDayValue(task, today, (current + delta).coerceAtLeast(0), refreshWidgets = false)
+
+            updateAppWidgetState(context, glanceId) { prefs ->
+                prefs[WidgetRefreshNonceKey] = System.currentTimeMillis()
+            }
+            WidgetUpdateTrigger.updateGlanceId(context, glanceId)
+            WidgetUpdateTrigger.updateAllWidgetInstances(context)
+            WidgetUpdateTrigger.triggerUpdateViaBroadcast(context)
+            HabitWidgetUpdateScheduler.triggerNow(context)
+            HabitWidgetUpdateScheduler.scheduleWidgetUpdates(context)
+        }.onFailure { error ->
+            WidgetDebugLog.e("incrementAction failed", error)
+        }
+    }
+}
+
 @Composable
 private fun LargeHeader(data: WidgetHabitData) {
     Row(
@@ -603,6 +969,57 @@ private fun LargeStatsRow(data: WidgetHabitData, language: AppLanguage) {
                 text = "${data.weekCompletionPct.coerceIn(0, 100)}%",
                 style = TextStyle(
                     fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = WidgetAccent
+                )
+            )
+        }
+    }
+}
+
+@Composable
+private fun LargeStatsRowCompact(data: WidgetHabitData, language: AppLanguage) {
+    Row(modifier = GlanceModifier.fillMaxWidth()) {
+        StatBlockCompact(
+            modifier = GlanceModifier.defaultWeight(),
+            label = translate(language, "widget_stat_streak")
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(text = "🔥", style = TextStyle(fontSize = 10.sp))
+                Spacer(GlanceModifier.width(3.dp))
+                Text(
+                    text = data.currentStreak.toString(),
+                    style = TextStyle(
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = WidgetStreak
+                    )
+                )
+            }
+        }
+        Spacer(GlanceModifier.width(6.dp))
+        StatBlockCompact(
+            modifier = GlanceModifier.defaultWeight(),
+            label = translate(language, "widget_stat_record")
+        ) {
+            Text(
+                text = data.bestStreak.toString(),
+                style = TextStyle(
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = WidgetTextPrimary
+                )
+            )
+        }
+        Spacer(GlanceModifier.width(6.dp))
+        StatBlockCompact(
+            modifier = GlanceModifier.defaultWeight(),
+            label = translate(language, "widget_stat_7_days")
+        ) {
+            Text(
+                text = "${data.weekCompletionPct.coerceIn(0, 100)}%",
+                style = TextStyle(
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     color = WidgetAccent
                 )
@@ -892,6 +1309,172 @@ private fun DayDotInner(
 }
 
 @Composable
+private fun StatBlockCompact(
+    modifier: GlanceModifier,
+    label: String,
+    content: @Composable () -> Unit
+) {
+    Column(
+        modifier = modifier
+            .background(WidgetSurfaceSecondary)
+            .cornerRadius(10.dp)
+            .padding(horizontal = 5.dp, vertical = 5.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = label,
+            style = TextStyle(
+                fontSize = 9.sp,
+                color = WidgetTextMuted
+            ),
+            maxLines = 1
+        )
+        Spacer(GlanceModifier.height(2.dp))
+        content()
+    }
+}
+
+@Composable
+private fun ValueProgressNumber(
+    value: Int,
+    target: Int,
+    unitLabel: String,
+    valueFont: TextUnit,
+    valueColor: ColorProvider
+) {
+    val text = "${value.coerceAtLeast(0)} / ${target.coerceAtLeast(1)} $unitLabel"
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = text,
+            style = TextStyle(
+                fontSize = valueFont,
+                fontWeight = FontWeight.Bold,
+                color = valueColor
+            )
+        )
+    }
+}
+
+@Composable
+private fun ValueProgressBar(
+    data: WidgetHabitData,
+    height: Dp,
+    radius: Dp
+) {
+    val target = data.dailyTarget.coerceAtLeast(1)
+    val progress = (data.todayValue.toFloat() / target.toFloat()).coerceIn(0f, 1f)
+    LinearProgressIndicator(
+        progress = progress,
+        modifier = GlanceModifier
+            .fillMaxWidth()
+            .height(height)
+            .cornerRadius(radius),
+        color = WidgetDayDoneFill,
+        backgroundColor = WidgetProgressTrack
+    )
+}
+
+@Composable
+private fun IncrementButton(
+    habitId: String,
+    delta: Int,
+    label: String,
+    modifier: GlanceModifier = GlanceModifier
+) {
+    val action = actionRunCallback<IncrementValueAction>(
+        actionParametersOf(
+            HabitIdParamKey to habitId,
+            IncrementDeltaKey to delta
+        )
+    )
+    Box(
+        modifier = modifier
+            .background(WidgetSurfaceSecondary)
+            .cornerRadius(10.dp)
+            .padding(vertical = 8.dp)
+            .clickable(action),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            style = TextStyle(
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = WidgetAccent
+            ),
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
+private fun ValueCtaButton(
+    data: WidgetHabitData,
+    language: AppLanguage,
+    height: Dp,
+    fontSize: TextUnit
+) {
+    val action = actionRunCallback<MarkDoneAction>(
+        actionParametersOf(HabitIdParamKey to data.habitId)
+    )
+    val unit = widgetUnitLabel(data, language)
+    val remaining = valueRemaining(data)
+    val text = when {
+        data.isCompletedToday -> widgetCtaDone(language)
+        data.todayValue <= 0 -> widgetCtaNotStarted(language, data.dailyTarget.coerceAtLeast(1), unit)
+        else -> widgetCtaInProgress(language, remaining, unit)
+    }
+    val background = if (data.isCompletedToday) {
+        WidgetDayDoneFill
+    } else {
+        null
+    }
+    val textColor = if (data.isCompletedToday) WidgetDayDoneText else WidgetDayTodayPendingBorder
+
+    if (background != null) {
+        Box(
+            modifier = GlanceModifier
+                .fillMaxWidth()
+                .height(height)
+                .cornerRadius(12.dp)
+                .background(background)
+                .clickable(action),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = text,
+                style = TextStyle(
+                    fontSize = fontSize,
+                    fontWeight = FontWeight.Medium,
+                    color = textColor
+                ),
+                maxLines = 1
+            )
+        }
+    } else {
+        Box(
+            modifier = GlanceModifier
+                .fillMaxWidth()
+                .height(height)
+                .cornerRadius(12.dp)
+                .background(ImageProvider(R.drawable.widget_btn_pending_outline))
+                .clickable(action),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = text,
+                style = TextStyle(
+                    fontSize = fontSize,
+                    fontWeight = FontWeight.Medium,
+                    color = textColor
+                ),
+                maxLines = 1
+            )
+        }
+    }
+}
+
+@Composable
 private fun ProgressRow(data: WidgetHabitData, language: AppLanguage) {
     val completedDays = data.last7Days.count { it == DayStatus.DONE || it == DayStatus.TODAY_DONE }
     val progress = (completedDays.coerceIn(0, 7)) / 7f
@@ -929,6 +1512,20 @@ private fun daysToNewRecord(data: WidgetHabitData): Int {
     } else {
         (data.bestStreak - data.currentStreak).coerceAtLeast(1)
     }
+}
+
+private fun widgetUnitLabel(data: WidgetHabitData, language: AppLanguage): String {
+    return when {
+        data.unitLabel.isNotBlank() -> data.unitLabel
+        data.trackingType == TrackingType.DURATION -> translate(language, "min")
+        data.trackingType == TrackingType.COUNT -> translate(language, "times")
+        else -> ""
+    }
+}
+
+private fun valueRemaining(data: WidgetHabitData): Int {
+    val target = data.dailyTarget.coerceAtLeast(1)
+    return (target - data.todayValue).coerceAtLeast(0)
 }
 
 @Composable

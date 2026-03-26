@@ -5,6 +5,7 @@ import com.example.microhabit.data.AppLanguage
 import com.example.microhabit.data.HabitLifecycleState
 import com.example.microhabit.data.HabitRepository
 import com.example.microhabit.data.HabitTask
+import com.example.microhabit.data.TrackingType
 import com.example.microhabit.data.hasPremiumAccess
 import com.example.microhabit.i18n.localeForLanguage
 import com.example.microhabit.i18n.translate
@@ -26,6 +27,10 @@ data class WidgetHabitData(
     val habitId: String,
     val emoji: String,
     val title: String,
+    val trackingType: TrackingType,
+    val dailyTarget: Int,
+    val todayValue: Int,
+    val unitLabel: String,
     val currentStreak: Int,
     val bestStreak: Int,
     val isCompletedToday: Boolean,
@@ -115,6 +120,11 @@ class WidgetDataProvider(
             status == DayStatus.DONE || status == DayStatus.TODAY_DONE
         }
         val weekPct = if (scheduled > 0) (completed * 100 / scheduled).coerceIn(0, 100) else 0
+        val resolvedUnitLabel = when (resolvedTask.trackingType) {
+            TrackingType.DURATION -> translate(language, "min")
+            TrackingType.COUNT -> repository.unitLabel(resolvedTask)
+            TrackingType.YES_NO -> ""
+        }
         WidgetDebugLog.d(
             "getWidgetData requestedHabitId=$habitId resolvedHabitId=${resolvedTask.id} " +
                 "completedToday=$completedToday dayValueToday=${repository.getDayValue(resolvedTask, today)} " +
@@ -125,6 +135,10 @@ class WidgetDataProvider(
             habitId = resolvedTask.id,
             emoji = resolvedTask.emoji,
             title = resolvedTask.title,
+            trackingType = resolvedTask.trackingType,
+            dailyTarget = repository.dailyTarget(resolvedTask),
+            todayValue = repository.getDayValue(resolvedTask, today),
+            unitLabel = resolvedUnitLabel,
             currentStreak = repository.calculateStreak(resolvedTask, today),
             bestStreak = repository.bestStreak(resolvedTask, today),
             isCompletedToday = completedToday,
@@ -140,6 +154,10 @@ class WidgetDataProvider(
             habitId = "",
             emoji = "✨",
             title = translate(language, "Micro-habit"),
+            trackingType = TrackingType.YES_NO,
+            dailyTarget = 1,
+            todayValue = 0,
+            unitLabel = "",
             currentStreak = 0,
             bestStreak = 0,
             isCompletedToday = false,

@@ -31,7 +31,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.microhabit.MainActivity
+import com.example.microhabit.data.AppLanguage
+import com.example.microhabit.data.HabitRepository
 import com.example.microhabit.data.HabitTask
+import com.example.microhabit.i18n.translate
 import com.example.microhabit.ui.theme.AppTheme
 import com.example.microhabit.ui.theme.MicroHabitTheme
 
@@ -51,6 +54,7 @@ class HabitWidgetConfigActivity : ComponentActivity() {
         }
         setResult(RESULT_CANCELED)
 
+        val language = HabitRepository(this).getLanguage()
         val dataProvider = WidgetDataProvider(this)
         val isProUser = dataProvider.isProUser()
         val activeHabits = dataProvider.getActiveHabits()
@@ -62,6 +66,7 @@ class HabitWidgetConfigActivity : ComponentActivity() {
             setContent {
                 MicroHabitTheme {
                     WidgetUpsellScreen(
+                        language = language,
                         onOpenPro = {
                             startActivity(Intent(this, MainActivity::class.java))
                             finish()
@@ -86,6 +91,7 @@ class HabitWidgetConfigActivity : ComponentActivity() {
         setContent {
             MicroHabitTheme {
                 HabitSelectionScreen(
+                    language = language,
                     habits = activeHabits,
                     onHabitSelected = ::bindHabitAndFinish,
                     onCancel = { finish() }
@@ -107,6 +113,7 @@ class HabitWidgetConfigActivity : ComponentActivity() {
 
 @Composable
 private fun WidgetUpsellScreen(
+    language: AppLanguage,
     onOpenPro: () -> Unit,
     onCancel: () -> Unit
 ) {
@@ -119,24 +126,24 @@ private fun WidgetUpsellScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "Widgets are available in PRO",
+            text = translate(language, "widget_upsell_title"),
             style = MaterialTheme.typography.titleMedium,
             color = colors.textPrimary,
             fontWeight = FontWeight.SemiBold
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "Open app to upgrade and add this widget.",
+            text = translate(language, "widget_upsell_subtitle"),
             style = MaterialTheme.typography.bodyMedium,
             color = colors.textSecondary
         )
         Spacer(Modifier.height(16.dp))
         Button(onClick = onOpenPro, modifier = Modifier.fillMaxWidth()) {
-            Text("Open PRO")
+            Text(translate(language, "widget_open_pro"))
         }
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "Cancel",
+            text = translate(language, "Cancel"),
             modifier = Modifier.clickable(onClick = onCancel),
             style = MaterialTheme.typography.labelLarge,
             color = colors.textSecondary
@@ -146,6 +153,7 @@ private fun WidgetUpsellScreen(
 
 @Composable
 private fun HabitSelectionScreen(
+    language: AppLanguage,
     habits: List<HabitTask>,
     onHabitSelected: (String) -> Unit,
     onCancel: () -> Unit
@@ -157,7 +165,7 @@ private fun HabitSelectionScreen(
             .padding(16.dp)
     ) {
         Text(
-            text = "Choose a habit for widget",
+            text = translate(language, "widget_choose_habit"),
             style = MaterialTheme.typography.titleMedium,
             color = colors.textPrimary,
             fontWeight = FontWeight.SemiBold
@@ -202,7 +210,7 @@ private fun HabitSelectionScreen(
         }
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "Cancel",
+            text = translate(language, "Cancel"),
             modifier = Modifier.clickable(onClick = onCancel),
             style = MaterialTheme.typography.labelLarge,
             color = colors.textSecondary

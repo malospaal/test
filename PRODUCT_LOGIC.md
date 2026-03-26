@@ -448,6 +448,9 @@ Unit label UX для `COUNT`:
   - немедленно при изменениях данных в приложении (через `refreshWidget()` / `WidgetUpdateTrigger`);
   - при возврате приложения в foreground (`MainActivity.onResume`);
   - в полночь через `MidnightWidgetWorker` (one-time schedule с переносом на следующую полночь).
+- Локализация виджетов:
+  - все user-facing строки и подписи дней недели в widget UI строятся из текущего `AppLanguage` (а не из системного locale устройства);
+  - при смене языка в приложении виджеты принудительно обновляются и сразу показывают новый язык без ожидания periodic refresh.
 
 ## 13. Reminder System
 Источник: `notifications/HabitReminderScheduler.kt`.

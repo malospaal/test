@@ -48,8 +48,12 @@ import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.example.microhabit.MainActivity
 import com.example.microhabit.R
+import com.example.microhabit.data.AppLanguage
 import com.example.microhabit.data.HabitRepository
 import com.example.microhabit.data.TrackingType
+import com.example.microhabit.i18n.formatTranslate
+import com.example.microhabit.i18n.localeForLanguage
+import com.example.microhabit.i18n.translate
 import java.time.LocalDate
 import java.time.format.TextStyle as DateTextStyle
 import java.util.Locale
@@ -72,9 +76,12 @@ internal open class HabitWidget(
         val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
 
         provideContent {
+            val repository = HabitRepository(context)
+            val language = repository.getLanguage()
+            val locale = localeForLanguage(language)
             val statePrefs = (LocalState.current as? Preferences)
             val nonce = statePrefs?.get(WidgetRefreshNonceKey) ?: 0L
-            val dataProvider = WidgetDataProvider(context)
+            val dataProvider = WidgetDataProvider(context, language = language, locale = locale)
             val habitId = WidgetBindingStore.getHabitId(context, appWidgetId)
             val data = dataProvider.getWidgetData(habitId)
             WidgetDebugLog.d(
@@ -82,10 +89,10 @@ internal open class HabitWidget(
                     "resolvedHabitId=${data.habitId} isCompletedToday=${data.isCompletedToday} nonce=$nonce"
             )
             when {
-                !data.isProUser -> ProLockedContent()
-                layoutSize == WidgetLayoutSize.SMALL -> SmallWidgetContent(data)
-                layoutSize == WidgetLayoutSize.MEDIUM -> MediumWidgetContent(data)
-                else -> LargeWidgetContent(data)
+                !data.isProUser -> ProLockedContent(language)
+                layoutSize == WidgetLayoutSize.SMALL -> SmallWidgetContent(data, language)
+                layoutSize == WidgetLayoutSize.MEDIUM -> MediumWidgetContent(data, language)
+                else -> LargeWidgetContent(data, language)
             }
         }
     }
@@ -171,7 +178,7 @@ class MarkDoneAction : ActionCallback {
 }
 
 @Composable
-private fun ProLockedContent() {
+private fun ProLockedContent(language: AppLanguage) {
     Box(
         modifier = GlanceModifier
             .fillMaxSize()
@@ -184,7 +191,7 @@ private fun ProLockedContent() {
             Text("🔒", style = TextStyle(fontSize = 16.sp))
             Spacer(GlanceModifier.height(6.dp))
             Text(
-                text = "Widgets are PRO",
+                text = translate(language, "Widgets are PRO"),
                 style = TextStyle(
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
@@ -196,14 +203,14 @@ private fun ProLockedContent() {
 }
 
 @Composable
-private fun SmallWidgetContent(data: WidgetHabitData) {
+private fun SmallWidgetContent(data: WidgetHabitData, language: AppLanguage) {
     Column(
         modifier = GlanceModifier
             .fillMaxSize()
             .background(ImageProvider(R.drawable.widget_bg))
-            .padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 8.dp)
+            .padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 21.dp)
     ) {
-        SmallHeader(data)
+        SmallHeader(data, language)
 
         Box(
             modifier = GlanceModifier
@@ -214,12 +221,12 @@ private fun SmallWidgetContent(data: WidgetHabitData) {
             SmallWeekDots(data)
         }
         Spacer(GlanceModifier.height(4.dp))
-        SmallMarkButton(data = data)
+        SmallMarkButton(data = data, language = language)
     }
 }
 
 @Composable
-private fun MediumWidgetContent(data: WidgetHabitData) {
+private fun MediumWidgetContent(data: WidgetHabitData, language: AppLanguage) {
     val horizontalPadding = 16.dp
     val dayGap = 4.dp
     val daySide = weekCellSide(horizontalPadding = horizontalPadding, gap = dayGap, min = 10.dp, max = 60.dp)
@@ -235,18 +242,24 @@ private fun MediumWidgetContent(data: WidgetHabitData) {
                 .fillMaxSize()
                 .padding(bottom = 56.dp)
         ) {
-            MediumHeader(data)
+            MediumHeader(data, language)
             Spacer(GlanceModifier.height(8.dp))
             WeekRow(data = data, side = daySide, radius = 8.dp, gap = dayGap, fontSize = 10.sp)
             Spacer(GlanceModifier.height(8.dp))
-            ProgressRow(data)
+            ProgressRow(data, language)
         }
-        MarkButton(data = data, fontSize = 13.sp, verticalPadding = 10.dp, bottomInset = 9.dp)
+        MarkButton(
+            data = data,
+            fontSize = 13.sp,
+            verticalPadding = 10.dp,
+            bottomInset = 9.dp,
+            language = language
+        )
     }
 }
 
 @Composable
-private fun LargeWidgetContent(data: WidgetHabitData) {
+private fun LargeWidgetContent(data: WidgetHabitData, language: AppLanguage) {
     val horizontalPadding = 16.dp
     val dayGap = 4.dp
     val daySide = weekCellSide(horizontalPadding = horizontalPadding, gap = dayGap, min = 10.dp, max = 60.dp)
@@ -262,26 +275,32 @@ private fun LargeWidgetContent(data: WidgetHabitData) {
                 .fillMaxSize()
                 .padding(bottom = 58.dp)
         ) {
-            LargeHeader(data)
+            LargeHeader(data, language)
             Spacer(GlanceModifier.height(8.dp))
-            LargeStatsRow(data)
+            LargeStatsRow(data, language)
             Spacer(GlanceModifier.height(8.dp))
             WeekRow(data = data, side = daySide, radius = 9.dp, gap = dayGap, fontSize = 10.sp)
             Spacer(GlanceModifier.height(8.dp))
-            ProgressRow(data)
+            ProgressRow(data, language)
 
-            val insight = buildInsight(data)
+            val insight = buildInsight(data, language)
             if (insight != null) {
                 Spacer(GlanceModifier.height(8.dp))
                 InsightRow(insight)
             }
         }
-        MarkButton(data = data, fontSize = 13.sp, verticalPadding = 10.dp, bottomInset = 9.dp)
+        MarkButton(
+            data = data,
+            fontSize = 13.sp,
+            verticalPadding = 10.dp,
+            bottomInset = 9.dp,
+            language = language
+        )
     }
 }
 
 @Composable
-private fun SmallHeader(data: WidgetHabitData) {
+private fun SmallHeader(data: WidgetHabitData, language: AppLanguage) {
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(text = data.emoji, style = TextStyle(fontSize = 18.sp))
@@ -296,23 +315,23 @@ private fun SmallHeader(data: WidgetHabitData) {
                 maxLines = 1
             )
         }
-        Spacer(GlanceModifier.height(2.dp))
+        Spacer(GlanceModifier.height(12.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(text = "🔥", style = TextStyle(fontSize = 10.sp))
+            Text(text = "🔥", style = TextStyle(fontSize = 15.sp))
             Spacer(GlanceModifier.width(3.dp))
             Text(
                 text = data.currentStreak.toString(),
                 style = TextStyle(
-                    fontSize = 13.sp,
+                    fontSize = 19.5.sp,
                     fontWeight = FontWeight.Bold,
                     color = WidgetStreak
                 )
             )
             Spacer(GlanceModifier.width(3.dp))
             Text(
-                text = "серия",
+                text = translate(language, "widget_streak_label"),
                 style = TextStyle(
-                    fontSize = 13.sp,
+                    fontSize = 19.5.sp,
                     color = WidgetTextMuted
                 )
             )
@@ -352,7 +371,7 @@ private fun SmallWeekDots(
 }
 
 @Composable
-private fun SmallMarkButton(data: WidgetHabitData) {
+private fun SmallMarkButton(data: WidgetHabitData, language: AppLanguage) {
     val action = actionRunCallback<MarkDoneAction>(
         actionParametersOf(HabitIdParamKey to data.habitId)
     )
@@ -361,7 +380,11 @@ private fun SmallMarkButton(data: WidgetHabitData) {
     } else {
         ImageProvider(R.drawable.widget_small_cta_pending)
     }
-    val text = if (data.isCompletedToday) "Выполнено ✓" else "Отметить"
+    val text = if (data.isCompletedToday) {
+        translate(language, "Completed ✓")
+    } else {
+        translate(language, "widget_mark_short")
+    }
     val textColor = if (data.isCompletedToday) WidgetDayDoneText else WidgetDayTodayPendingBorder
 
     Box(
@@ -394,7 +417,7 @@ private fun smallDotDrawable(status: DayStatus): Int {
 }
 
 @Composable
-private fun MediumHeader(data: WidgetHabitData) {
+private fun MediumHeader(data: WidgetHabitData, language: AppLanguage) {
     Row(
         modifier = GlanceModifier.fillMaxWidth(),
         verticalAlignment = Alignment.Top
@@ -415,7 +438,7 @@ private fun MediumHeader(data: WidgetHabitData) {
             }
             Spacer(GlanceModifier.height(2.dp))
             Text(
-                text = buildDateSubtitle(),
+                text = buildDateSubtitle(language),
                 style = TextStyle(
                     fontSize = 11.sp,
                     color = WidgetTextMuted
@@ -443,7 +466,7 @@ private fun MediumHeader(data: WidgetHabitData) {
             )
             Spacer(GlanceModifier.width(3.dp))
             Text(
-                text = "дн",
+                text = translate(language, "widget_day_short"),
                 style = TextStyle(
                     fontSize = 10.sp,
                     color = WidgetTextMuted
@@ -454,7 +477,7 @@ private fun MediumHeader(data: WidgetHabitData) {
 }
 
 @Composable
-private fun LargeHeader(data: WidgetHabitData) {
+private fun LargeHeader(data: WidgetHabitData, language: AppLanguage) {
     Row(
         modifier = GlanceModifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
@@ -475,7 +498,11 @@ private fun LargeHeader(data: WidgetHabitData) {
             }
             Spacer(GlanceModifier.height(2.dp))
             Text(
-                text = if (data.isCompletedToday) "Сегодня: выполнено" else "Сегодня: в процессе",
+                text = if (data.isCompletedToday) {
+                    translate(language, "widget_today_completed")
+                } else {
+                    translate(language, "widget_today_in_progress")
+                },
                 style = TextStyle(
                     fontSize = 11.sp,
                     color = WidgetTextMuted
@@ -513,12 +540,12 @@ private fun LargeHeader(data: WidgetHabitData) {
 }
 
 @Composable
-private fun LargeStatsRow(data: WidgetHabitData) {
+private fun LargeStatsRow(data: WidgetHabitData, language: AppLanguage) {
     val statWidth = ((LocalSize.current.width - 44.dp) / 3f).coerceAtLeast(72.dp)
     Row(modifier = GlanceModifier.fillMaxWidth()) {
         StatBlock(
             modifier = GlanceModifier.width(statWidth),
-            label = "СЕРИЯ"
+            label = translate(language, "widget_stat_streak")
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(text = "🔥", style = TextStyle(fontSize = 12.sp))
@@ -536,7 +563,7 @@ private fun LargeStatsRow(data: WidgetHabitData) {
         Spacer(GlanceModifier.width(6.dp))
         StatBlock(
             modifier = GlanceModifier.width(statWidth),
-            label = "РЕКОРД"
+            label = translate(language, "widget_stat_record")
         ) {
             Text(
                 text = data.currentStreak.toString(),
@@ -550,7 +577,7 @@ private fun LargeStatsRow(data: WidgetHabitData) {
         Spacer(GlanceModifier.width(6.dp))
         StatBlock(
             modifier = GlanceModifier.width(statWidth),
-            label = "7 ДНЕЙ"
+            label = translate(language, "widget_stat_7_days")
         ) {
             Text(
                 text = "${data.weekCompletionPct.coerceIn(0, 100)}%",
@@ -780,7 +807,7 @@ private fun DayDotInner(
 }
 
 @Composable
-private fun ProgressRow(data: WidgetHabitData) {
+private fun ProgressRow(data: WidgetHabitData, language: AppLanguage) {
     val completedDays = data.last7Days.count { it == DayStatus.DONE || it == DayStatus.TODAY_DONE }
     Row(
         modifier = GlanceModifier.fillMaxWidth(),
@@ -799,7 +826,7 @@ private fun ProgressRow(data: WidgetHabitData) {
     Spacer(GlanceModifier.height(4.dp))
     Box(modifier = GlanceModifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
         Text(
-            text = "$completedDays / 7 дн",
+            text = formatTranslate(language, "widget_week_progress_short", completedDays),
             style = TextStyle(
                 fontSize = 10.sp,
                 color = WidgetTextMuted
@@ -814,14 +841,14 @@ private data class WidgetInsight(
     val secondary: String
 )
 
-private fun buildInsight(data: WidgetHabitData): WidgetInsight? {
+private fun buildInsight(data: WidgetHabitData, language: AppLanguage): WidgetInsight? {
     if (data.currentStreak <= 0) return null
     return WidgetInsight(
-        primary = "Текущий рекорд: ${data.currentStreak} дней",
+        primary = formatTranslate(language, "widget_current_record_days", data.currentStreak),
         secondary = if (data.isCompletedToday) {
-            "Сегодня отмечено. Продолжай серию."
+            translate(language, "widget_insight_keep_streak")
         } else {
-            "Отметь сегодня и сохрани серию."
+            translate(language, "widget_insight_mark_today")
         }
     )
 }
@@ -870,7 +897,8 @@ private fun MarkButton(
     fontSize: TextUnit,
     verticalPadding: Dp,
     bottomInset: Dp = 0.dp,
-    horizontalInset: Dp = 0.dp
+    horizontalInset: Dp = 0.dp,
+    language: AppLanguage
 ) {
     val action = actionRunCallback<MarkDoneAction>(
         actionParametersOf(HabitIdParamKey to data.habitId)
@@ -890,7 +918,7 @@ private fun MarkButton(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "Выполнено",
+                    text = translate(language, "widget_done"),
                     style = TextStyle(
                         fontSize = fontSize,
                         fontWeight = FontWeight.Medium,
@@ -925,7 +953,7 @@ private fun MarkButton(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "Отметить ✓",
+                    text = translate(language, "widget_mark_done"),
                     style = TextStyle(
                         fontSize = fontSize,
                         fontWeight = FontWeight.Medium,
@@ -949,9 +977,9 @@ private fun weekCellSide(
     return raw.coerceAtLeast(min).coerceAtMost(max)
 }
 
-private fun buildDateSubtitle(): String {
+private fun buildDateSubtitle(language: AppLanguage): String {
     val now = LocalDate.now()
-    val locale = Locale.getDefault()
+    val locale = localeForLanguage(language)
     val dow = now.dayOfWeek.getDisplayName(DateTextStyle.SHORT, locale)
     val month = now.month.getDisplayName(DateTextStyle.SHORT, locale)
     return "$dow, ${now.dayOfMonth} $month"

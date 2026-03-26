@@ -946,6 +946,82 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "notes_placeholder_done" to (v("Wie lief es heute?", "Comment cela s'est-il passé aujourd'hui ?", "Como te fue hoy?", "Com'è andata oggi?", "Как прошло сегодня?") + mapOf(AppLanguage.EN to "How did it go today?", AppLanguage.CS to "Jak to dnes šlo?")),
     "notes_placeholder_missed" to (v("Warum hast du heute ausgesetzt?", "Pourquoi avez-vous manque aujourd'hui ?", "Por que fallaste hoy?", "Perche hai saltato oggi?", "Почему пропустил сегодня?") + mapOf(AppLanguage.EN to "Why did you miss today?", AppLanguage.CS to "Proč jsi dnes vynechal?")),
     "notes_placeholder_default" to (v("Notizen zur Gewohnheit", "Notes d'habitude", "Notas del habito", "Note sull'abitudine", "Заметки о привычке") + mapOf(AppLanguage.EN to "Habit notes", AppLanguage.CS to "Poznámky ke zvyku")),
+    "Widgets are PRO" to (
+        v("Widgets sind PRO", "Les widgets sont PRO", "Los widgets son PRO", "I widget sono PRO", "Виджеты доступны в PRO") +
+            mapOf(AppLanguage.EN to "Widgets are PRO", AppLanguage.CS to "Widgety jsou v PRO")
+    ),
+    "widget_streak_label" to (
+        v("Serie", "serie", "racha", "serie", "серия") +
+            mapOf(AppLanguage.EN to "streak", AppLanguage.CS to "série")
+    ),
+    "widget_mark_short" to (
+        v("Markieren", "Marquer", "Marcar", "Segna", "Отметить") +
+            mapOf(AppLanguage.EN to "Mark", AppLanguage.CS to "Označit")
+    ),
+    "widget_day_short" to (
+        v("T", "j", "d", "g", "дн") +
+            mapOf(AppLanguage.EN to "d", AppLanguage.CS to "d")
+    ),
+    "widget_today_completed" to (
+        v("Heute: erledigt", "Aujourd'hui : fait", "Hoy: completado", "Oggi: completato", "Сегодня: выполнено") +
+            mapOf(AppLanguage.EN to "Today: completed", AppLanguage.CS to "Dnes: splněno")
+    ),
+    "widget_today_in_progress" to (
+        v("Heute: in Arbeit", "Aujourd'hui : en cours", "Hoy: en progreso", "Oggi: in corso", "Сегодня: в процессе") +
+            mapOf(AppLanguage.EN to "Today: in progress", AppLanguage.CS to "Dnes: v procesu")
+    ),
+    "widget_stat_streak" to (
+        v("SERIE", "SÉRIE", "RACHA", "SERIE", "СЕРИЯ") +
+            mapOf(AppLanguage.EN to "STREAK", AppLanguage.CS to "SÉRIE")
+    ),
+    "widget_stat_record" to (
+        v("REKORD", "RECORD", "RÉCORD", "RECORD", "РЕКОРД") +
+            mapOf(AppLanguage.EN to "RECORD", AppLanguage.CS to "REKORD")
+    ),
+    "widget_stat_7_days" to (
+        v("7 TAGE", "7 JOURS", "7 DÍAS", "7 GIORNI", "7 ДНЕЙ") +
+            mapOf(AppLanguage.EN to "7 DAYS", AppLanguage.CS to "7 DNÍ")
+    ),
+    "widget_week_progress_short" to (
+        v("%d / 7 T", "%d / 7 j", "%d / 7 d", "%d / 7 g", "%d / 7 дн") +
+            mapOf(AppLanguage.EN to "%d / 7 d", AppLanguage.CS to "%d / 7 d")
+    ),
+    "widget_current_record_days" to (
+        v("Aktueller Rekord: %d Tage", "Record actuel : %d jours", "Récord actual: %d días", "Record attuale: %d giorni", "Текущий рекорд: %d дней") +
+            mapOf(AppLanguage.EN to "Current record: %d days", AppLanguage.CS to "Aktuální rekord: %d dní")
+    ),
+    "widget_insight_keep_streak" to (
+        v("Heute markiert. Halte die Serie.", "Marqué aujourd'hui. Garde la série.", "Hoy marcado. Mantén la racha.", "Segnato oggi. Mantieni la serie.", "Сегодня отмечено. Продолжай серию.") +
+            mapOf(AppLanguage.EN to "Today is marked. Keep the streak going.", AppLanguage.CS to "Dnes splněno. Udrž sérii.")
+    ),
+    "widget_insight_mark_today" to (
+        v("Markiere heute und halte die Serie.", "Marque aujourd'hui et garde la série.", "Marca hoy y mantén la racha.", "Segna oggi e mantieni la serie.", "Отметь сегодня и сохрани серию.") +
+            mapOf(AppLanguage.EN to "Mark today and keep the streak.", AppLanguage.CS to "Označ dnes a udrž sérii.")
+    ),
+    "widget_done" to (
+        v("Erledigt", "Terminé", "Completado", "Completato", "Выполнено") +
+            mapOf(AppLanguage.EN to "Completed", AppLanguage.CS to "Splněno")
+    ),
+    "widget_mark_done" to (
+        v("Markieren ✓", "Marquer ✓", "Marcar ✓", "Segna ✓", "Отметить ✓") +
+            mapOf(AppLanguage.EN to "Mark ✓", AppLanguage.CS to "Označit ✓")
+    ),
+    "widget_upsell_title" to (
+        v("Widgets sind in PRO verfügbar", "Les widgets sont disponibles dans PRO", "Los widgets están disponibles en PRO", "I widget sono disponibili in PRO", "Виджеты доступны в PRO") +
+            mapOf(AppLanguage.EN to "Widgets are available in PRO", AppLanguage.CS to "Widgety jsou dostupné v PRO")
+    ),
+    "widget_upsell_subtitle" to (
+        v("Öffne die App zum Upgrade und Hinzufügen dieses Widgets.", "Ouvrez l'application pour passer à PRO et ajouter ce widget.", "Abre la app para mejorar y añadir este widget.", "Apri l'app per passare a PRO e aggiungere questo widget.", "Открой приложение, чтобы обновиться и добавить этот виджет.") +
+            mapOf(AppLanguage.EN to "Open app to upgrade and add this widget.", AppLanguage.CS to "Otevři aplikaci, upgraduj a přidej tento widget.")
+    ),
+    "widget_open_pro" to (
+        v("PRO öffnen", "Ouvrir PRO", "Abrir PRO", "Apri PRO", "Открыть PRO") +
+            mapOf(AppLanguage.EN to "Open PRO", AppLanguage.CS to "Otevřít PRO")
+    ),
+    "widget_choose_habit" to (
+        v("Wähle eine Gewohnheit für das Widget", "Choisissez une habitude pour le widget", "Elige un hábito para el widget", "Scegli un'abitudine per il widget", "Выбери привычку для виджета") +
+            mapOf(AppLanguage.EN to "Choose a habit for widget", AppLanguage.CS to "Vyber návyk pro widget")
+    ),
     "Save note" to v("Notiz speichern", "Enregistrer la note", "Guardar nota", "Salva nota", "Сохранить заметку"),
     "New habit" to v("Neue Gewohnheit", "Nouvelle habitude", "Nuevo habito", "Nuova abitudine", "Новая привычка"),
     "Choose emoji" to v("Emoji wahlen", "Choisir un emoji", "Elegir emoji", "Scegli emoji", "Выбрать эмодзи"),

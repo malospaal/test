@@ -281,6 +281,7 @@ class MainViewModel(
     fun setLanguage(language: AppLanguage) {
         viewModelScope.launch {
             repository.setLanguage(language)
+            repository.refreshWidget()
             refresh()
         }
     }

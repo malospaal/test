@@ -1,13 +1,16 @@
 package com.example.microhabit.widget
 
 import android.content.Context
+import com.example.microhabit.data.AppLanguage
 import com.example.microhabit.data.HabitLifecycleState
 import com.example.microhabit.data.HabitRepository
 import com.example.microhabit.data.HabitTask
 import com.example.microhabit.data.hasPremiumAccess
+import com.example.microhabit.i18n.localeForLanguage
+import com.example.microhabit.i18n.translate
+import com.example.microhabit.i18n.weekdayLabels
 import java.time.DayOfWeek
 import java.time.LocalDate
-import java.time.format.TextStyle
 import java.util.Locale
 
 enum class DayStatus {
@@ -53,7 +56,8 @@ object WidgetBindingStore {
 
 class WidgetDataProvider(
     private val context: Context,
-    private val locale: Locale = Locale.getDefault()
+    private val language: AppLanguage = HabitRepository(context).getLanguage(),
+    private val locale: Locale = localeForLanguage(language)
 ) {
     private val repository = HabitRepository(context)
 
@@ -82,10 +86,7 @@ class WidgetDataProvider(
 
         val today = LocalDate.now()
         val weekStart = today.with(DayOfWeek.MONDAY)
-        val dayLabels = (0..6).map { offset ->
-            val day = weekStart.plusDays(offset.toLong()).dayOfWeek
-            day.getDisplayName(TextStyle.SHORT, locale).take(2)
-        }
+        val dayLabels = weekdayLabels(language).map { it.take(2) }
 
         val last7 = (0..6).map { offset ->
             val date = weekStart.plusDays(offset.toLong())
@@ -136,11 +137,11 @@ class WidgetDataProvider(
         return WidgetHabitData(
             habitId = "",
             emoji = "✨",
-            title = "Micro Habit",
+            title = translate(language, "Micro-habit"),
             currentStreak = 0,
             isCompletedToday = false,
             last7Days = List(7) { DayStatus.NOT_SCHEDULED },
-            dayLabels = listOf("Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"),
+            dayLabels = weekdayLabels(language).map { it.take(2) },
             weekCompletionPct = 0,
             isProUser = isProUser()
         )

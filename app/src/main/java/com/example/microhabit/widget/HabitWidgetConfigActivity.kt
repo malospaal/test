@@ -30,6 +30,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.microhabit.EXTRA_OPEN_PAYWALL_TRIGGER
+import com.example.microhabit.EXTRA_PAYWALL_TRIGGER_WIDGETS
 import com.example.microhabit.MainActivity
 import com.example.microhabit.data.AppLanguage
 import com.example.microhabit.data.HabitRepository
@@ -68,7 +70,11 @@ class HabitWidgetConfigActivity : ComponentActivity() {
                     WidgetUpsellScreen(
                         language = language,
                         onOpenPro = {
-                            startActivity(Intent(this, MainActivity::class.java))
+                            startActivity(
+                                Intent(this, MainActivity::class.java).apply {
+                                    putExtra(EXTRA_OPEN_PAYWALL_TRIGGER, EXTRA_PAYWALL_TRIGGER_WIDGETS)
+                                }
+                            )
                             finish()
                         },
                         onCancel = { finish() }
@@ -139,7 +145,7 @@ private fun WidgetUpsellScreen(
         )
         Spacer(Modifier.height(16.dp))
         Button(onClick = onOpenPro, modifier = Modifier.fillMaxWidth()) {
-            Text(translate(language, "widget_open_pro"))
+            Text(translate(language, "Get Premium"))
         }
         Spacer(Modifier.height(8.dp))
         Text(

@@ -14,6 +14,7 @@ import com.example.microhabit.data.HabitTask
 import com.example.microhabit.data.HabitTemplate
 import com.example.microhabit.data.HabitTemplateCatalog
 import com.example.microhabit.data.ProAccessSource
+import com.example.microhabit.data.SubscriptionState
 import com.example.microhabit.data.SubscriptionPlan
 import com.example.microhabit.data.TaskFrequency
 import com.example.microhabit.data.TrackingType
@@ -178,6 +179,7 @@ data class HabitUiState(
     val editorShowAdvanced: Boolean = false,
     val plan: SubscriptionPlan = SubscriptionPlan.FREE,
     val proAccessSource: ProAccessSource = ProAccessSource.NONE,
+    val subscriptionState: SubscriptionState = SubscriptionState.Free,
     val themeMode: AppThemeMode = AppThemeMode.SYSTEM,
     val language: AppLanguage = AppLanguage.RU,
     val minimumCompletionPercent: Int = 100,
@@ -267,6 +269,27 @@ class MainViewModel(
     fun setProAccessSource(source: ProAccessSource) {
         viewModelScope.launch {
             repository.setProAccessSource(source)
+            refresh()
+        }
+    }
+
+    fun cancelSubscription() {
+        viewModelScope.launch {
+            repository.cancelSubscription()
+            refresh()
+        }
+    }
+
+    fun renewSubscription() {
+        viewModelScope.launch {
+            repository.renewSubscription()
+            refresh()
+        }
+    }
+
+    fun debugForceFreePlan() {
+        viewModelScope.launch {
+            repository.debugForceFreePlan()
             refresh()
         }
     }
@@ -946,6 +969,7 @@ class MainViewModel(
             val tasks = allTasks.filter { repository.lifecycleState(it) == HabitLifecycleState.ACTIVE }
             val plan = repository.getPlan()
             val proAccessSource = repository.getProAccessSource()
+            val subscriptionState = repository.getSubscriptionState()
             val themeMode = repository.getThemeMode()
             val language = repository.getLanguage()
             val minimumCompletionPercent = repository.getMinimumCompletionPercent()
@@ -1154,6 +1178,7 @@ class MainViewModel(
                     calendarBreakdownItems = calendarBreakdownItems,
                     plan = plan,
                     proAccessSource = proAccessSource,
+                    subscriptionState = subscriptionState,
                     themeMode = themeMode,
                     language = language,
                     minimumCompletionPercent = minimumCompletionPercent,

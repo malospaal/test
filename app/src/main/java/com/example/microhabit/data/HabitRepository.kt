@@ -110,6 +110,7 @@ data class AnalyticsWeekSummary(
 class HabitRepository(private val context: Context) {
     private val prefs = context.getSharedPreferences("habit_prefs", Context.MODE_PRIVATE)
     private val formatter = DateTimeFormatter.ISO_LOCAL_DATE
+    private val subscriptionRepository = SubscriptionRepository(context)
 
     fun getTasks(): List<HabitTask> {
         val raw = prefs.getString(KEY_TASKS_JSON, null) ?: return emptyList()
@@ -346,35 +347,84 @@ class HabitRepository(private val context: Context) {
     fun getSelectedTaskId(): String? = prefs.getString(KEY_SELECTED_TASK, null)
 
     fun getPlan(): SubscriptionPlan {
-        val raw = prefs.getString(KEY_PLAN, SubscriptionPlan.FREE.name) ?: SubscriptionPlan.FREE.name
-        if (raw == "LIFETIME") {
-            // Migration from the old tier model: lifetime should grant PRO entitlement.
-            setPlan(SubscriptionPlan.PRO)
-            if (getProAccessSource() == ProAccessSource.NONE) {
-                setProAccessSource(ProAccessSource.LIFETIME)
-            }
-            return SubscriptionPlan.PRO
+        syncLegacyPlanCache()
+        return if (subscriptionRepository.hasPremiumAccess()) {
+            SubscriptionPlan.PRO
+        } else {
+            SubscriptionPlan.FREE
         }
-        return runCatching { SubscriptionPlan.valueOf(raw) }.getOrDefault(SubscriptionPlan.FREE)
     }
 
     fun setPlan(plan: SubscriptionPlan) {
-        val editor = prefs.edit()
-            .putString(KEY_PLAN, plan.name)
-        if (plan == SubscriptionPlan.FREE) {
-            editor.putString(KEY_PRO_ACCESS_SOURCE, ProAccessSource.NONE.name)
+        when (plan) {
+            SubscriptionPlan.FREE -> subscriptionRepository.setFree(debugForced = false)
+            SubscriptionPlan.PRO -> {
+                val state = subscriptionRepository.getSubscriptionState()
+                if (state !is SubscriptionState.PremiumActive) {
+                    subscriptionRepository.activatePremium(
+                        plan = PremiumPlan.YEARLY,
+                        nextBillingDate = LocalDate.now().plusYears(1),
+                        nextBillingAmount = "$24.99"
+                    )
+                }
+            }
         }
-        editor.apply()
+        syncLegacyPlanCache()
     }
 
     fun getProAccessSource(): ProAccessSource {
+        syncLegacyPlanCache()
         val raw = prefs.getString(KEY_PRO_ACCESS_SOURCE, ProAccessSource.NONE.name)
             ?: ProAccessSource.NONE.name
         return runCatching { ProAccessSource.valueOf(raw) }.getOrDefault(ProAccessSource.NONE)
     }
 
     fun setProAccessSource(source: ProAccessSource) {
-        prefs.edit().putString(KEY_PRO_ACCESS_SOURCE, source.name).apply()
+        when (source) {
+            ProAccessSource.MONTHLY -> subscriptionRepository.activatePremium(
+                plan = PremiumPlan.MONTHLY,
+                nextBillingDate = LocalDate.now().plusMonths(1),
+                nextBillingAmount = "$3.99"
+            )
+
+            ProAccessSource.YEARLY -> subscriptionRepository.activatePremium(
+                plan = PremiumPlan.YEARLY,
+                nextBillingDate = LocalDate.now().plusYears(1),
+                nextBillingAmount = "$24.99"
+            )
+
+            ProAccessSource.LIFETIME -> subscriptionRepository.activatePremium(
+                plan = PremiumPlan.LIFETIME,
+                nextBillingDate = null,
+                nextBillingAmount = null
+            )
+
+            ProAccessSource.NONE -> subscriptionRepository.setFree(debugForced = false)
+        }
+        syncLegacyPlanCache()
+    }
+
+    fun getSubscriptionState(): SubscriptionState {
+        return subscriptionRepository.getSubscriptionState()
+    }
+
+    fun cancelSubscription() {
+        subscriptionRepository.cancelSubscription()
+        syncLegacyPlanCache()
+    }
+
+    fun renewSubscription() {
+        subscriptionRepository.renewSubscription()
+        syncLegacyPlanCache()
+    }
+
+    fun debugForceFreePlan() {
+        subscriptionRepository.debugForceFreePlan()
+        syncLegacyPlanCache()
+    }
+
+    fun isDebugForceFreeEnabled(): Boolean {
+        return subscriptionRepository.isDebugForceFreeEnabled()
     }
 
     fun getThemeMode(): AppThemeMode {
@@ -1204,6 +1254,32 @@ class HabitRepository(private val context: Context) {
             segments += StreakSegment(currentRun)
         }
         return segments
+    }
+
+    private fun syncLegacyPlanCache() {
+        val state = subscriptionRepository.getSubscriptionState()
+        val legacyPlan = if (subscriptionRepository.hasPremiumAccess()) {
+            SubscriptionPlan.PRO
+        } else {
+            SubscriptionPlan.FREE
+        }
+        val source = when (state) {
+            SubscriptionState.Free -> ProAccessSource.NONE
+            is SubscriptionState.PremiumActive -> state.plan.toLegacySource()
+            is SubscriptionState.PremiumCancelled -> state.plan.toLegacySource()
+        }
+        prefs.edit()
+            .putString(KEY_PLAN, legacyPlan.name)
+            .putString(KEY_PRO_ACCESS_SOURCE, source.name)
+            .apply()
+    }
+
+    private fun PremiumPlan.toLegacySource(): ProAccessSource {
+        return when (this) {
+            PremiumPlan.MONTHLY -> ProAccessSource.MONTHLY
+            PremiumPlan.YEARLY -> ProAccessSource.YEARLY
+            PremiumPlan.LIFETIME -> ProAccessSource.LIFETIME
+        }
     }
 
     private fun doneKey(taskId: String, date: LocalDate): String {

@@ -95,26 +95,26 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "Menu" to v("Menu", "Menu", "Menu", "Menu", "Меню"),
     "Add" to v("Hinzufugen", "Ajouter", "Anadir", "Aggiungi", "Добавить"),
     "Upgrade" to v("Upgrade", "Mettre a niveau", "Mejorar", "Aggiorna", "Улучшить"),
-    "PRO yearly activated (debug)" to v(
-        "PRO-Jahresplan aktiviert (Debug)",
-        "PRO annuel active (debug)",
-        "PRO anual activado (debug)",
-        "PRO annuale attivato (debug)",
-        "PRO на год активирован (debug)"
+    "Premium yearly activated (debug)" to v(
+        "Premium-Jahresplan aktiviert (Debug)",
+        "Premium annuel active (debug)",
+        "Premium anual activado (debug)",
+        "Premium annuale attivato (debug)",
+        "Premium на год активирован (debug)"
     ),
-    "PRO monthly activated (debug)" to v(
-        "PRO-Monatsplan aktiviert (Debug)",
-        "PRO mensuel active (debug)",
-        "PRO mensual activado (debug)",
-        "PRO mensile attivato (debug)",
-        "PRO на месяц активирован (debug)"
+    "Premium monthly activated (debug)" to v(
+        "Premium-Monatsplan aktiviert (Debug)",
+        "Premium mensuel active (debug)",
+        "Premium mensual activado (debug)",
+        "Premium mensile attivato (debug)",
+        "Premium на месяц активирован (debug)"
     ),
-    "PRO lifetime activated (debug)" to v(
-        "PRO-Lifetime aktiviert (Debug)",
-        "PRO a vie active (debug)",
-        "PRO de por vida activado (debug)",
-        "PRO a vita attivato (debug)",
-        "PRO навсегда активирован (debug)"
+    "Premium lifetime activated (debug)" to v(
+        "Premium-Lifetime aktiviert (Debug)",
+        "Premium a vie active (debug)",
+        "Premium de por vida activado (debug)",
+        "Premium a vita attivato (debug)",
+        "Premium навсегда активирован (debug)"
     ),
     "Purchases restored (debug)" to v(
         "Kaufe wiederhergestellt (Debug)",
@@ -124,7 +124,7 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
         "Покупки восстановлены (debug)"
     ),
     "Micro-habit" to v("Micro-Habit", "Micro-habitude", "Micro-habito", "Micro-abitudine", "Микро-привычка"),
-    "Plan: PRO" to v("Plan: PRO", "Forfait : PRO", "Plan: PRO", "Piano: PRO", "Тариф: PRO"),
+    "Plan: Premium" to v("Plan: Premium", "Forfait : Premium", "Plan: Premium", "Piano: Premium", "Тариф: Premium"),
     "Plan: Free" to v("Plan: Kostenlos", "Forfait : Gratuit", "Plan: Gratis", "Piano: Gratuito", "Тариф: Free"),
     "No habits yet" to v("Noch keine Gewohnheiten", "Aucune habitude pour le moment", "Aun no hay habitos", "Nessuna abitudine ancora", "Пока нет привычек"),
     "Create your first habit to start building momentum." to v(
@@ -135,7 +135,7 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
         "Создайте первую привычку, чтобы начать движение."
     ),
     "Create habit" to v("Gewohnheit erstellen", "Creer une habitude", "Crear habito", "Crea abitudine", "Создать привычку"),
-    "Upgrade to PRO" to v("Auf PRO upgraden", "Passer a PRO", "Mejorar a PRO", "Passa a PRO", "Обновиться до PRO"),
+    "Get Premium" to v("Premium holen", "Obtenir Premium", "Obtener Premium", "Ottieni Premium", "Получить Premium"),
     "Active habits" to v("Aktive Gewohnheiten", "Habitudes actives", "Habitos activos", "Abitudini attive", "Активные привычки"),
     "Completed habits" to v("Abgeschlossene Gewohnheiten", "Habitudes terminees", "Habitos completados", "Abitudini completate", "Завершенные привычки"),
     "Archived habits" to v("Archivierte Gewohnheiten", "Habitudes archivees", "Habitos archivados", "Abitudini archiviate", "Архивные привычки"),
@@ -194,21 +194,21 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
         v("Woche zu Woche", "Semaine apres semaine", "Semana a semana", "Settimana su settimana", "Неделя к неделе") +
             mapOf(AppLanguage.CS to "Týden po týdnu")
     ),
-    "Unlock PRO" to (
-        v("PRO freischalten", "Debloquer PRO", "Desbloquear PRO", "Sblocca PRO", "Открыть PRO") +
-            mapOf(AppLanguage.CS to "Odemknout PRO")
+    "Unlock Premium" to (
+        v("Premium freischalten", "Debloquer Premium", "Desbloquear Premium", "Sblocca Premium", "Открыть Premium") +
+            mapOf(AppLanguage.CS to "Odemknout Premium")
     ),
-    "Best time of day\navailable in PRO" to (
-        v("Beste Tageszeit\nnur in PRO", "Meilleur moment de la journee\ndisponible en PRO", "Mejor momento del dia\ndisponible en PRO", "Momento migliore della giornata\ndisponibile in PRO", "Лучшее время дня\nдоступно в PRO") +
-            mapOf(AppLanguage.CS to "Nejlepší čas dne\nk dispozici v PRO")
+    "Best time of day\navailable in Premium" to (
+        v("Beste Tageszeit\nnur in Premium", "Meilleur moment de la journee\ndisponible en Premium", "Mejor momento del dia\ndisponible en Premium", "Momento migliore della giornata\ndisponibile in Premium", "Лучшее время дня\nдоступно в Premium") +
+            mapOf(AppLanguage.CS to "Nejlepší čas dne\nk dispozici v Premium")
     ),
-    "Weekday consistency\navailable in PRO" to (
-        v("Wochentags-Konsistenz\nnur in PRO", "Regularite par jour\ndisponible en PRO", "Consistencia por dias\ndisponible en PRO", "Costanza per giorni\ndisponibile in PRO", "Стабильность по дням\nдоступна в PRO") +
-            mapOf(AppLanguage.CS to "Stabilita podle dnů\nk dispozici v PRO")
+    "Weekday consistency\navailable in Premium" to (
+        v("Wochentags-Konsistenz\nnur in Premium", "Regularite par jour\ndisponible en Premium", "Consistencia por dias\ndisponible en Premium", "Costanza per giorni\ndisponibile in Premium", "Стабильность по дням\nдоступна в Premium") +
+            mapOf(AppLanguage.CS to "Stabilita podle dnů\nk dispozici v Premium")
     ),
-    "Week comparison\navailable in PRO" to (
-        v("Wochenvergleich\nnur in PRO", "Comparaison des semaines\ndisponible en PRO", "Comparacion semanal\ndisponible en PRO", "Confronto settimane\ndisponibile in PRO", "Сравнение недель\nдоступно в PRO") +
-            mapOf(AppLanguage.CS to "Porovnání týdnů\nk dispozici v PRO")
+    "Week comparison\navailable in Premium" to (
+        v("Wochenvergleich\nnur in Premium", "Comparaison des semaines\ndisponible en Premium", "Comparacion semanal\ndisponible en Premium", "Confronto settimane\ndisponibile in Premium", "Сравнение недель\nдоступно в Premium") +
+            mapOf(AppLanguage.CS to "Porovnání týdnů\nk dispozici v Premium")
     ),
     "−2 wk" to (
         v("−2 Wo.", "−2 sem.", "−2 sem.", "−2 sett.", "−2 нед.") +
@@ -251,18 +251,18 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "Not scheduled" to v("Nicht geplant", "Non planifie", "No programado", "Non pianificato", "Не запланировано"),
     "Future" to v("Zukunft", "Futur", "Futuro", "Futuro", "Будущее"),
     "Upcoming" to v("Bevorstehend", "A venir", "Proximo", "In arrivo", "Впереди"),
-    "You are on PRO. Manage options in Premium." to v(
-        "Du hast PRO. Verwalte Optionen im Premium-Bereich.",
-        "Vous etes sur PRO. Gere vos options dans Premium.",
-        "Estas en PRO. Gestiona opciones en Premium.",
-        "Sei su PRO. Gestisci le opzioni in Premium.",
-        "У вас PRO. Управляйте параметрами в разделе Премиум."
+    "You are on Premium. Manage options in Premium." to v(
+        "Du hast Premium. Verwalte Optionen im Premium-Bereich.",
+        "Vous etes sur Premium. Gere vos options dans Premium.",
+        "Estas en Premium. Gestiona opciones en Premium.",
+        "Sei su Premium. Gestisci le opzioni in Premium.",
+        "У вас Premium. Управляйте параметрами в разделе Премиум."
     ),
     "You are on Free. Upgrade to unlock unlimited habits." to v(
         "Du hast Free. Upgrade fur unbegrenzte Gewohnheiten.",
         "Vous etes sur Free. Passez a niveau pour des habitudes illimitees.",
         "Estas en Free. Mejora para desbloquear habitos ilimitados.",
-        "Sei su Free. Passa a PRO per abitudini illimitate.",
+        "Sei su Free. Passa a Premium per abitudini illimitate.",
         "У вас Free. Обновитесь, чтобы открыть безлимитные привычки."
     ),
     "Open Premium" to v("Premium offnen", "Ouvrir Premium", "Abrir Premium", "Apri Premium", "Открыть Премиум"),
@@ -272,7 +272,7 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "Current" to v("Aktuell", "Actuel", "Actual", "Attuale", "Текущий"),
     "Choose" to v("Wahlen", "Choisir", "Elegir", "Scegli", "Выбрать"),
     "Unlimited habits" to v("Unbegrenzte Gewohnheiten", "Habitudes illimitees", "Habitos ilimitados", "Abitudini illimitate", "Безлимитные привычки"),
-    "Choose PRO" to v("PRO wahlen", "Choisir PRO", "Elegir PRO", "Scegli PRO", "Выбрать PRO"),
+    "Choose Premium" to v("Premium wahlen", "Choisir Premium", "Elegir Premium", "Scegli Premium", "Выбрать Premium"),
     "Profile and app usage overview." to v(
         "Profil und Nutzungsubersicht.",
         "Profil et apercu d'utilisation.",
@@ -375,9 +375,165 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
         ) + mapOf(AppLanguage.CS to "Čas splnit svůj návyk!")
     ),
     "Subscription" to v("Abonnement", "Abonnement", "Suscripcion", "Abbonamento", "Подписка"),
-    "Manage Free and PRO plans." to v("Free- und PRO-Plane verwalten.", "Gerer les offres Free et PRO.", "Gestiona planes Free y PRO.", "Gestisci i piani Free e PRO.", "Управляйте тарифами Free и PRO."),
+    "Manage Free and Premium plans." to v("Free- und Premium-Plane verwalten.", "Gerer les offres Free et Premium.", "Gestiona planes Free y Premium.", "Gestisci i piani Free e Premium.", "Управляйте тарифами Free и Premium."),
     "Manage subscription" to v("Abo verwalten", "Gerer l'abonnement", "Gestionar suscripcion", "Gestisci abbonamento", "Управление подпиской"),
-    "PRO active: unlimited habits" to v("PRO aktiv: unbegrenzte Gewohnheiten", "PRO actif : habitudes illimitees", "PRO activo: habitos ilimitados", "PRO attivo: abitudini illimitate", "PRO активен: безлимитные привычки"),
+    "Home screen widgets" to (
+        v("Widgets", "Widgets de l'écran d'accueil", "Widgets de pantalla de inicio", "Widget schermata home", "Виджеты для рабочего стола") +
+            mapOf(AppLanguage.EN to "Home screen widgets", AppLanguage.CS to "Widgety")
+    ),
+    "Premium active: unlimited habits" to v("Premium aktiv: unbegrenzte Gewohnheiten", "Premium actif : habitudes illimitees", "Premium activo: habitos ilimitados", "Premium attivo: abitudini illimitate", "Premium активен: безлимитные привычки"),
+    "3 habits" to (
+        v("3 Gewohnheiten", "3 habitudes", "3 hábitos", "3 abitudini", "3 привычки") +
+            mapOf(AppLanguage.EN to "3 habits", AppLanguage.CS to "3 návyky")
+    ),
+    "Next billing" to (
+        v("Nächste Zahlung", "Prochaine facturation", "Próximo cobro", "Prossimo addebito", "Следующее списание") +
+            mapOf(AppLanguage.EN to "Next billing", AppLanguage.CS to "Příští platba")
+    ),
+    "Subscription cancelled" to (
+        v("Abo gekündigt", "Abonnement annulé", "Suscripción cancelada", "Abbonamento annullato", "Подписка отменена") +
+            mapOf(AppLanguage.EN to "Subscription cancelled", AppLanguage.CS to "Předplatné zrušeno")
+    ),
+    "Until expiry" to (
+        v("Bis Ablauf", "Jusqu'à expiration", "Hasta el vencimiento", "Fino alla scadenza", "До истечения") +
+            mapOf(AppLanguage.EN to "Until expiry", AppLanguage.CS to "Do vypršení")
+    ),
+    "No charge will happen." to (
+        v("Es erfolgt keine Abbuchung.", "Aucun débit n'aura lieu.", "No se realizará ningún cobro.", "Non verrà effettuato alcun addebito.", "Списание не произойдёт.") +
+            mapOf(AppLanguage.EN to "No charge will happen.", AppLanguage.CS to "Žádná platba neproběhne.")
+    ),
+    "Premium active until" to (
+        v("Premium aktiv bis", "Premium actif jusqu'au", "Premium activo hasta", "Premium attivo fino al", "Premium активен до") +
+            mapOf(AppLanguage.EN to "Premium active until", AppLanguage.CS to "Premium aktivní do")
+    ),
+    "Active plan" to (
+        v("Aktiver Plan", "Plan actif", "Plan activo", "Piano attivo", "Активный план") +
+            mapOf(AppLanguage.EN to "Active plan", AppLanguage.CS to "Aktivní plán")
+    ),
+    "Included in Premium" to (
+        v("In Premium enthalten", "Inclus dans Premium", "Incluido en Premium", "Incluso in Premium", "Включено в Premium") +
+            mapOf(AppLanguage.EN to "Included in Premium", AppLanguage.CS to "Součást Premium")
+    ),
+    "Changed your mind?" to (
+        v("Anders überlegt?", "Vous avez changé d'avis ?", "¿Cambiaste de opinión?", "Hai cambiato idea?", "Передумали?") +
+            mapOf(AppLanguage.EN to "Changed your mind?", AppLanguage.CS to "Rozmyslel sis to?")
+    ),
+    "Renew before %s and nothing changes." to (
+        v("Erneuere vor %s und alles bleibt gleich.", "Renouvelez avant le %s et rien ne change.", "Renueva antes de %s y nada cambiará.", "Rinnova entro %s e non cambia nulla.", "Возобновите до %s и ничего не изменится.") +
+            mapOf(AppLanguage.EN to "Renew before %s and nothing changes.", AppLanguage.CS to "Obnov do %s a nic se nezmění.")
+    ),
+    "Renew subscription" to (
+        v("Abo erneuern", "Renouveler l'abonnement", "Renovar suscripción", "Rinnova abbonamento", "Возобновить подписку") +
+            mapOf(AppLanguage.EN to "Renew subscription", AppLanguage.CS to "Obnovit předplatné")
+    ),
+    "After cancellation Premium stays active until %s. No charge will happen. Then your account switches to Free." to (
+        v("Nach der Kündigung bleibt Premium bis %s aktiv. Es erfolgt keine Abbuchung. Danach wechselt dein Konto auf Free.", "Après annulation Premium reste actif jusqu'au %s. Aucun débit n'aura lieu. Ensuite le compte passe au plan Free.", "Tras cancelar, Premium sigue activo hasta %s. No habrá cobro. Después tu cuenta pasará a Free.", "Dopo l'annullamento Premium resta attivo fino al %s. Nessun addebito. Poi l'account passerà al piano Free.", "После отмены Premium остаётся активным до %s. Списание не произойдёт. Затем аккаунт перейдёт на Free.") +
+            mapOf(AppLanguage.EN to "After cancellation Premium stays active until %s. No charge will happen. Then your account switches to Free.", AppLanguage.CS to "Po zrušení zůstane Premium aktivní do %s. Platba neproběhne. Poté se účet přepne na Free.")
+    ),
+    "Debug" to (
+        v("Debug", "Debug", "Debug", "Debug", "Debug") +
+            mapOf(AppLanguage.EN to "Debug", AppLanguage.CS to "Debug")
+    ),
+    "Switch to Free plan" to (
+        v("Auf Free wechseln", "Passer à Free", "Cambiar a Free", "Passa a Free", "Переключить на Free план") +
+            mapOf(AppLanguage.EN to "Switch to Free plan", AppLanguage.CS to "Přepnout na Free")
+    ),
+    "Cancel subscription?" to (
+        v("Abo kündigen?", "Annuler l'abonnement ?", "¿Cancelar suscripción?", "Annullare l'abbonamento?", "Отменить подписку?") +
+            mapOf(AppLanguage.EN to "Cancel subscription?", AppLanguage.CS to "Zrušit předplatné?")
+    ),
+    "Cancel subscription" to (
+        v("Abo kündigen", "Annuler l'abonnement", "Cancelar suscripción", "Annulla abbonamento", "Отменить подписку") +
+            mapOf(AppLanguage.EN to "Cancel subscription", AppLanguage.CS to "Zrušit předplatné")
+    ),
+    "Active until" to (
+        v("Aktiv bis", "Actif jusqu'au", "Activo hasta", "Attivo fino al", "Активен до") +
+            mapOf(AppLanguage.EN to "Active until", AppLanguage.CS to "Aktivní do")
+    ),
+    "Charge" to (
+        v("Abbuchung", "Débit", "Cobro", "Addebito", "Списание") +
+            mapOf(AppLanguage.EN to "Charge", AppLanguage.CS to "Platba")
+    ),
+    "No charge ✓" to (
+        v("Keine Abbuchung ✓", "Aucun débit ✓", "Sin cobro ✓", "Nessun addebito ✓", "Списание не произойдёт ✓") +
+            mapOf(AppLanguage.EN to "No charge ✓", AppLanguage.CS to "Žádná platba ✓")
+    ),
+    "After %s you lose:" to (
+        v("Nach %s verlierst du:", "Après le %s vous perdrez :", "Después de %s perderás:", "Dopo %s perderai:", "После %s вы потеряете:") +
+            mapOf(AppLanguage.EN to "After %s you lose:", AppLanguage.CS to "Po %s ztratíš:")
+    ),
+    "More than 3 active habits" to (
+        v("Mehr als 3 aktive Gewohnheiten", "Plus de 3 habitudes actives", "Más de 3 hábitos activos", "Più di 3 abitudini attive", "Более 3 активных привычек") +
+            mapOf(AppLanguage.EN to "More than 3 active habits", AppLanguage.CS to "Více než 3 aktivní návyky")
+    ),
+    "Keep Premium" to (
+        v("Premium behalten", "Garder Premium", "Mantener Premium", "Mantieni Premium", "Оставить Premium") +
+            mapOf(AppLanguage.EN to "Keep Premium", AppLanguage.CS to "Ponechat Premium")
+    ),
+    "Confirm cancellation" to (
+        v("Kündigung bestätigen", "Confirmer l'annulation", "Confirmar cancelación", "Conferma annullamento", "Подтвердить отмену") +
+            mapOf(AppLanguage.EN to "Confirm cancellation", AppLanguage.CS to "Potvrdit zrušení")
+    ),
+    "Unlock Premium" to (
+        v("Premium freischalten", "Débloquer Premium", "Desbloquear Premium", "Sblocca Premium", "Разблокируй Premium") +
+            mapOf(AppLanguage.EN to "Unlock Premium", AppLanguage.CS to "Odemkni Premium")
+    ),
+    "You reached the limit of 3 habits." to (
+        v("Du hast das Limit von 3 Gewohnheiten erreicht.", "Vous avez atteint la limite de 3 habitudes.", "Has alcanzado el límite de 3 hábitos.", "Hai raggiunto il limite di 3 abitudini.", "Вы достигли лимита в 3 привычки.") +
+            mapOf(AppLanguage.EN to "You reached the limit of 3 habits.", AppLanguage.CS to "Dosáhl jsi limitu 3 návyků.")
+    ),
+    "Unlock advanced analytics." to (
+        v("Schalte erweiterte Analysen frei.", "Débloquez les analyses avancées.", "Desbloquea analíticas avanzadas.", "Sblocca analisi avanzate.", "Откройте расширенную аналитику.") +
+            mapOf(AppLanguage.EN to "Unlock advanced analytics.", AppLanguage.CS to "Odemkni pokročilou analytiku.")
+    ),
+    "Add widgets on your home screen." to (
+        v("Füge Widgets zum Startbildschirm hinzu.", "Ajoutez des widgets à votre écran d'accueil.", "Añade widgets a tu pantalla de inicio.", "Aggiungi widget alla schermata iniziale.", "Добавьте виджеты на рабочий стол.") +
+            mapOf(AppLanguage.EN to "Add widgets on your home screen.", AppLanguage.CS to "Přidej widgety na plochu.")
+    ),
+    "Get access to all features." to (
+        v("Erhalte Zugriff auf alle Funktionen.", "Accédez à toutes les fonctionnalités.", "Obtén acceso a todas las funciones.", "Ottieni accesso a tutte le funzionalità.", "Получите доступ ко всем возможностям.") +
+            mapOf(AppLanguage.EN to "Get access to all features.", AppLanguage.CS to "Získej přístup ke všem funkcím.")
+    ),
+    "Upgrade to Premium to unlock all features." to (
+        v("Upgrade auf Premium, um alle Funktionen freizuschalten.", "Passez à Premium pour débloquer toutes les fonctionnalités.", "Mejora a Premium para desbloquear todas las funciones.", "Passa a Premium per sbloccare tutte le funzionalità.", "Перейдите на Premium, чтобы открыть все возможности.") +
+            mapOf(AppLanguage.EN to "Upgrade to Premium to unlock all features.", AppLanguage.CS to "Přejděte na Premium a odemkněte všechny funkce.")
+    ),
+    "year" to (
+        v("Jahr", "an", "año", "anno", "год") +
+            mapOf(AppLanguage.EN to "year", AppLanguage.CS to "rok")
+    ),
+    "month" to (
+        v("Monat", "mois", "mes", "mese", "месяц") +
+            mapOf(AppLanguage.EN to "month", AppLanguage.CS to "měsíc")
+    ),
+    "Track as many goals as you want" to (
+        v("Verfolge so viele Ziele wie du willst", "Suivez autant d'objectifs que vous voulez", "Sigue tantas metas como quieras", "Tieni traccia di tutti gli obiettivi che vuoi", "Отслеживай сколько угодно целей") +
+            mapOf(AppLanguage.EN to "Track as many goals as you want", AppLanguage.CS to "Sleduj tolik cílů, kolik chceš")
+    ),
+    "Progress right on your home screen" to (
+        v("Fortschritt direkt auf dem Startbildschirm", "Progression directement sur l'écran d'accueil", "Progreso directo en la pantalla de inicio", "Progressi direttamente nella schermata iniziale", "Прогресс прямо на рабочем столе") +
+            mapOf(AppLanguage.EN to "Progress right on your home screen", AppLanguage.CS to "Pokrok přímo na ploše")
+    ),
+    "Patterns, consistency, and best time insights" to (
+        v("Muster, Konstanz und beste Zeiten", "Tendances, régularité et meilleur moment", "Patrones, constancia y mejor hora", "Pattern, costanza e orario migliore", "Паттерны, стабильность и лучшее время") +
+            mapOf(AppLanguage.EN to "Patterns, consistency, and best time insights", AppLanguage.CS to "Vzorce, stabilita a nejlepší čas")
+    ),
+    "Response within 24 hours" to (
+        v("Antwort innerhalb von 24 Stunden", "Réponse sous 24 heures", "Respuesta en 24 horas", "Risposta entro 24 ore", "Ответ в течение 24 часов") +
+            mapOf(AppLanguage.EN to "Response within 24 hours", AppLanguage.CS to "Odpověď do 24 hodin")
+    ),
+    "Best value" to (
+        v("Bestes Angebot", "Meilleur choix", "Mejor opción", "Miglior scelta", "Лучший выбор") +
+            mapOf(AppLanguage.EN to "Best value", AppLanguage.CS to "Nejlepší volba")
+    ),
+    "Forever, no recurring payments" to (
+        v("Für immer, ohne weitere Zahlungen", "À vie, sans paiements récurrents", "Para siempre, sin pagos recurrentes", "Per sempre, senza pagamenti ricorrenti", "Навсегда, без платежей") +
+            mapOf(AppLanguage.EN to "Forever, no recurring payments", AppLanguage.CS to "Navždy, bez opakovaných plateb")
+    ),
+    "Auto-renewal. Cancel anytime. Terms · Privacy" to (
+        v("Automatische Verlängerung. Jederzeit kündbar. Bedingungen · Datenschutz", "Renouvellement automatique. Annulation à tout moment. Conditions · Confidentialité", "Renovación automática. Cancela cuando quieras. Términos · Privacidad", "Rinnovo automatico. Annulla quando vuoi. Termini · Privacy", "Автопродление. Отмена в любое время. Terms · Privacy") +
+            mapOf(AppLanguage.EN to "Auto-renewal. Cancel anytime. Terms · Privacy", AppLanguage.CS to "Automatické obnovení. Zrušení kdykoli. Podmínky · Ochrana soukromí")
+    ),
     "Free plan: one active habit" to v("Free-Plan: eine aktive Gewohnheit", "Plan Free : une habitude active", "Plan Free: un habito activo", "Piano Free: una abitudine attiva", "План Free: одна активная привычка"),
     "Free plan: 3 active habits" to (
         v("Free-Plan: 3 aktive Gewohnheiten", "Plan Free : 3 habitudes actives", "Plan Free: 3 habitos activos", "Piano Free: 3 abitudini attive", "План Free: 3 активные привычки") +
@@ -946,9 +1102,9 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "notes_placeholder_done" to (v("Wie lief es heute?", "Comment cela s'est-il passé aujourd'hui ?", "Como te fue hoy?", "Com'è andata oggi?", "Как прошло сегодня?") + mapOf(AppLanguage.EN to "How did it go today?", AppLanguage.CS to "Jak to dnes šlo?")),
     "notes_placeholder_missed" to (v("Warum hast du heute ausgesetzt?", "Pourquoi avez-vous manque aujourd'hui ?", "Por que fallaste hoy?", "Perche hai saltato oggi?", "Почему пропустил сегодня?") + mapOf(AppLanguage.EN to "Why did you miss today?", AppLanguage.CS to "Proč jsi dnes vynechal?")),
     "notes_placeholder_default" to (v("Notizen zur Gewohnheit", "Notes d'habitude", "Notas del habito", "Note sull'abitudine", "Заметки о привычке") + mapOf(AppLanguage.EN to "Habit notes", AppLanguage.CS to "Poznámky ke zvyku")),
-    "Widgets are PRO" to (
-        v("Widgets sind PRO", "Les widgets sont PRO", "Los widgets son PRO", "I widget sono PRO", "Виджеты доступны в PRO") +
-            mapOf(AppLanguage.EN to "Widgets are PRO", AppLanguage.CS to "Widgety jsou v PRO")
+    "Widgets are Premium" to (
+        v("Widgets sind Premium", "Les widgets sont Premium", "Los widgets son Premium", "I widget sono Premium", "Виджеты доступны в Premium") +
+            mapOf(AppLanguage.EN to "Widgets are Premium", AppLanguage.CS to "Widgety jsou v Premium")
     ),
     "widget_streak_label" to (
         v("Serie", "serie", "racha", "serie", "серия") +
@@ -1035,16 +1191,16 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
             mapOf(AppLanguage.EN to "+%d %s", AppLanguage.CS to "+%d %s")
     ),
     "widget_upsell_title" to (
-        v("Widgets sind in PRO verfügbar", "Les widgets sont disponibles dans PRO", "Los widgets están disponibles en PRO", "I widget sono disponibili in PRO", "Виджеты доступны в PRO") +
-            mapOf(AppLanguage.EN to "Widgets are available in PRO", AppLanguage.CS to "Widgety jsou dostupné v PRO")
+        v("Widgets sind in Premium verfügbar", "Les widgets sont disponibles en Premium", "Los widgets están disponibles en Premium", "I widget sono disponibili in Premium", "Виджеты доступны в Premium") +
+            mapOf(AppLanguage.EN to "Widgets are available in Premium", AppLanguage.CS to "Widgety jsou dostupné v Premium")
     ),
     "widget_upsell_subtitle" to (
-        v("Öffne die App zum Upgrade und Hinzufügen dieses Widgets.", "Ouvrez l'application pour passer à PRO et ajouter ce widget.", "Abre la app para mejorar y añadir este widget.", "Apri l'app per passare a PRO e aggiungere questo widget.", "Открой приложение, чтобы обновиться и добавить этот виджет.") +
+        v("Öffne die App zum Upgrade und Hinzufügen dieses Widgets.", "Ouvrez l'application pour passer à Premium et ajouter ce widget.", "Abre la app para mejorar a Premium y añadir este widget.", "Apri l'app per passare a Premium e aggiungere questo widget.", "Открой приложение, чтобы перейти на Premium и добавить этот виджет.") +
             mapOf(AppLanguage.EN to "Open app to upgrade and add this widget.", AppLanguage.CS to "Otevři aplikaci, upgraduj a přidej tento widget.")
     ),
     "widget_open_pro" to (
-        v("PRO öffnen", "Ouvrir PRO", "Abrir PRO", "Apri PRO", "Открыть PRO") +
-            mapOf(AppLanguage.EN to "Open PRO", AppLanguage.CS to "Otevřít PRO")
+        v("Premium öffnen", "Ouvrir Premium", "Abrir Premium", "Apri Premium", "Открыть Premium") +
+            mapOf(AppLanguage.EN to "Open Premium", AppLanguage.CS to "Otevřít Premium")
     ),
     "widget_choose_habit" to (
         v("Wähle eine Gewohnheit für das Widget", "Choisissez une habitude pour le widget", "Elige un hábito para el widget", "Scegli un'abitudine per il widget", "Выбери привычку для виджета") +

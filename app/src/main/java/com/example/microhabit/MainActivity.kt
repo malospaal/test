@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Activity
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
+import android.content.pm.ApplicationInfo
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
@@ -193,7 +194,9 @@ import com.example.microhabit.data.HabitTask
 import com.example.microhabit.data.HabitTemplate
 import com.example.microhabit.data.HabitTemplateCatalog
 import com.example.microhabit.data.MAX_HABIT_TITLE_LENGTH
+import com.example.microhabit.data.PremiumPlan
 import com.example.microhabit.data.ProAccessSource
+import com.example.microhabit.data.SubscriptionState
 import com.example.microhabit.data.SubscriptionPlan
 import com.example.microhabit.data.TaskFrequency
 import com.example.microhabit.data.TrackingType
@@ -272,7 +275,15 @@ private enum class AppPage {
     CALENDAR,
     PAYWALL,
     ACCOUNT,
+    MANAGE_SUBSCRIPTION,
     SETTINGS
+}
+
+private enum class PaywallTrigger {
+    DEFAULT,
+    HABIT_LIMIT,
+    ANALYTICS,
+    WIDGETS
 }
 
 private enum class BillingCycle {
@@ -284,6 +295,8 @@ private enum class BillingCycle {
 private const val PRODUCT_ID_MONTHLY = "micro_habit_pro_monthly"
 private const val PRODUCT_ID_YEARLY = "micro_habit_pro_yearly"
 private const val PRODUCT_ID_LIFETIME = "micro_habit_pro_lifetime"
+const val EXTRA_OPEN_PAYWALL_TRIGGER = "extra_open_paywall_trigger"
+const val EXTRA_PAYWALL_TRIGGER_WIDGETS = "WIDGETS"
 
 private fun billingProductIdFor(cycle: BillingCycle): String {
     return when (cycle) {
@@ -403,6 +416,7 @@ private fun pageTitle(page: AppPage): String {
         AppPage.CALENDAR -> t("Calendar")
         AppPage.PAYWALL -> t("Premium")
         AppPage.ACCOUNT -> t("Account")
+        AppPage.MANAGE_SUBSCRIPTION -> t("Manage subscription")
         AppPage.SETTINGS -> t("Settings")
     }
 }
@@ -416,6 +430,7 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
     var trackerScrollToTopSignal by rememberSaveable { mutableStateOf(0) }
     var habitsScrollToTopSignal by rememberSaveable { mutableStateOf(0) }
     var selectedBilling by rememberSaveable { mutableStateOf(BillingCycle.YEARLY) }
+    var paywallTrigger by rememberSaveable { mutableStateOf(PaywallTrigger.DEFAULT) }
     var showNotificationsBlockedDialog by rememberSaveable { mutableStateOf(false) }
     var pendingPermissionAction by remember { mutableStateOf<NotificationPermissionAction?>(null) }
     var pendingSettingsAction by remember { mutableStateOf<NotificationPermissionAction?>(null) }
@@ -487,8 +502,9 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
         previousPage = from
         page = AppPage.SETTINGS
     }
-    val openPaywallFromCurrentPage = {
+    val openPaywallFromCurrentPage: (PaywallTrigger) -> Unit = { trigger ->
         previousPage = page
+        paywallTrigger = trigger
         page = AppPage.PAYWALL
     }
     val openTemplatePicker = {
@@ -500,6 +516,14 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
 
     LaunchedEffect(state.isLoaded, state.tasks, state.allTasks) {
         val activity = context.findActivity() ?: return@LaunchedEffect
+        val paywallTriggerExtra = activity.intent?.getStringExtra(EXTRA_OPEN_PAYWALL_TRIGGER)
+        if (paywallTriggerExtra == EXTRA_PAYWALL_TRIGGER_WIDGETS) {
+            activity.intent?.removeExtra(EXTRA_OPEN_PAYWALL_TRIGGER)
+            previousPage = AppPage.TRACKER
+            paywallTrigger = PaywallTrigger.WIDGETS
+            page = AppPage.PAYWALL
+            return@LaunchedEffect
+        }
         val openHabitId = activity.intent?.getStringExtra(HabitReminderScheduler.EXTRA_OPEN_HABIT_ID)
             ?: return@LaunchedEffect
         activity.intent?.removeExtra(HabitReminderScheduler.EXTRA_OPEN_HABIT_ID)
@@ -630,6 +654,14 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                                         )
                                     }
                                 }
+                                AppPage.MANAGE_SUBSCRIPTION -> {
+                                    IconButton(onClick = { page = AppPage.ACCOUNT }) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                                            contentDescription = t("Back")
+                                        )
+                                    }
+                                }
                                 AppPage.SETTINGS -> {
                                     IconButton(
                                         onClick = {
@@ -656,8 +688,7 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                                                     if (canAdd) {
                                                         openTemplatePicker()
                                                     } else {
-                                                        previousPage = page
-                                                        page = AppPage.PAYWALL
+                                                        openPaywallFromCurrentPage(PaywallTrigger.HABIT_LIMIT)
                                                     }
                                                 }
                                             ) {
@@ -772,8 +803,7 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                             vm = vm,
                             onCreateHabit = openTemplatePicker,
                             onUpgrade = {
-                                previousPage = AppPage.HABITS
-                                page = AppPage.PAYWALL
+                                openPaywallFromCurrentPage(PaywallTrigger.HABIT_LIMIT)
                             },
                             isEditMode = habitsEditMode,
                             onEditModeChange = { habitsEditMode = it },
@@ -783,13 +813,13 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                             state = state,
                             onSelectTask = vm::selectTask,
                             onUpgrade = {
-                                previousPage = AppPage.ANALYTICS
-                                page = AppPage.PAYWALL
+                                openPaywallFromCurrentPage(PaywallTrigger.ANALYTICS)
                             }
                         )
                         AppPage.CALENDAR -> CalendarScreen(state = state, vm = vm)
                         AppPage.PAYWALL -> PaywallPage(
                             currentPlan = state.plan,
+                            trigger = paywallTrigger,
                             selectedBilling = selectedBilling,
                             onSelectBilling = { selectedBilling = it },
                             onSubscribe = {
@@ -804,9 +834,9 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                                 Toast.makeText(
                                     context,
                                     when (selectedBilling) {
-                                        BillingCycle.YEARLY -> translate(language, "PRO yearly activated (debug)")
-                                        BillingCycle.MONTHLY -> translate(language, "PRO monthly activated (debug)")
-                                        BillingCycle.LIFETIME -> translate(language, "PRO lifetime activated (debug)")
+                                        BillingCycle.YEARLY -> translate(language, "Premium yearly activated (debug)")
+                                        BillingCycle.MONTHLY -> translate(language, "Premium monthly activated (debug)")
+                                        BillingCycle.LIFETIME -> translate(language, "Premium lifetime activated (debug)")
                                     },
                                     Toast.LENGTH_SHORT
                                 ).show()
@@ -824,9 +854,11 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                         )
                         AppPage.ACCOUNT -> AccountPage(
                             state = state,
-                            onOpenPaywall = {
-                                previousPage = AppPage.ACCOUNT
-                                page = AppPage.PAYWALL
+                            onOpenPaywall = { trigger ->
+                                openPaywallFromCurrentPage(trigger)
+                            },
+                            onOpenManageSubscription = {
+                                page = AppPage.MANAGE_SUBSCRIPTION
                             },
                             onOpenSettings = {
                                 openSettingsPage(AppPage.ACCOUNT)
@@ -835,14 +867,34 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                             onResetProgress = vm::resetProgress,
                             onDeleteAccount = vm::deleteAccount
                         )
+                        AppPage.MANAGE_SUBSCRIPTION -> ManageSubscriptionScreen(
+                            state = state,
+                            onOpenPaywall = { trigger ->
+                                openPaywallFromCurrentPage(trigger)
+                            },
+                            onRestorePurchase = {
+                                val source = state.proAccessSource
+                                    .takeIf { it != ProAccessSource.NONE }
+                                    ?: ProAccessSource.YEARLY
+                                vm.setPlan(SubscriptionPlan.PRO)
+                                vm.setProAccessSource(source)
+                                Toast.makeText(
+                                    context,
+                                    translate(language, "Purchases restored (debug)"),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            },
+                            onCancelSubscription = vm::cancelSubscription,
+                            onRenewSubscription = vm::renewSubscription,
+                            onDebugForceFree = vm::debugForceFreePlan
+                        )
                         AppPage.SETTINGS -> SettingsPage(
                             state = state,
                             onSetTheme = vm::setThemeMode,
                             onSetLanguage = vm::setLanguage,
                             onSetMinimumCompletionPercent = vm::setMinimumCompletionPercent,
                             onOpenPaywall = {
-                                previousPage = AppPage.SETTINGS
-                                page = AppPage.PAYWALL
+                                page = AppPage.MANAGE_SUBSCRIPTION
                             },
                             onExportData = vm::exportData,
                             onResetProgress = vm::resetProgress,
@@ -863,7 +915,7 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                         onCategorySelected = { category ->
                             if (!vm.canCreateTask()) {
                                 showTemplatePicker = false
-                                openPaywallFromCurrentPage()
+                                openPaywallFromCurrentPage(PaywallTrigger.HABIT_LIMIT)
                             } else {
                                 selectedTemplateCategory = category.name
                                 selectedTemplateId = null
@@ -872,7 +924,7 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                         onCreateCustom = {
                             if (!vm.canCreateTask()) {
                                 showTemplatePicker = false
-                                openPaywallFromCurrentPage()
+                                openPaywallFromCurrentPage(PaywallTrigger.HABIT_LIMIT)
                             } else {
                                 showTemplatePicker = false
                                 vm.openCreateTask()
@@ -881,7 +933,7 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                         onSkip = {
                             if (!vm.canCreateTask()) {
                                 showTemplatePicker = false
-                                openPaywallFromCurrentPage()
+                                openPaywallFromCurrentPage(PaywallTrigger.HABIT_LIMIT)
                             } else {
                                 showTemplatePicker = false
                                 vm.openCreateTask()
@@ -902,7 +954,7 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                         onTemplateSelected = { template ->
                             if (!vm.canCreateTask()) {
                                 showTemplatePicker = false
-                                openPaywallFromCurrentPage()
+                                openPaywallFromCurrentPage(PaywallTrigger.HABIT_LIMIT)
                                 return@HabitTemplateScreen
                             }
                             selectedTemplateId = template.id
@@ -922,7 +974,7 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                         onCreateCustomHabit = {
                             if (!vm.canCreateTask()) {
                                 showTemplatePicker = false
-                                openPaywallFromCurrentPage()
+                                openPaywallFromCurrentPage(PaywallTrigger.HABIT_LIMIT)
                             } else {
                                 showTemplatePicker = false
                                 vm.openCreateTask()
@@ -1665,7 +1717,7 @@ private fun HabitsPage(
                             onClick = { if (canAdd) onCreateHabit() else onUpgrade() },
                             shape = RoundedCornerShape(AppTheme.radius.md)
                         ) {
-                            Text(if (canAdd) t("Create habit") else t("Upgrade to PRO"))
+                            Text(if (canAdd) t("Create habit") else t("Get Premium"))
                         }
                     }
                 }
@@ -2786,7 +2838,8 @@ private fun statusLabel(state: CalendarDayState, language: AppLanguage): String 
 @Composable
 private fun AccountPage(
     state: HabitUiState,
-    onOpenPaywall: () -> Unit,
+    onOpenPaywall: (PaywallTrigger) -> Unit,
+    onOpenManageSubscription: () -> Unit,
     onOpenSettings: () -> Unit,
     onExportData: () -> Result<String>,
     onResetProgress: () -> Unit,
@@ -2796,6 +2849,10 @@ private fun AccountPage(
     val semantic = AppTheme.colors
     val context = LocalContext.current
     val language = LocalAppLanguage.current
+    val locale = appLocale()
+    val dateFormatter = remember(locale) {
+        DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)
+    }
     var showResetConfirm by rememberSaveable { mutableStateOf(false) }
     var showDeleteConfirm by rememberSaveable { mutableStateOf(false) }
     LazyColumn(
@@ -2805,29 +2862,177 @@ private fun AccountPage(
     ) {
         item {
             GlassCard(tone = SurfaceTone.PRIMARY) {
-                Text(t("Current plan"), style = MaterialTheme.typography.labelLarge, color = semantic.textSecondary)
-                Spacer(Modifier.height(spacing.x0_5))
-                Text(
-                    if (state.plan.hasPremiumAccess()) {
-                        t("Plan: PRO")
-                    } else {
-                        t("Plan: Free")
-                    },
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(Modifier.height(spacing.x0_5))
-                Text(
-                    text = if (state.plan.hasPremiumAccess()) {
-                        t("Unlimited habits")
-                    } else {
-                        t("Free plan: 3 active habits")
-                    },
-                    color = semantic.textSecondary
-                )
-                Spacer(Modifier.height(spacing.x1))
-                Button(onClick = onOpenPaywall, modifier = Modifier.fillMaxWidth()) {
-                    Text(t("Manage subscription"))
+                when (val subscriptionState = state.subscriptionState) {
+                    SubscriptionState.Free -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                t("Current plan"),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = semantic.textSecondary
+                            )
+                            Surface(
+                                color = semantic.backgroundSurfaceMuted,
+                                shape = RoundedCornerShape(999.dp)
+                            ) {
+                                Text(
+                                    text = t("3 habits"),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = semantic.textSecondary,
+                                    modifier = Modifier.padding(horizontal = spacing.x1, vertical = 2.dp)
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(spacing.x0_5))
+                        Text(
+                            text = t("Free"),
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(Modifier.height(spacing.x1))
+                        Text("○ ${t("Home screen widgets")}", color = semantic.textSecondary)
+                        Spacer(Modifier.height(spacing.x0_5))
+                        Text("○ ${t("Advanced analytics")}", color = semantic.textSecondary)
+                        Spacer(Modifier.height(spacing.x0_5))
+                        Text("○ ${t("Unlimited habits")}", color = semantic.textSecondary)
+                        Spacer(Modifier.height(spacing.x1_5))
+                        Button(
+                            onClick = { onOpenPaywall(PaywallTrigger.DEFAULT) },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF2DCF96),
+                                contentColor = Color(0xFF04342C)
+                            )
+                        ) {
+                            Text(
+                                text = "${t("Get Premium")} ✦",
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+
+                    is SubscriptionState.PremiumActive -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                t("Current plan"),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = semantic.textSecondary
+                            )
+                            Surface(
+                                color = Color(0xFF1A3A20),
+                                shape = RoundedCornerShape(999.dp)
+                            ) {
+                                Text(
+                                    text = t("Active"),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color(0xFF2DCF96),
+                                    modifier = Modifier.padding(horizontal = spacing.x1, vertical = 2.dp)
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(spacing.x0_5))
+                        Text(
+                            text = "${t("Premium")} ✦",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        if (subscriptionState.nextBillingDate != null) {
+                            Spacer(Modifier.height(spacing.x1))
+                            HorizontalDivider(color = semantic.borderSubtle.copy(alpha = 0.4f))
+                            Spacer(Modifier.height(spacing.x1))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Text(
+                                    text = t("Next billing"),
+                                    color = semantic.textSecondary,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        text = subscriptionState.nextBillingAmount.orEmpty(),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = subscriptionState.nextBillingDate.format(dateFormatter),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = semantic.textSecondary
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(spacing.x1_5))
+                        OutlinedButton(
+                            onClick = onOpenManageSubscription,
+                            modifier = Modifier.fillMaxWidth(),
+                            border = BorderStroke(1.dp, semantic.primary)
+                        ) {
+                            Text("${t("Manage subscription")} →")
+                        }
+                    }
+
+                    is SubscriptionState.PremiumCancelled -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                t("Subscription cancelled"),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = semantic.textSecondary
+                            )
+                            Surface(
+                                color = Color(0xFF2A1F0A),
+                                shape = RoundedCornerShape(999.dp)
+                            ) {
+                                Text(
+                                    text = t("Until expiry"),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color(0xFFF59E42),
+                                    modifier = Modifier.padding(horizontal = spacing.x1, vertical = 2.dp)
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(spacing.x0_5))
+                        Text(
+                            text = "${subscriptionState.plan.displayName()} · ${planPriceLabel(subscriptionState.plan)}",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = semantic.textPrimary
+                        )
+                        Spacer(Modifier.height(spacing.x1))
+                        HorizontalDivider(color = semantic.borderSubtle.copy(alpha = 0.4f))
+                        Spacer(Modifier.height(spacing.x1))
+                        Text(
+                            text = "${t("Premium active until")} ${subscriptionState.expiresOn.format(dateFormatter)}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFFF59E42)
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = t("No charge will happen."),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = semantic.textSecondary
+                        )
+                        Spacer(Modifier.height(spacing.x1_5))
+                        OutlinedButton(
+                            onClick = onOpenManageSubscription,
+                            modifier = Modifier.fillMaxWidth(),
+                            border = BorderStroke(1.dp, semantic.primary)
+                        ) {
+                            Text("${t("Manage subscription")} →")
+                        }
+                    }
                 }
             }
         }
@@ -3032,7 +3237,7 @@ private fun SettingsPage(
             SettingsGroup(title = t("Subscription")) {
                 SettingsRow(
                     title = t("Manage subscription"),
-                    value = if (state.plan.hasPremiumAccess()) "PRO" else t("FREE"),
+                    value = if (state.plan.hasPremiumAccess()) t("Premium") else t("Free"),
                     onClick = onOpenPaywall
                 )
             }
@@ -3236,6 +3441,7 @@ private fun SettingsPage(
 @Composable
 private fun PaywallPage(
     currentPlan: SubscriptionPlan,
+    trigger: PaywallTrigger,
     selectedBilling: BillingCycle,
     onSelectBilling: (BillingCycle) -> Unit,
     onSubscribe: () -> Unit,
@@ -3244,6 +3450,18 @@ private fun PaywallPage(
 ) {
     val spacing = AppTheme.spacing
     val colors = AppTheme.colors
+    val subtitle = when (trigger) {
+        PaywallTrigger.HABIT_LIMIT -> t("You reached the limit of 3 habits.")
+        PaywallTrigger.ANALYTICS -> t("Unlock advanced analytics.")
+        PaywallTrigger.WIDGETS -> t("Add widgets on your home screen.")
+        PaywallTrigger.DEFAULT -> t("Get access to all features.")
+    }
+
+    val ctaLabel = when (selectedBilling) {
+        BillingCycle.YEARLY -> "${t("Get Premium")} — \$24.99 / ${t("year")}"
+        BillingCycle.MONTHLY -> "${t("Get Premium")} — \$3.99 / ${t("month")}"
+        BillingCycle.LIFETIME -> "${t("Get Premium")} — \$59.99"
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -3252,43 +3470,34 @@ private fun PaywallPage(
     ) {
         item {
             GlassCard {
-                Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.Top
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    IconButton(
+                        onClick = onClose,
+                        modifier = Modifier.align(Alignment.TopStart)
                     ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(spacing.x0_5)) {
-                            Text(
-                                text = t("Premium"),
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = colors.textPrimary
-                            )
-                            Text(
-                                text = t("Calm focus for consistent habit building."),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = colors.textSecondary
-                            )
-                        }
-                        IconButton(onClick = onClose) {
-                            Icon(Icons.Rounded.Close, contentDescription = t("Close"))
-                        }
+                        Icon(Icons.Rounded.Close, contentDescription = t("Close"))
                     }
-
-                    Surface(
-                        color = colors.primaryMuted,
-                        shape = RoundedCornerShape(AppTheme.radius.md)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = spacing.x1),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(spacing.x0_5)
                     ) {
                         Text(
-                            text = if (currentPlan.hasPremiumAccess()) {
-                                t("You already have Premium access.")
-                            } else {
-                                t("Unlock unlimited habits and deeper insights.")
-                            },
-                            modifier = Modifier.padding(horizontal = spacing.x1_5, vertical = spacing.x1),
+                            text = "✦",
+                            style = MaterialTheme.typography.displaySmall,
+                            color = colors.primary
+                        )
+                        Text(
+                            text = t("Unlock Premium"),
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = subtitle,
                             style = MaterialTheme.typography.bodyMedium,
-                            color = colors.textPrimary
+                            color = colors.textSecondary
                         )
                     }
                 }
@@ -3298,67 +3507,21 @@ private fun PaywallPage(
         item {
             GlassCard {
                 Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
-                    Text(
-                        text = t("Included with Premium"),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
+                    PremiumFeatureRow(
+                        title = t("Unlimited habits"),
+                        subtitle = t("Track as many goals as you want")
                     )
-                    FeatureBulletRow(t("Unlimited active habits"))
-                    FeatureBulletRow(t("Advanced analytics and consistency views"))
-                    FeatureBulletRow(t("Priority support and early access updates"))
-                    FeatureBulletRow(t("Future cross-device sync support"))
-                }
-            }
-        }
-
-        item {
-            GlassCard {
-                Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
-                    Text(
-                        text = t("Plan comparison"),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
+                    PremiumFeatureRow(
+                        title = t("Home screen widgets"),
+                        subtitle = t("Progress right on your home screen")
                     )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(spacing.x1)
-                    ) {
-                        Text(
-                            text = t("Feature"),
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = colors.textSecondary
-                        )
-                        Text(
-                            text = t("Free"),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = colors.textSecondary
-                        )
-                        Text(
-                            text = t("Premium"),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = colors.textSecondary
-                        )
-                    }
-                    PlanComparisonRow(
-                        feature = t("Active habits"),
-                        freeIncluded = true,
-                        premiumIncluded = true
+                    PremiumFeatureRow(
+                        title = t("Advanced analytics"),
+                        subtitle = t("Patterns, consistency, and best time insights")
                     )
-                    PlanComparisonRow(
-                        feature = t("More than three habits"),
-                        freeIncluded = false,
-                        premiumIncluded = true
-                    )
-                    PlanComparisonRow(
-                        feature = t("Advanced analytics"),
-                        freeIncluded = false,
-                        premiumIncluded = true
-                    )
-                    PlanComparisonRow(
-                        feature = t("Priority support"),
-                        freeIncluded = false,
-                        premiumIncluded = true
+                    PremiumFeatureRow(
+                        title = t("Priority support"),
+                        subtitle = t("Response within 24 hours")
                     )
                 }
             }
@@ -3368,19 +3531,10 @@ private fun PaywallPage(
             Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
                 PricingPlanCard(
                     model = PricingCardModel(
-                        title = t("Lifetime"),
-                        priceLabel = "\$59.99",
-                        subtitle = t("Pay once — keep it forever.")
-                    ),
-                    selected = selectedBilling == BillingCycle.LIFETIME,
-                    onClick = { onSelectBilling(BillingCycle.LIFETIME) }
-                )
-                PricingPlanCard(
-                    model = PricingCardModel(
                         title = t("Yearly"),
-                        priceLabel = "\$24.99 / year",
-                        subtitle = t("Equivalent to \$2.08 / month"),
-                        badge = t("Recommended")
+                        priceLabel = "\$24.99 / ${t("year")}",
+                        subtitle = "\$2.08 / ${t("month")}",
+                        badge = t("Best value")
                     ),
                     selected = selectedBilling == BillingCycle.YEARLY,
                     recommended = true,
@@ -3389,56 +3543,486 @@ private fun PaywallPage(
                 PricingPlanCard(
                     model = PricingCardModel(
                         title = t("Monthly"),
-                        priceLabel = "\$3.99 / month",
+                        priceLabel = "\$3.99 / ${t("month")}",
                         subtitle = t("Flexible monthly billing")
                     ),
                     selected = selectedBilling == BillingCycle.MONTHLY,
                     onClick = { onSelectBilling(BillingCycle.MONTHLY) }
                 )
-                Text(
-                    text = t("One-time forever · \$2.08/mo equivalent over 2 years"),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = colors.textSecondary
+                PricingPlanCard(
+                    model = PricingCardModel(
+                        title = t("Lifetime"),
+                        priceLabel = "\$59.99",
+                        subtitle = t("Forever, no recurring payments")
+                    ),
+                    selected = selectedBilling == BillingCycle.LIFETIME,
+                    onClick = { onSelectBilling(BillingCycle.LIFETIME) }
                 )
+            }
+        }
+
+        item {
+            Button(
+                onClick = onSubscribe,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF2DCF96),
+                    contentColor = Color(0xFF04342C)
+                ),
+                enabled = !currentPlan.hasPremiumAccess()
+            ) {
+                Text(
+                    text = ctaLabel,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        item {
+            TextButton(
+                onClick = onRestorePurchase,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(t("Restore purchase"))
+            }
+            Text(
+                text = t("Auto-renewal. Cancel anytime. Terms · Privacy"),
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.textSecondary,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+    }
+}
+
+@Composable
+private fun ManageSubscriptionScreen(
+    state: HabitUiState,
+    onOpenPaywall: (PaywallTrigger) -> Unit,
+    onRestorePurchase: () -> Unit,
+    onCancelSubscription: () -> Unit,
+    onRenewSubscription: () -> Unit,
+    onDebugForceFree: () -> Unit
+) {
+    val spacing = AppTheme.spacing
+    val colors = AppTheme.colors
+    val context = LocalContext.current
+    val locale = appLocale()
+    val dateFormatter = remember(locale) {
+        DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)
+    }
+    var showCancelSheet by rememberSaveable { mutableStateOf(false) }
+    val subscriptionState = state.subscriptionState
+    val isDebugBuild = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(spacing.x2),
+        verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
+    ) {
+        item {
+            GlassCard {
+                when (subscriptionState) {
+                    SubscriptionState.Free -> {
+                        Text(
+                            text = t("Free"),
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(Modifier.height(spacing.x1))
+                        Text(
+                            text = t("Upgrade to Premium to unlock all features."),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colors.textSecondary
+                        )
+                        Spacer(Modifier.height(spacing.x1_5))
+                        Button(
+                            onClick = { onOpenPaywall(PaywallTrigger.DEFAULT) },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF2DCF96),
+                                contentColor = Color(0xFF04342C)
+                            )
+                        ) {
+                            Text(text = t("Get Premium"), fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+
+                    is SubscriptionState.PremiumActive -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = t("Active plan"),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = colors.textSecondary
+                            )
+                            Surface(
+                                color = Color(0xFF1A3A20),
+                                shape = RoundedCornerShape(999.dp)
+                            ) {
+                                Text(
+                                    text = t("Active"),
+                                    color = Color(0xFF2DCF96),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    modifier = Modifier.padding(horizontal = spacing.x1, vertical = 2.dp)
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(spacing.x0_5))
+                        Text(
+                            text = "${subscriptionState.plan.displayName()} · ${planPriceLabel(subscriptionState.plan)}",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        if (subscriptionState.nextBillingDate != null) {
+                            Spacer(Modifier.height(spacing.x1))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Text(
+                                    text = t("Next billing"),
+                                    color = colors.textSecondary
+                                )
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        text = subscriptionState.nextBillingAmount.orEmpty(),
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = subscriptionState.nextBillingDate.format(dateFormatter),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = colors.textSecondary
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    is SubscriptionState.PremiumCancelled -> {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = t("Subscription cancelled"),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = colors.textSecondary
+                            )
+                            Surface(
+                                color = Color(0xFF2A1F0A),
+                                shape = RoundedCornerShape(999.dp)
+                            ) {
+                                Text(
+                                    text = t("Until expiry"),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color(0xFFF59E42),
+                                    modifier = Modifier.padding(horizontal = spacing.x1, vertical = 2.dp)
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(spacing.x1))
+                        Text(
+                            text = "${t("Premium active until")} ${subscriptionState.expiresOn.format(dateFormatter)}",
+                            color = Color(0xFFF59E42),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = t("No charge will happen."),
+                            color = colors.textSecondary,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+        }
+
+        if (subscriptionState is SubscriptionState.PremiumCancelled) {
+            item {
+                GlassCard {
+                    Text(
+                        text = t("Changed your mind?"),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(Modifier.height(spacing.x0_5))
+                    Text(
+                        text = tf("Renew before %s and nothing changes.", subscriptionState.expiresOn.format(dateFormatter)),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.textSecondary
+                    )
+                    Spacer(Modifier.height(spacing.x1))
+                    Button(
+                        onClick = onRenewSubscription,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF2DCF96),
+                            contentColor = Color(0xFF04342C)
+                        )
+                    ) {
+                        Text(t("Renew subscription"), fontWeight = FontWeight.SemiBold)
+                    }
+                }
             }
         }
 
         item {
             GlassCard {
                 Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
-                    Button(
-                        onClick = onSubscribe,
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !currentPlan.hasPremiumAccess()
-                    ) {
-                        Text(
-                            if (currentPlan.hasPremiumAccess()) {
-                                t("Premium active")
-                            } else {
-                                tf(
-                                    "Continue with %s",
-                                    when (selectedBilling) {
-                                        BillingCycle.YEARLY -> t("Yearly")
-                                        BillingCycle.MONTHLY -> t("Monthly")
-                                        BillingCycle.LIFETIME -> t("Lifetime")
-                                    }
-                                )
-                            }
-                        )
-                    }
-                    TextButton(
-                        onClick = onRestorePurchase,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(t("Restore purchase"))
-                    }
                     Text(
-                        text = t("Billing integration is shown in debug mode for now."),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = colors.textTertiary
+                        text = t("Included in Premium"),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
                     )
+                    FeatureBulletRow(t("Unlimited habits"))
+                    FeatureBulletRow(t("Home screen widgets"))
+                    FeatureBulletRow(t("Advanced analytics"))
+                    FeatureBulletRow(t("Priority support"))
                 }
             }
+        }
+
+        if (subscriptionState is SubscriptionState.PremiumActive) {
+            item {
+                GlassCard {
+                    Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onRestorePurchase() },
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = t("Restore purchase"),
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            Text("›", style = MaterialTheme.typography.titleLarge, color = colors.textSecondary)
+                        }
+                        HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.35f))
+                        OutlinedButton(
+                            onClick = { showCancelSheet = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            border = BorderStroke(1.dp, Color(0xFF3A1A1A)),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFE05C5C))
+                        ) {
+                            Text(t("Cancel subscription"))
+                        }
+                    }
+                }
+            }
+        }
+
+        if (subscriptionState is SubscriptionState.PremiumActive && subscriptionState.plan != PremiumPlan.LIFETIME) {
+            item {
+                Text(
+                    text = tf(
+                        "After cancellation Premium stays active until %s. No charge will happen. Then your account switches to Free.",
+                        subscriptionState.nextBillingDate?.format(dateFormatter).orEmpty()
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.textSecondary
+                )
+            }
+        }
+
+        if (isDebugBuild) {
+            item {
+                val strokeWidthPx = with(LocalDensity.current) { 1.dp.toPx() }
+                val cornerRadiusPx = with(LocalDensity.current) { AppTheme.radius.lg.toPx() }
+                val dashPathEffect = remember { PathEffect.dashPathEffect(floatArrayOf(10f, 7f), 0f) }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(AppTheme.radius.lg))
+                        .background(Color(0xFF1A1A0A))
+                        .drawBehind {
+                            val halfStroke = strokeWidthPx / 2f
+                            drawRoundRect(
+                                color = Color(0xFF3A3A10),
+                                topLeft = Offset(halfStroke, halfStroke),
+                                size = Size(size.width - strokeWidthPx, size.height - strokeWidthPx),
+                                cornerRadius = CornerRadius(
+                                    cornerRadiusPx - halfStroke,
+                                    cornerRadiusPx - halfStroke
+                                ),
+                                style = Stroke(width = strokeWidthPx, pathEffect = dashPathEffect)
+                            )
+                        }
+                        .padding(spacing.x1_5)
+                ) {
+                    Column {
+                        Text(
+                            text = "🛠 ${t("Debug")}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color(0xFF8A8A30)
+                        )
+                        Spacer(Modifier.height(spacing.x0_5))
+                        OutlinedButton(
+                            onClick = onDebugForceFree,
+                            modifier = Modifier.fillMaxWidth(),
+                            border = BorderStroke(1.dp, Color(0xFF3A3A10))
+                        ) {
+                            Text(t("Switch to Free plan"))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showCancelSheet && subscriptionState is SubscriptionState.PremiumActive) {
+        CancelSubscriptionSheet(
+            state = subscriptionState,
+            onDismiss = { showCancelSheet = false },
+            onConfirmCancel = {
+                onCancelSubscription()
+                showCancelSheet = false
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CancelSubscriptionSheet(
+    state: SubscriptionState.PremiumActive,
+    onDismiss: () -> Unit,
+    onConfirmCancel: () -> Unit
+) {
+    val spacing = AppTheme.spacing
+    val colors = AppTheme.colors
+    val locale = appLocale()
+    val dateFormatter = remember(locale) {
+        DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)
+    }
+    val activeUntil = state.nextBillingDate?.format(dateFormatter).orEmpty()
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = spacing.x2, vertical = spacing.x1_5),
+            verticalArrangement = Arrangement.spacedBy(spacing.x1)
+        ) {
+            Text(
+                text = t("Cancel subscription?"),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
+            GlassCard {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(t("Active until"), color = colors.textSecondary)
+                    Text(activeUntil, fontWeight = FontWeight.SemiBold)
+                }
+                Spacer(Modifier.height(spacing.x0_5))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(t("Charge"), color = colors.textSecondary)
+                    Text(t("No charge ✓"), color = Color(0xFF2DCF96), fontWeight = FontWeight.SemiBold)
+                }
+            }
+            GlassCard {
+                Text(
+                    text = tf("After %s you lose:", activeUntil),
+                    color = Color(0xFFE05C5C),
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(Modifier.height(spacing.x0_5))
+                Text("✕ ${t("Home screen widgets")}", color = Color(0xFFE05C5C))
+                Spacer(Modifier.height(2.dp))
+                Text("✕ ${t("Advanced analytics")}", color = Color(0xFFE05C5C))
+                Spacer(Modifier.height(2.dp))
+                Text("✕ ${t("More than 3 active habits")}", color = Color(0xFFE05C5C))
+            }
+            OutlinedButton(
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(t("Keep Premium"), fontWeight = FontWeight.SemiBold)
+            }
+            OutlinedButton(
+                onClick = onConfirmCancel,
+                modifier = Modifier.fillMaxWidth(),
+                border = BorderStroke(1.dp, Color(0xFF3A1A1A)),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFE05C5C))
+            ) {
+                Text(t("Confirm cancellation"))
+            }
+            Spacer(Modifier.height(spacing.x1))
+        }
+    }
+}
+
+@Composable
+private fun PremiumPlan.displayName(): String = when (this) {
+    PremiumPlan.MONTHLY -> t("Monthly")
+    PremiumPlan.YEARLY -> t("Yearly")
+    PremiumPlan.LIFETIME -> t("Lifetime")
+}
+
+@Composable
+private fun planPriceLabel(plan: PremiumPlan): String = when (plan) {
+    PremiumPlan.MONTHLY -> "\$3.99 / ${t("month")}"
+    PremiumPlan.YEARLY -> "\$24.99 / ${t("year")}"
+    PremiumPlan.LIFETIME -> "\$59.99"
+}
+
+@Composable
+private fun PremiumFeatureRow(
+    title: String,
+    subtitle: String
+) {
+    val spacing = AppTheme.spacing
+    val colors = AppTheme.colors
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+    ) {
+        Surface(
+            modifier = Modifier.size(18.dp),
+            shape = RoundedCornerShape(999.dp),
+            color = Color(0xFF2DCF96).copy(alpha = 0.2f)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Rounded.Check,
+                    contentDescription = null,
+                    tint = Color(0xFF2DCF96),
+                    modifier = Modifier.size(12.dp)
+                )
+            }
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.textSecondary
+            )
         }
     }
 }
@@ -3529,7 +4113,7 @@ private fun OnboardingCard(vm: MainViewModel) {
                 enabled = canAdd,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(if (canAdd) t("Create habit") else t("Upgrade to PRO"))
+                Text(if (canAdd) t("Create habit") else t("Get Premium"))
             }
         }
     }
@@ -4246,7 +4830,7 @@ private fun TaskControlsRow(
     ) {
         TaskControlButton(
             modifier = Modifier.weight(1f),
-            label = if (canAddTask) t("New") else "PRO",
+            label = if (canAddTask) t("New") else t("Premium"),
             icon = if (canAddTask) Icons.Rounded.AddCircle else Icons.Rounded.WorkspacePremium,
             onClick = onCreate,
             emphasis = ActionEmphasis.PRIMARY

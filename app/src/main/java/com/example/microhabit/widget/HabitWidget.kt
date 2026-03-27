@@ -196,7 +196,7 @@ private fun ProLockedContent(language: AppLanguage) {
             Text("🔒", style = TextStyle(fontSize = 16.sp))
             Spacer(GlanceModifier.height(6.dp))
             Text(
-                text = translate(language, "Widgets are PRO"),
+                text = translate(language, "Widgets are Premium"),
                 style = TextStyle(
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,

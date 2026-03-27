@@ -239,7 +239,7 @@ fun AnalyticsScreen(
             item {
                 ProBlurOverlay(
                     isProUser = isProUser,
-                    lockedLabel = t("Best time of day\navailable in PRO"),
+                    lockedLabel = t("Best time of day\navailable in Premium"),
                     onUpgrade = onUpgrade
                 ) {
                     BestTimeOfDayCard(hourlyData = hourlyData)
@@ -249,7 +249,7 @@ fun AnalyticsScreen(
         item {
             ProBlurOverlay(
                 isProUser = isProUser,
-                lockedLabel = t("Weekday consistency\navailable in PRO"),
+                lockedLabel = t("Weekday consistency\navailable in Premium"),
                 onUpgrade = onUpgrade
             ) {
                 WeekdayRadarCard(weekdayData = weekdayData)
@@ -258,7 +258,7 @@ fun AnalyticsScreen(
         item {
             ProBlurOverlay(
                 isProUser = isProUser,
-                lockedLabel = t("Week comparison\navailable in PRO"),
+                lockedLabel = t("Week comparison\navailable in Premium"),
                 onUpgrade = onUpgrade
             ) {
                 WeekCompareCard(weeks = weekComparisons)
@@ -761,7 +761,7 @@ private fun ProBlurOverlay(
                         colors = ButtonDefaults.buttonColors(containerColor = AppTheme.colors.primary, contentColor = Color.White),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)
                     ) {
-                        Text(text = t("Unlock PRO"), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                        Text(text = t("Get Premium"), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }

@@ -29,7 +29,7 @@
     <string name="delete">Delete</string>
     <string name="archive">Archive</string>
     <string name="create_habit">Create habit</string>
-    <string name="upgrade_to_pro">Upgrade to PRO</string>
+    <string name="upgrade_to_pro">Get Premium</string>
     <string name="no_habits_yet">No habits yet</string>
     <string name="create_first_habit_desc">Create your first habit to start building momentum.</string>
 </resources>

@@ -1,5 +1,6 @@
 package com.example.microhabit.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -8,7 +9,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -19,42 +19,52 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import com.example.microhabit.ui.theme.AppTheme
 
 @Composable
 fun SettingsGroup(
     title: String,
     subtitle: String? = null,
+    borderColorOverride: Color? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     val spacing = AppTheme.spacing
-    val colors = AppTheme.colors
+    val semantic = AppTheme.colors
     val radius = AppTheme.radius
     val stroke = AppTheme.stroke
+    val isDark = semantic.backgroundCanvas.red < 0.2f
+    val cardBackground = if (isDark) semantic.backgroundSurfaceMuted else Color(0xFFFFFFFF)
+    val cardBorderColor = borderColorOverride ?: if (isDark) {
+        semantic.borderSubtle.copy(alpha = 0.55f)
+    } else {
+        Color(0xFFC8D9CA)
+    }
 
     Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
         Text(
             text = title,
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.SemiBold,
-            color = colors.textSecondary
+            color = if (isDark) semantic.textSecondary else Color(0xFF5A7A5E)
         )
         if (!subtitle.isNullOrBlank()) {
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.bodySmall,
-                color = colors.textTertiary
+                color = if (isDark) semantic.textTertiary else Color(0xFF5A7A5E)
             )
         }
 
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = colors.backgroundSurfaceMuted),
+            colors = CardDefaults.cardColors(containerColor = cardBackground),
             shape = RoundedCornerShape(radius.lg),
-            border = BorderStroke(stroke.thin, colors.borderSubtle.copy(alpha = 0.55f)),
-            elevation = CardDefaults.cardElevation(defaultElevation = AppTheme.elevation.none)
+            border = BorderStroke(stroke.thin, cardBorderColor),
+            elevation = CardDefaults.cardElevation(defaultElevation = if (isDark) AppTheme.elevation.none else 1.dp)
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
                 content()
@@ -75,6 +85,10 @@ fun SettingsRow(
 ) {
     val spacing = AppTheme.spacing
     val colors = AppTheme.colors
+    val isDark = colors.backgroundCanvas.red < 0.2f
+    val normalTextColor = if (isDark) colors.textPrimary else Color(0xFF0D1F12)
+    val normalSecondaryColor = if (isDark) colors.textSecondary else Color(0xFF5A7A5E)
+    val normalChevronColor = if (isDark) colors.textSecondary else Color(0xFF5A7A5E)
 
     Row(
         modifier = Modifier
@@ -88,7 +102,7 @@ fun SettingsRow(
             Icon(
                 imageVector = leadingIcon,
                 contentDescription = null,
-                tint = if (enabled) colors.textSecondary else colors.textTertiary
+                tint = if (enabled) normalSecondaryColor else colors.textTertiary
             )
         }
         Column(
@@ -101,14 +115,14 @@ fun SettingsRow(
                 color = when {
                     !enabled -> colors.textTertiary
                     destructive -> colors.danger
-                    else -> colors.textPrimary
+                    else -> normalTextColor
                 }
             )
             if (!subtitle.isNullOrBlank()) {
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (enabled) colors.textSecondary else colors.textTertiary
+                    color = if (enabled) normalSecondaryColor else colors.textTertiary
                 )
             }
         }
@@ -117,7 +131,7 @@ fun SettingsRow(
             Text(
                 text = value,
                 style = MaterialTheme.typography.labelLarge,
-                color = if (enabled) colors.textSecondary else colors.textTertiary
+                color = if (enabled) normalSecondaryColor else colors.textTertiary
             )
         }
 
@@ -125,7 +139,7 @@ fun SettingsRow(
             Text(
                 text = ">",
                 style = MaterialTheme.typography.labelLarge,
-                color = if (enabled) colors.textSecondary else colors.textTertiary
+                color = if (destructive) colors.danger else if (enabled) normalChevronColor else colors.textTertiary
             )
         }
     }
@@ -177,7 +191,7 @@ fun SettingsSwitchRow(
 
 @Composable
 fun SettingsDivider() {
-    val colors = AppTheme.colors
-    HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.6f))
+    val semantic = AppTheme.colors
+    val isDark = semantic.backgroundCanvas.red < 0.2f
+    HorizontalDivider(color = if (isDark) semantic.borderSubtle.copy(alpha = 0.6f) else Color(0xFFE4EDE5))
 }
-

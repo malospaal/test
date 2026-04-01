@@ -59,7 +59,7 @@ internal fun PaywallPage(
     onClose: () -> Unit
 ) {
     val colors = AppTheme.colors
-    val isDark = isSystemInDarkTheme()
+    val isDark = colors.backgroundCanvas.red < 0.2f
     val colorScheme = MaterialTheme.colorScheme
     val accentPrimary = if (isDark) Color(0xFF2DCF96) else colorScheme.primary
     val legalColor = if (isDark) Color(0xFF6AAA85) else colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
@@ -146,11 +146,12 @@ internal fun PaywallPage(
                 enabled = !currentPlan.hasPremiumAccess(),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = accentPrimary,
-                    contentColor = if (isDark) Color(0xFF04342C) else colorScheme.onPrimary
+                    contentColor = Color(0xFF04342C)
                 ),
-                shape = RoundedCornerShape(14.dp)
+                shape = RoundedCornerShape(14.dp),
+                contentPadding = PaddingValues(vertical = 14.dp)
             ) {
-                Text(ctaLabel, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(vertical = 2.dp))
+                Text(ctaLabel, fontSize = 15.sp, fontWeight = FontWeight.Bold)
             }
 
             Text(
@@ -181,22 +182,28 @@ internal fun PaywallPlanCard(
     badge: String? = null
 ) {
     val colors = AppTheme.colors
-    val isDark = isSystemInDarkTheme()
-    val selectedBorder = if (isDark) Color(0xFF2DCF96) else colors.primary
-    val selectedTitle = if (isDark) Color(0xFFE8F5EF) else colors.textPrimary
-    val selectedPrice = if (isDark) Color(0xFF2DCF96) else colors.primary
-    val selectedMeta = if (isDark) Color(0xFF6AAA85) else colors.textSecondary
-    val selectedBadgeBg = if (isDark) Color(0xFF1A3A20) else colors.primaryMuted
-    val selectedBadgeText = if (isDark) Color(0xFF2DCF96) else colors.primary
-    val lifetimeSelectedBadgeBg = if (isDark) Color(0xFF1A2A1A) else colors.warning.copy(alpha = 0.16f)
-    val lifetimeSelectedBadgeText = if (isDark) Color(0xFFF59E42) else colors.warning
-    val unselectedTitle = if (isDark) Color(0xFF9ECFB4) else colors.textTertiary
-    val unselectedPrice = if (isDark) Color(0xFF9ECFB4) else colors.textTertiary
-    val unselectedMeta = if (isDark) Color(0xFF4A7A5E) else colors.textTertiary.copy(alpha = 0.88f)
-    val unselectedBadgeBg = if (isDark) Color(0xFF152E1F) else colors.backgroundSurfaceMuted
-    val unselectedBadgeText = if (isDark) Color(0xFF4A7A5E) else colors.textTertiary
-    val lifetimeUnselectedBadgeBg = if (isDark) Color(0xFF151E15) else colors.backgroundSurfaceMuted
-    val lifetimeUnselectedBadgeText = if (isDark) Color(0xFF7A6030) else colors.textTertiary
+    val isDark = colors.backgroundCanvas.red < 0.2f
+    val selectedBorder = if (isDark) Color(0xFF2DCF96) else Color(0xFF1D9E75)
+    val selectedTitle = if (isDark) Color(0xFFE8F5EF) else Color(0xFF0D1F12)
+    val selectedPrice = if (isDark) Color(0xFF2DCF96) else Color(0xFF1D9E75)
+    val selectedMeta = if (isDark) Color(0xFF6AAA85) else Color(0xFF3A5C3E)
+    val selectedBadgeBg = if (isDark) Color(0xFF1A3A20) else Color(0xFFE0F4EC)
+    val selectedBadgeText = if (isDark) Color(0xFF2DCF96) else Color(0xFF0F6E56)
+    val lifetimeSelectedBadgeBg = if (isDark) Color(0xFF1A2A1A) else Color(0xFFFEF3E0)
+    val lifetimeSelectedBadgeText = if (isDark) Color(0xFFF59E42) else Color(0xFFB45309)
+    val unselectedTitle = if (isDark) Color(0xFF9ECFB4) else Color(0xFF2D4A30)
+    val unselectedPrice = if (isDark) Color(0xFF9ECFB4) else Color(0xFF3A5C3E)
+    val unselectedMeta = if (isDark) Color(0xFF4A7A5E) else Color(0xFF5A7A5E)
+    val unselectedBadgeBg = if (isDark) Color(0xFF152E1F) else Color(0xFFE0F4EC)
+    val unselectedBadgeText = if (isDark) Color(0xFF4A7A5E) else Color(0xFF0F6E56)
+    val lifetimeUnselectedBadgeBg = if (isDark) Color(0xFF151E15) else Color(0xFFFEF3E0)
+    val lifetimeUnselectedBadgeText = if (isDark) Color(0xFF7A6030) else Color(0xFFB45309)
+    val cardBackground = if (isDark) colors.backgroundSurface else Color(0xFFFFFFFF)
+    val cardBorder = if (isDark) {
+        if (selected) BorderStroke(1.5.dp, selectedBorder) else null
+    } else {
+        if (selected) BorderStroke(1.5.dp, selectedBorder) else BorderStroke(1.dp, Color(0xFFC8D9CA))
+    }
 
     val titleColor = if (selected) selectedTitle else unselectedTitle
     val priceColor = if (selected) selectedPrice else unselectedPrice
@@ -219,31 +226,30 @@ internal fun PaywallPlanCard(
     Surface(
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable(onClick = onClick),
         shape = RoundedCornerShape(14.dp),
-        color = colors.backgroundSurface,
-        border = if (selected) BorderStroke(1.5.dp, selectedBorder) else null
+        color = cardBackground,
+        border = cardBorder
     ) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 13.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = titleColor)
+                Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = titleColor)
                 if (!badge.isNullOrBlank()) {
                     Text(
                         badge,
                         color = badgeTextColor,
-                        fontSize = 12.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.background(badgeBgColor, RoundedCornerShape(5.dp)).padding(horizontal = 7.dp, vertical = 2.dp)
                     )
                 }
             }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
-                Text(price, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = priceColor)
+                Text(price, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = priceColor)
                 Spacer(Modifier.width(4.dp))
-                Text(meta, fontSize = 12.sp, color = metaColor, modifier = Modifier.padding(bottom = 2.dp))
+                Text(meta, fontSize = 14.sp, color = metaColor, modifier = Modifier.padding(bottom = 2.dp))
             }
         }
     }
 }
-
 
 @Composable
 internal fun planPriceLabel(plan: PremiumPlan): String = when (plan) {
@@ -256,25 +262,36 @@ internal fun planPriceLabel(plan: PremiumPlan): String = when (plan) {
 @Composable
 internal fun PremiumFeatureRow(title: String, subtitle: String, showSubtitle: Boolean = true) {
     val colors = AppTheme.colors
-    val isDark = isSystemInDarkTheme()
+    val isDark = colors.backgroundCanvas.red < 0.2f
     val colorScheme = MaterialTheme.colorScheme
     val accentPrimary = if (isDark) Color(0xFF2DCF96) else colorScheme.primary
+    val checkCircleBg = if (isDark) accentPrimary.copy(alpha = 0.2f) else Color(0xFF1D9E75)
+    val checkTickColor = if (isDark) accentPrimary else Color(0xFFFFFFFF)
+    val featureTextColor = if (isDark) colors.textPrimary else Color(0xFF0D1F12)
+    val subtitleColor = if (isDark) colors.textSecondary else Color(0xFF5A7A5E)
+
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
         verticalAlignment = if (showSubtitle) Alignment.Top else Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Surface(Modifier.size(18.dp), shape = RoundedCornerShape(999.dp), color = accentPrimary.copy(alpha = if (isDark) 0.2f else 0.14f)) {
-            Box(contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Check, contentDescription = null, tint = accentPrimary, modifier = Modifier.size(12.dp)) }
+        Surface(Modifier.size(18.dp), shape = RoundedCornerShape(999.dp), color = checkCircleBg) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(Icons.Rounded.Check, contentDescription = null, tint = checkTickColor, modifier = Modifier.size(12.dp))
+            }
         }
         if (showSubtitle) {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                Text(subtitle, fontSize = 12.sp, color = colors.textSecondary)
+                Text(title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = featureTextColor)
+                Text(subtitle, fontSize = 12.sp, color = subtitleColor)
             }
         } else {
-            Text(title, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary)
+            Text(title, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = featureTextColor)
         }
     }
 }
+
+
+
+
 

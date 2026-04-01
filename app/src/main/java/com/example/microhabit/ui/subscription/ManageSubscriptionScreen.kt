@@ -69,7 +69,7 @@ internal fun ManageSubscriptionScreen(
     val activeBadgeText = if (isDark) accentPrimary else Color(0xFF0F6E56)
     val activePlanLabelColor = if (isDark) colors.textSecondary else Color(0xFF2D4A30)
     val warningBadgeBg = if (isDark) Color(0xFF2A1F0A) else colorScheme.error.copy(alpha = 0.12f)
-    val lifetimeBadgeBg = if (isDark) Color(0xFF1A2A1A) else colorScheme.surfaceVariant
+    val lifetimeBadgeBg = if (isDark) Color(0xFF1A2A1A) else Color(0xFFFEF3E0)
     val activeCardBorder = accentPrimary
     val cancelledCardBorder = if (isDark) Color(0xFF3A1A1A) else colorScheme.error.copy(alpha = 0.45f)
 
@@ -384,60 +384,109 @@ internal fun ManagePlanSwitchRow(
     opacity: Float = 1f
 ) {
     val isDark = AppTheme.colors.backgroundCanvas.red < 0.2f
-    val colorScheme = MaterialTheme.colorScheme
-    val cardBackground = if (isDark) Color(0xFF0A1F13) else colorScheme.surface
+    val cardBackground = if (isDark) Color(0xFF0A1F13) else Color(0xFFFFFFFF)
 
-    val selectedBorder = if (isDark) Color(0xFF2DCF96) else colorScheme.primary
-    val checkFill = if (isDark) Color(0xFF2DCF96) else colorScheme.primary
-    val unselectedRing = if (isDark) Color(0xFF2A5A3A) else colorScheme.outline
-    val baseBadgeBackground = if (badgeBackground == Color.Unspecified) Color(0xFF1A3A20) else badgeBackground
-    val baseBadgeColor = if (badgeColor == Color.Unspecified) { if (isDark) Color(0xFF2DCF96) else Color(0xFF0F6E56) } else badgeColor
-    val badgeBg = if (isDark) baseBadgeBackground else Color(0xFFD1F0E4)
-    val badgeFg = if (isDark) baseBadgeColor else baseBadgeColor
-    val selectedTitleColor = if (isDark) Color(0xFFE8F5EF) else AppTheme.colors.textPrimary
-    val unselectedTitleColor = if (isDark) Color(0xFF9ECFB4) else AppTheme.colors.textSecondary
-    val selectedPriceColor = if (isDark) Color(0xFF2DCF96) else AppTheme.colors.primary
-    val unselectedPriceColor = if (isDark) Color(0xFF4A7A5E) else AppTheme.colors.textTertiary
+    val selectedBorder = if (isDark) Color(0xFF2DCF96) else Color(0xFF1D9E75)
+    val unselectedBorder = if (isDark) null else BorderStroke(1.dp, Color(0xFFC8D9CA))
+    val checkFill = if (isDark) Color(0xFF2DCF96) else Color(0xFF1D9E75)
+    val unselectedRing = if (isDark) Color(0xFF2A5A3A) else Color(0xFFA8BEA9)
+
+    val defaultBadgeBg = if (isDark) Color(0xFF1A3A20) else Color(0xFFE0F4EC)
+    val defaultBadgeFg = if (isDark) Color(0xFF2DCF96) else Color(0xFF0F6E56)
+    val badgeBg = if (badgeBackground == Color.Unspecified) defaultBadgeBg else badgeBackground
+    val badgeFg = if (badgeColor == Color.Unspecified) defaultBadgeFg else badgeColor
+
+    val selectedTitleColor = if (isDark) Color(0xFFE8F5EF) else Color(0xFF0D1F12)
+    val unselectedTitleColor = if (isDark) Color(0xFF9ECFB4) else Color(0xFF2D4A30)
+    val selectedPriceColor = if (isDark) Color(0xFF2DCF96) else Color(0xFF1D9E75)
+    val unselectedPriceColor = if (isDark) Color(0xFF4A7A5E) else Color(0xFF3A5C3E)
+    val selectedMetaColor = if (isDark) Color(0xFF6AAA85) else Color(0xFF3A5C3E)
+    val unselectedMetaColor = if (isDark) Color(0xFF4A7A5E) else Color(0xFF5A7A5E)
+
+    val priceSplitIndex = when {
+        price.contains(" /") -> price.indexOf(" /")
+        price.contains(" ·") -> price.indexOf(" ·")
+        else -> -1
+    }
+    val priceMain = if (priceSplitIndex >= 0) price.substring(0, priceSplitIndex) else price
+    val priceMeta = if (priceSplitIndex >= 0) price.substring(priceSplitIndex) else ""
 
     Surface(
-        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier).graphicsLayer { alpha = opacity },
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier)
+            .graphicsLayer { alpha = opacity },
         shape = RoundedCornerShape(14.dp),
         color = cardBackground,
-        border = if (selected) BorderStroke(1.5.dp, selectedBorder) else null
+        border = if (selected) BorderStroke(1.5.dp, selectedBorder) else unselectedBorder
     ) {
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 13.dp, vertical = 13.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (selected) {
-                Surface(Modifier.size(20.dp), shape = RoundedCornerShape(999.dp), color = checkFill) {
-                    Box(contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Check, null, tint = Color.White, modifier = Modifier.size(11.dp)) }
+                Surface(
+                    modifier = Modifier.size(18.dp),
+                    shape = RoundedCornerShape(999.dp),
+                    color = checkFill
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(Icons.Rounded.Check, null, tint = Color.White, modifier = Modifier.size(12.dp))
+                    }
                 }
             } else {
-                Box(Modifier.size(20.dp).border(2.dp, unselectedRing, RoundedCornerShape(999.dp)))
+                Box(Modifier.size(18.dp).border(2.dp, unselectedRing, RoundedCornerShape(999.dp)))
             }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text(title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = if (selected) selectedTitleColor else unselectedTitleColor)
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        title,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (selected) selectedTitleColor else unselectedTitleColor
+                    )
                     if (!badge.isNullOrBlank()) {
                         Text(
                             badge,
                             color = badgeFg,
-                            fontSize = 13.sp,
+                            fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier
-                                .background(badgeBg, RoundedCornerShape(8.dp))
-                                .padding(horizontal = 12.dp, vertical = 5.dp)
+                                .background(badgeBg, RoundedCornerShape(5.dp))
+                                .padding(horizontal = 7.dp, vertical = 2.dp)
                         )
                     }
                 }
-                Text(
-                    price,
-                    fontSize = 17.sp,
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                    color = if (selected) selectedPriceColor else unselectedPriceColor
-                )
+
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        priceMain,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (selected) selectedPriceColor else unselectedPriceColor
+                    )
+                    if (priceMeta.isNotBlank()) {
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            priceMeta,
+                            fontSize = 14.sp,
+                            color = if (selected) selectedMetaColor else unselectedMetaColor,
+                            modifier = Modifier.padding(bottom = 2.dp)
+                        )
+                    }
+                }
             }
         }
     }
@@ -449,7 +498,7 @@ internal fun MilestonePreviewSheet(
     onSelect: (Int) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val isDark = isSystemInDarkTheme()
+    val isDark = AppTheme.colors.backgroundCanvas.red < 0.2f
     val colorScheme = MaterialTheme.colorScheme
     val darkPrimaryText = if (isDark) Color(0xFFE8F5EF) else colorScheme.onBackground
     val darkMutedText = if (isDark) Color(0xFF6AAA85) else colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
@@ -656,6 +705,7 @@ internal fun managePlanHintText(currentPlan: PremiumPlan, targetPlan: PremiumPla
         else -> t("plan_switcher_select_hint")
     }
 }
+
 
 
 

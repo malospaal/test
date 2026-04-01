@@ -32,6 +32,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -63,6 +64,7 @@ internal fun SettingsPage(
 ) {
     val spacing = AppTheme.spacing
     val colors = AppTheme.colors
+    val isDark = colors.backgroundCanvas.red < 0.2f
     val context = LocalContext.current
     val language = LocalAppLanguage.current
     var showThemeDialog by rememberSaveable { mutableStateOf(false) }
@@ -157,7 +159,10 @@ internal fun SettingsPage(
         }
 
         item {
-            SettingsGroup(title = t("Danger zone")) {
+            SettingsGroup(
+                title = t("Danger zone"),
+                borderColorOverride = if (isDark) null else Color(0xFFE8D4D4)
+            ) {
                 SettingsRow(
                     title = t("Delete account"),
                     destructive = true,
@@ -392,5 +397,7 @@ internal fun <T> SelectionDialog(
         }
     )
 }
+
+
 
 

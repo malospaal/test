@@ -255,3 +255,4 @@ fun Stepper(
 fun parseColorHex(hex: String): Color {
     return runCatching { Color(android.graphics.Color.parseColor(hex)) }.getOrDefault(Color(0xFF1F6F64))
 }
+

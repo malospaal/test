@@ -110,3 +110,4 @@ private fun HabitPageDot(item: HabitPageDotModel) {
             .background(item.color)
     )
 }
+

@@ -82,3 +82,4 @@ object CreateHabitTemplateCatalog {
         TemplateCategory.PRODUCTIVITY -> "cat_productivity"
     }
 }
+

@@ -19,3 +19,4 @@ internal fun CalendarBreakdownStatus.toBreakdownRowStatus(): BreakdownRowStatus 
     CalendarBreakdownStatus.FUTURE -> BreakdownRowStatus.FUTURE
     CalendarBreakdownStatus.NOT_SCHEDULED -> BreakdownRowStatus.NOT_SCHEDULED
 }
+

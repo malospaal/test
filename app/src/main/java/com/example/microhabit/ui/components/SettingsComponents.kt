@@ -180,3 +180,4 @@ fun SettingsDivider() {
     val colors = AppTheme.colors
     HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.6f))
 }
+

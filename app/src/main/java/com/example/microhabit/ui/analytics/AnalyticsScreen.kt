@@ -51,7 +51,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.microhabit.HabitSelectorRow
+import com.example.microhabit.ui.shared.HabitSelectorRow
 import com.example.microhabit.HabitUiState
 import com.example.microhabit.data.AnalyticsWeekSummary
 import com.example.microhabit.data.hasPremiumAccess
@@ -768,3 +768,4 @@ private fun ProBlurOverlay(
         }
     }
 }
+

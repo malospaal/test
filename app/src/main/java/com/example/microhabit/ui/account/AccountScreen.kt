@@ -19,6 +19,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -68,13 +69,23 @@ internal fun AccountPage(
     val primaryOnDarkText = if (isDark) Color(0xFFE8F5EF) else colorScheme.onBackground
     val secondaryOnDarkText = if (isDark) Color(0xFF9ECFB4) else colorScheme.onSurfaceVariant
     val mutedOnDarkText = if (isDark) Color(0xFF6AAA85) else colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
+    val currentPlanLabelColor = if (isDark) Color(0xFF9ECFB4) else Color(0xFF2D4A30)
     val disabledOnDarkText = if (isDark) Color(0xFF4A7A5E) else colorScheme.outline
     val accentPrimary = if (isDark) Color(0xFF2DCF96) else colorScheme.primary
     val accentSecondary = if (isDark) Color(0xFF1D9E75) else colorScheme.primary
-    val sectionDividerColor = if (isDark) Color(0xFF1A3528) else colorScheme.outline.copy(alpha = 0.45f)
-    val freeBadgeBackground = if (isDark) Color(0xFF1A2A1A) else colorScheme.surfaceVariant
-    val activeBadgeBackground = if (isDark) Color(0xFF1A3A20) else accentPrimary.copy(alpha = 0.14f)
+    val sectionDividerColor = if (isDark) Color(0xFF1A3528) else Color(0xFFE4EDE5)
+    val freeBadgeBackground = if (isDark) Color(0xFF1A2A1A) else Color(0xFFE0EAE1)
+    val freeBadgeTextColor = if (isDark) mutedOnDarkText else Color(0xFF3A5C3E)
+    val activeBadgeBackground = if (isDark) Color(0xFF1A3A20) else Color(0xFFD1F0E4)
+    val activeBadgeTextColor = if (isDark) accentPrimary else Color(0xFF0F6E56)
     val cancelledBadgeBackground = if (isDark) Color(0xFF2A1F0A) else colorScheme.error.copy(alpha = 0.12f)
+    val primaryButtonTextColor = Color(0xFF04342C)
+    val freeUsageLabelColor = if (isDark) secondaryOnDarkText else Color(0xFF3A5C3E)
+    val freeLimitReachedColor = if (isDark) Color(0xFFF59E42) else Color(0xFFB45309)
+    val freeProgressFillReachedColor = if (isDark) Color(0xFFF59E42) else Color(0xFFF59E0B)
+    val freeProgressTrackColor = if (isDark) innerSunkenSurface else Color(0xFFD8E6D9)
+    val lockedFeatureBorderColor = if (isDark) Color(0xFF2A4A38) else Color(0xFFA8BEA9)
+    val lockedFeatureTextColor = if (isDark) disabledOnDarkText else Color(0xFF0D1F12)
     var showResetConfirm by rememberSaveable { mutableStateOf(false) }
     var showDeleteConfirm by rememberSaveable { mutableStateOf(false) }
 
@@ -90,17 +101,35 @@ internal fun AccountPage(
                 t("Advanced analytics")
             )
 
-            val cardBorderColor = when (state.subscriptionState) {
-                is SubscriptionState.PremiumActive -> accentPrimary
-                is SubscriptionState.PremiumCancelled -> if (isDark) Color(0xFF3A1A1A) else colorScheme.error.copy(alpha = 0.45f)
-                SubscriptionState.Free -> Color.Transparent
+            val planCardBorder = when (state.subscriptionState) {
+                is SubscriptionState.PremiumActive -> BorderStroke(
+                    1.5.dp,
+                    if (isDark) accentPrimary else Color(0xFF1D9E75)
+                )
+                is SubscriptionState.PremiumCancelled -> BorderStroke(
+                    1.5.dp,
+                    if (isDark) Color(0xFF3A1A1A) else colorScheme.error.copy(alpha = 0.45f)
+                )
+                SubscriptionState.Free -> if (isDark) null else BorderStroke(1.dp, Color(0xFFC8D9CA))
+            }
+
+            val planCardElevation = when (state.subscriptionState) {
+                SubscriptionState.Free -> if (isDark) 0.dp else 1.dp
+                is SubscriptionState.PremiumActive, is SubscriptionState.PremiumCancelled -> if (isDark) 0.dp else 2.dp
             }
 
             Surface(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .shadow(
+                        elevation = planCardElevation,
+                        shape = RoundedCornerShape(16.dp),
+                        ambientColor = if (isDark) Color.Transparent else Color(0xFF0D1F12).copy(alpha = 0.08f),
+                        spotColor = if (isDark) Color.Transparent else Color(0xFF0D1F12).copy(alpha = 0.08f)
+                    ),
                 color = planCardSurface,
                 shape = RoundedCornerShape(16.dp),
-                border = if (state.subscriptionState == SubscriptionState.Free) null else BorderStroke(1.5.dp, cardBorderColor)
+                border = planCardBorder
             ) {
                 Column(
                     modifier = Modifier
@@ -118,7 +147,7 @@ internal fun AccountPage(
                                     Text(
                                         text = t("Current plan").uppercase(locale),
                                         fontSize = 11.sp,
-                                        color = mutedOnDarkText,
+                                        color = currentPlanLabelColor,
                                         fontWeight = FontWeight.Medium
                                     )
                                     Text(
@@ -127,11 +156,7 @@ internal fun AccountPage(
                                         fontWeight = FontWeight.ExtraBold,
                                         color = primaryOnDarkText
                                     )
-                                    Text(
-                                        text = "$activeHabitsCount / $freeHabitLimit ${t("plan_habits_usage").lowercase(locale)}",
-                                        fontSize = 12.sp,
-                                        color = mutedOnDarkText
-                                    )
+
                                 }
                                 Surface(
                                     color = freeBadgeBackground,
@@ -139,8 +164,8 @@ internal fun AccountPage(
                                 ) {
                                     Text(
                                         text = t("plan_free_badge"),
-                                        color = mutedOnDarkText,
-                                        fontSize = 10.sp,
+                                        color = freeBadgeTextColor,
+                                        fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold,
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                                     )
@@ -153,7 +178,8 @@ internal fun AccountPage(
                             Surface(
                                 modifier = Modifier.fillMaxWidth(),
                                 color = innerWidgetSurface,
-                                shape = RoundedCornerShape(10.dp)
+                                shape = RoundedCornerShape(10.dp),
+                                border = if (isDark) null else BorderStroke(1.dp, Color(0xFFD8E6D9))
                             ) {
                                 Column(
                                     modifier = Modifier
@@ -169,7 +195,7 @@ internal fun AccountPage(
                                         Text(
                                             text = t("plan_habits_usage"),
                                             fontSize = 12.sp,
-                                            color = secondaryOnDarkText
+                                            color = freeUsageLabelColor
                                         )
                                         Text(
                                             text = "$activeHabitsCount / $freeHabitLimit",
@@ -180,8 +206,8 @@ internal fun AccountPage(
                                     }
                                     LinearProgressIndicator(
                                         progress = { usageProgress },
-                                        color = if (activeHabitsCount >= freeHabitLimit) Color(0xFFF59E42) else accentSecondary,
-                                        trackColor = innerSunkenSurface,
+                                        color = if (activeHabitsCount >= freeHabitLimit) freeProgressFillReachedColor else accentSecondary,
+                                        trackColor = freeProgressTrackColor,
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .height(4.dp)
@@ -193,8 +219,8 @@ internal fun AccountPage(
                                         } else {
                                             t("plan_slots_free").replace("{n}", freeSlots.toString())
                                         },
-                                        fontSize = 10.sp,
-                                        color = if (activeHabitsCount >= freeHabitLimit) Color(0xFFF59E42) else mutedOnDarkText
+                                        fontSize = if (activeHabitsCount >= freeHabitLimit) 11.sp else 10.sp,
+                                        color = if (activeHabitsCount >= freeHabitLimit) freeLimitReachedColor else mutedOnDarkText
                                     )
                                 }
                             }
@@ -211,13 +237,13 @@ internal fun AccountPage(
                                     Box(
                                         modifier = Modifier
                                             .size(15.dp)
-                                            .border(1.5.dp, if (isDark) Color(0xFF2A4A38) else colorScheme.outline, RoundedCornerShape(999.dp))
+                                            .border(1.5.dp, lockedFeatureBorderColor, RoundedCornerShape(999.dp))
                                     )
                                     Spacer(Modifier.width(8.dp))
                                     Text(
                                         text = feature,
                                         fontSize = 13.sp,
-                                        color = disabledOnDarkText
+                                        color = lockedFeatureTextColor
                                     )
                                 }
                             }
@@ -228,13 +254,13 @@ internal fun AccountPage(
                                 shape = RoundedCornerShape(14.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = accentPrimary,
-                                    contentColor = Color(0xFF04342C)
+                                    contentColor = primaryButtonTextColor
                                 ),
                                 contentPadding = PaddingValues(vertical = 14.dp)
                             ) {
                                 Text(
                                     text = "${t("Get Premium")} ✦",
-                                    fontSize = 14.sp,
+                                    fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
@@ -251,7 +277,7 @@ internal fun AccountPage(
                                     Text(
                                         text = t("Current plan").uppercase(locale),
                                         fontSize = 11.sp,
-                                        color = mutedOnDarkText,
+                                        color = currentPlanLabelColor,
                                         fontWeight = FontWeight.Medium
                                     )
                                     Text(
@@ -267,8 +293,8 @@ internal fun AccountPage(
                                 ) {
                                     Text(
                                         text = t("Active"),
-                                        color = accentPrimary,
-                                        fontSize = 10.sp,
+                                        color = activeBadgeTextColor,
+                                        fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold,
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                                     )
@@ -292,13 +318,14 @@ internal fun AccountPage(
                                     Column(horizontalAlignment = Alignment.End) {
                                         Text(
                                             text = subscriptionState.nextBillingAmount.orEmpty(),
-                                            fontSize = 15.sp,
+                                            fontSize = 18.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = primaryOnDarkText
                                         )
                                         Text(
                                             text = subscriptionState.nextBillingDate.format(dateFormatter),
-                                            fontSize = 11.sp,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Medium,
                                             color = mutedOnDarkText
                                         )
                                     }
@@ -344,13 +371,13 @@ internal fun AccountPage(
                                 shape = RoundedCornerShape(14.dp),
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = accentPrimary,
-                                    contentColor = Color(0xFF04342C)
+                                    contentColor = primaryButtonTextColor
                                 ),
                                 contentPadding = PaddingValues(vertical = 13.dp)
                             ) {
                                 Text(
                                     text = t("manage_subscription"),
-                                    fontSize = 13.sp,
+                                    fontSize = 14.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
@@ -366,7 +393,7 @@ internal fun AccountPage(
                                     Text(
                                         text = t("Current plan").uppercase(locale),
                                         fontSize = 11.sp,
-                                        color = mutedOnDarkText,
+                                        color = currentPlanLabelColor,
                                         fontWeight = FontWeight.Medium
                                     )
                                     Text(
@@ -460,7 +487,7 @@ internal fun AccountPage(
                             ) {
                                 Text(
                                     text = t("manage_subscription"),
-                                    fontSize = 13.sp,
+                                    fontSize = 14.sp,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
@@ -524,7 +551,9 @@ internal fun AccountPage(
                 )
             }
             Spacer(Modifier.height(4.dp))
-            AccountActionCard {
+            AccountActionCard(
+                borderColorOverride = if (isDark) null else Color(0xFFE8D4D4)
+            ) {
                 AccountActionRow(
                     title = t("Delete account"),
                     destructive = true,
@@ -537,11 +566,11 @@ internal fun AccountPage(
             Text(
                 text = "Micro Habit · $appVersionName",
                 fontSize = 11.sp,
-                color = mutedOnDarkText,
+                color = if (isDark) mutedOnDarkText else Color(0xFFA8C4AA),
                 textAlign = TextAlign.Center,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 20.dp)
+                    .padding(top = 14.dp)
             )
         }
     }
@@ -606,25 +635,44 @@ internal fun AccountPage(
 
 @Composable
 internal fun AccountSectionLabel(title: String) {
+    val isDark = AppTheme.colors.backgroundCanvas.red < 0.2f
+    val locale = appLocale()
     Text(
-        text = title,
-        fontSize = 12.sp,
+        text = title.uppercase(locale),
+        fontSize = 11.sp,
         fontWeight = FontWeight.Medium,
-        color = AppTheme.colors.textTertiary,
+        color = if (isDark) AppTheme.colors.textTertiary else Color(0xFF5A7A5E),
+        letterSpacing = 0.4.sp,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 4.dp, end = 4.dp, top = 16.dp, bottom = 6.dp)
+            .padding(start = 4.dp, end = 4.dp, top = 14.dp, bottom = 6.dp)
     )
 }
 
 @Composable
-internal fun AccountActionCard(content: @Composable () -> Unit) {
+internal fun AccountActionCard(
+    borderColorOverride: Color? = null,
+    content: @Composable () -> Unit
+) {
+    val isDark = AppTheme.colors.backgroundCanvas.red < 0.2f
     val colors = AppTheme.colors
+    val borderColor = borderColorOverride ?: if (isDark) {
+        colors.borderSubtle.copy(alpha = 0.55f)
+    } else {
+        Color(0xFFC8D9CA)
+    }
     Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = colors.backgroundSurfaceMuted,
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(
+                elevation = if (isDark) 0.dp else 1.dp,
+                shape = RoundedCornerShape(16.dp),
+                ambientColor = if (isDark) Color.Transparent else Color(0xFF0D1F12).copy(alpha = 0.06f),
+                spotColor = if (isDark) Color.Transparent else Color(0xFF0D1F12).copy(alpha = 0.06f)
+            ),
+        color = if (isDark) colors.backgroundSurfaceMuted else Color(0xFFFFFFFF),
         shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(1.dp, colors.borderSubtle.copy(alpha = 0.55f))
+        border = BorderStroke(1.dp, borderColor)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) { content() }
     }
@@ -636,6 +684,9 @@ internal fun AccountActionRow(
     destructive: Boolean = false,
     onClick: () -> Unit
 ) {
+    val isDark = AppTheme.colors.backgroundCanvas.red < 0.2f
+    val normalTextColor = if (isDark) AppTheme.colors.textPrimary else Color(0xFF0D1F12)
+    val normalChevronColor = if (isDark) MaterialTheme.colorScheme.outline else Color(0xFF5A7A5E)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -646,15 +697,18 @@ internal fun AccountActionRow(
         Text(
             text = title,
             fontSize = 14.sp,
-            color = if (destructive) AppTheme.colors.danger else AppTheme.colors.textPrimary,
+            color = if (destructive) AppTheme.colors.danger else normalTextColor,
             modifier = Modifier.weight(1f)
         )
         Text(
             text = "›",
             fontSize = 16.sp,
-            color = if (destructive) AppTheme.colors.danger else MaterialTheme.colorScheme.outline
+            color = if (destructive) AppTheme.colors.danger else normalChevronColor
         )
     }
 }
+
+
+
 
 

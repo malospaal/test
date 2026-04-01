@@ -3,7 +3,6 @@ package com.example.microhabit.ui.tracker
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -45,9 +44,9 @@ internal fun HeroMiniWeekRow(
 ) {
     val semantic = AppTheme.colors
     val locale = appLocale()
-    val isDark = isSystemInDarkTheme()
-    val lightMissedFill = Color(0xFFC0392B).copy(alpha = 0.08f)
-    val lightMissedBorder = Color(0xFFC0392B).copy(alpha = 0.35f)
+    val isDarkTheme = AppTheme.colors.backgroundCanvas.red < 0.2f
+    val lightMissedFill = Color(0x14C0392B)
+    val lightMissedBorder = Color(0x59C0392B)
     val normalizedPoints = points.takeLast(7).let { if (it.size == 7) it else List(7 - it.size) { 0 } + it }
     val normalizedScheduled = scheduled.takeLast(7).let { if (it.size == 7) it else List(7 - it.size) { false } + it }
     val normalizedManualOverride = manualOverride.takeLast(7).let {
@@ -79,10 +78,10 @@ internal fun HeroMiniWeekRow(
                 isCompleted -> semantic.success
                 isPartial -> semantic.success.copy(alpha = 0.45f)
                 isToday -> Color.Transparent
-                isMissed && !isDark -> lightMissedFill
+                isMissed && !isDarkTheme -> lightMissedFill
                 else -> semantic.chartMissed
             }
-            val missedBorderColor = if (isMissed && !isDark) lightMissedBorder else null
+            val missedBorderColor = if (isMissed && !isDarkTheme) lightMissedBorder else null
             val showTodayBorder = isToday && isScheduled && !isFuture && !isCompleted && !isPartial
             val dayLabel = if (isToday) {
                 todayShortLabel
@@ -223,6 +222,9 @@ internal fun CalendarCard(
         }
     }
 }
+
+
+
 
 
 

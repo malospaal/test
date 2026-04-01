@@ -37,9 +37,9 @@ import com.example.microhabit.data.AppLanguage
 internal fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
     val spacing = AppTheme.spacing
     val colors = AppTheme.colors
+    val isDarkTheme = AppTheme.colors.backgroundCanvas.red < 0.2f
     val locale = appLocale()
     val today = LocalDate.now()
-    val maxCompletedInMonth = state.calendarCompletedCountByDate.values.maxOrNull()?.coerceAtLeast(1) ?: 1
     val taskById = remember(state.allTasks) { state.allTasks.associateBy { it.id } }
     val calendarFilterHabits = remember(state.calendarFilterOptions, taskById) {
         state.calendarFilterOptions.mapNotNull { option -> taskById[option.taskId] }
@@ -75,15 +75,20 @@ internal fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
         item {
             GlassCard(modifier = Modifier.height(416.dp)) {
                 Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+
                     CalendarHeaderRow(
                         monthLabel = localizedMonthYear(state.currentMonth, state.language, locale),
                         isTodaySelected = state.selectedDate == today && state.currentMonth == YearMonth.now(),
                         onPrev = { vm.moveMonth(-1) },
                         onToday = vm::jumpToToday,
-                        onNext = { vm.moveMonth(1) }
+                        onNext = { vm.moveMonth(1) },
+                        todayButtonBorderColor = colors.borderSubtle.copy(alpha = if (isDarkTheme) 0.90f else 0.95f),
+                        todayButtonTextColor = colors.textSecondary,
+                        todayButtonHeight = 34.dp,
+                        todayButtonBorderWidth = 1.2.dp
                     )
-
                     val weekdayLabels = weekdayLabels(LocalAppLanguage.current)
+                    val weekdayLabelColor = colors.textSecondary
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(spacing.x1)
@@ -94,7 +99,7 @@ internal fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
                                 modifier = Modifier.weight(1f),
                                 textAlign = TextAlign.Center,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = colors.textSecondary
+                                color = weekdayLabelColor
                             )
                         }
                     }
@@ -125,7 +130,6 @@ internal fun CalendarScreen(state: HabitUiState, vm: MainViewModel) {
                                     } else {
                                         0
                                     },
-                                    maxCompletedInMonth = maxCompletedInMonth,
                                     onClick = { dayDate?.let(vm::selectDate) }
                                 )
                             }
@@ -154,7 +158,6 @@ internal fun GlobalCalendarHeatCell(
     completedCount: Int,
     scheduledCount: Int,
     manualOverrideCount: Int,
-    maxCompletedInMonth: Int,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -172,69 +175,56 @@ internal fun GlobalCalendarHeatCell(
     }
 
     val todayDate = LocalDate.now()
-    val isToday = date.isEqual(todayDate)
+    val isToday = today || date.isEqual(todayDate)
     val isFuture = date.isAfter(todayDate)
     val hasManualOverride = manualOverrideCount > 0 && scheduledCount <= 0 && !isFuture && !isToday
-    val intensityLevel = if (completedCount <= 0 || maxCompletedInMonth <= 0) {
-        0
-    } else {
-        kotlin.math.ceil((completedCount.toFloat() / maxCompletedInMonth.toFloat()) * 4f).toInt().coerceIn(1, 4)
-    }
+
     val fillColor = when {
-        isToday -> Color.Transparent
-        isFuture -> Color.Transparent
-        hasManualOverride -> colors.success.copy(alpha = 0.18f)
-        scheduledCount <= 0 -> Color.Transparent
-        completedCount <= 0 -> colors.danger.copy(alpha = 0.10f)
-        intensityLevel == 1 -> colors.success.copy(alpha = 0.31f)
-        intensityLevel == 2 -> colors.success.copy(alpha = 0.46f)
-        intensityLevel == 3 -> colors.success.copy(alpha = 0.64f)
-        else -> colors.success.copy(alpha = 0.81f)
+        isFuture -> colors.backgroundSurfaceMuted.copy(alpha = 0.25f)
+        completedCount > 0 -> colors.success.copy(alpha = 0.90f)
+        hasManualOverride -> colors.successMuted.copy(alpha = 0.70f)
+        scheduledCount > 0 -> colors.danger.copy(alpha = 0.08f)
+        else -> colors.neutralMuted.copy(alpha = 0.40f)
     }
+
     val baseBorderColor = when {
-        isToday -> colors.primary
-        isFuture -> Color.Transparent
-        hasManualOverride -> colors.success.copy(alpha = 0.45f)
-        scheduledCount <= 0 -> Color.Transparent
-        completedCount <= 0 -> colors.danger.copy(alpha = 0.25f)
-        else -> Color.Transparent
+        isToday -> colors.calendarTodayRing
+        isFuture -> colors.borderSubtle.copy(alpha = 0.35f)
+        completedCount > 0 -> Color.Transparent
+        hasManualOverride -> colors.success.copy(alpha = 0.28f)
+        scheduledCount > 0 -> colors.danger.copy(alpha = 0.28f)
+        else -> colors.borderSubtle.copy(alpha = 0.70f)
     }
+
     val baseBorderWidth = when {
-        isToday -> 1.5.dp
-        hasManualOverride -> 1.dp
-        completedCount <= 0 && scheduledCount > 0 && !isFuture -> 1.dp
+        isToday -> stroke.thin
+        baseBorderColor.alpha > 0f -> stroke.thin
         else -> 0.dp
     }
-    val borderColor = if (selected && !isToday) {
-        colors.primary.copy(alpha = 0.72f)
-    } else {
-        baseBorderColor
-    }
-    val borderWidth = if (selected && !isToday) {
-        stroke.medium
-    } else {
-        baseBorderWidth
-    }
+
+    val borderColor = if (selected) colors.primary else baseBorderColor
+    val borderWidth = if (selected) stroke.medium else baseBorderWidth
+
     val textColor = when {
         isToday -> colors.primary
-        isFuture -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.45f)
-        hasManualOverride -> colors.success
+        isFuture -> colors.textTertiary
         completedCount > 0 -> MaterialTheme.colorScheme.onPrimary
+        hasManualOverride -> colors.success
         scheduledCount > 0 -> colors.danger
-        else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)
+        else -> colors.textSecondary
     }
 
     Box(
         modifier = modifier
             .height(spacing.x5 + spacing.x0_5)
-            .clip(RoundedCornerShape(radius.sm))
-            .background(fillColor, RoundedCornerShape(radius.sm))
+            .clip(RoundedCornerShape(radius.md))
+            .background(fillColor, RoundedCornerShape(radius.md))
             .then(
                 if (borderWidth > 0.dp) {
                     Modifier.border(
                         width = borderWidth,
                         color = borderColor,
-                        shape = RoundedCornerShape(radius.sm)
+                        shape = RoundedCornerShape(radius.md)
                     )
                 } else {
                     Modifier
@@ -245,9 +235,13 @@ internal fun GlobalCalendarHeatCell(
     ) {
         Text(
             text = date.dayOfMonth.toString(),
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.bodyMedium,
             color = textColor,
-            fontWeight = if (selected || today || isToday) FontWeight.SemiBold else FontWeight.Medium
+            fontWeight = if (selected || isToday || completedCount > 0 || hasManualOverride) {
+                FontWeight.SemiBold
+            } else {
+                FontWeight.Medium
+            }
         )
     }
 }

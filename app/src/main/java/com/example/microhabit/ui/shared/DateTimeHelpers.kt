@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.microhabit.i18n.t
 import com.example.microhabit.ui.theme.AppTheme
@@ -29,12 +30,19 @@ internal fun CalendarHeaderRow(
     isTodaySelected: Boolean,
     onPrev: () -> Unit,
     onToday: () -> Unit,
-    onNext: () -> Unit
+    onNext: () -> Unit,
+    todayButtonBorderColor: Color? = null,
+    todayButtonTextColor: Color? = null,
+    todayButtonHeight: Dp = 30.dp,
+    todayButtonBorderWidth: Dp? = null
 ) {
     val spacing = AppTheme.spacing
     val radius = AppTheme.radius
     val stroke = AppTheme.stroke
     val colors = AppTheme.colors
+    val todayBtnBorderColor = todayButtonBorderColor ?: colors.borderSubtle.copy(alpha = 0.65f)
+    val todayBtnTextColor = todayButtonTextColor ?: colors.textSecondary
+    val resolvedTodayBorderWidth = todayButtonBorderWidth ?: stroke.thin
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -62,16 +70,16 @@ internal fun CalendarHeaderRow(
                 onClick = onToday,
                 enabled = !isTodaySelected,
                 modifier = Modifier
-                    .height(30.dp)
+                    .height(todayButtonHeight)
                     .graphicsLayer(alpha = if (isTodaySelected) 0.55f else 1f),
                 shape = RoundedCornerShape(radius.full),
                 contentPadding = PaddingValues(horizontal = spacing.x1, vertical = spacing.x0),
-                border = BorderStroke(stroke.thin, colors.borderSubtle.copy(alpha = 0.65f)),
+                border = BorderStroke(resolvedTodayBorderWidth, todayBtnBorderColor),
                 colors = ButtonDefaults.outlinedButtonColors(
                     containerColor = Color.Transparent,
-                    contentColor = colors.textSecondary,
+                    contentColor = todayBtnTextColor,
                     disabledContainerColor = Color.Transparent,
-                    disabledContentColor = colors.textSecondary
+                    disabledContentColor = todayBtnTextColor
                 )
             ) {
                 Text(t("Today"), style = MaterialTheme.typography.labelMedium)
@@ -180,7 +188,4 @@ internal fun formatTimeForDevice(context: Context, hour: Int, minute: Int): Stri
     }
     return android.text.format.DateFormat.getTimeFormat(context).format(calendar.time)
 }
-
-
-
 

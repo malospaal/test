@@ -1,6 +1,7 @@
 package com.example.microhabit.ui.calendar
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -80,6 +82,7 @@ private fun BreakdownHeader(
     scheduledCount: Int
 ) {
     val locale = appLocale()
+    val isDarkTheme = isSystemInDarkTheme()
     Text(
         text = t("Day breakdown"),
         style = MaterialTheme.typography.titleMedium,
@@ -104,13 +107,13 @@ private fun BreakdownHeader(
             Spacer(Modifier.width(8.dp))
             Surface(
                 shape = RoundedCornerShape(10.dp),
-                color = AppTheme.colors.primary.copy(alpha = 0.12f)
+                color = if (isDarkTheme) AppTheme.colors.primary.copy(alpha = 0.12f) else Color(0xFFD1F0E4)
             ) {
                 Text(
                     text = tf("Done %d of %d", completedCount, scheduledCount),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Medium,
-                    color = AppTheme.colors.primary,
+                    color = if (isDarkTheme) AppTheme.colors.primary else Color(0xFF0F6E56),
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                 )
             }
@@ -219,31 +222,32 @@ private fun BreakdownStatusBadge(status: BreakdownRowStatus) {
         return
     }
 
+    val isDarkTheme = isSystemInDarkTheme()
     val (label, bgColor, textColor) = when (status) {
         BreakdownRowStatus.COMPLETED -> Triple(
             t("Completed"),
-            AppTheme.colors.success.copy(alpha = 0.14f),
-            AppTheme.colors.success
+            if (isDarkTheme) AppTheme.colors.success.copy(alpha = 0.14f) else Color(0xFFD1F0E4),
+            if (isDarkTheme) AppTheme.colors.success else Color(0xFF0F6E56)
         )
         BreakdownRowStatus.MISSED -> Triple(
             t("Missed"),
-            AppTheme.colors.danger.copy(alpha = 0.10f),
-            AppTheme.colors.danger
+            if (isDarkTheme) AppTheme.colors.danger.copy(alpha = 0.10f) else Color(0xFFF9E8E6),
+            if (isDarkTheme) AppTheme.colors.danger else Color(0xFFC0392B)
         )
         BreakdownRowStatus.PARTIAL -> Triple(
             t("Partial"),
-            AppTheme.colors.primary.copy(alpha = 0.10f),
-            AppTheme.colors.primary
+            if (isDarkTheme) AppTheme.colors.primary.copy(alpha = 0.10f) else Color(0xFFFEF3E0),
+            if (isDarkTheme) AppTheme.colors.primary else Color(0xFFB45309)
         )
         BreakdownRowStatus.TODAY_PENDING -> Triple(
             t("Today pending"),
-            MaterialTheme.colorScheme.surfaceVariant,
-            MaterialTheme.colorScheme.onSurfaceVariant
+            if (isDarkTheme) MaterialTheme.colorScheme.surfaceVariant else Color(0xFFE0EAE1),
+            if (isDarkTheme) MaterialTheme.colorScheme.onSurfaceVariant else Color(0xFF3A5C3E)
         )
         BreakdownRowStatus.FUTURE -> Triple(
             t("Upcoming"),
-            MaterialTheme.colorScheme.surfaceVariant,
-            MaterialTheme.colorScheme.onSurfaceVariant
+            if (isDarkTheme) MaterialTheme.colorScheme.surfaceVariant else Color(0xFFE8EFE8),
+            if (isDarkTheme) MaterialTheme.colorScheme.onSurfaceVariant else Color(0xFF5A7A5E)
         )
         BreakdownRowStatus.NOT_SCHEDULED -> return
     }
@@ -261,4 +265,3 @@ private fun BreakdownStatusBadge(status: BreakdownRowStatus) {
         )
     }
 }
-

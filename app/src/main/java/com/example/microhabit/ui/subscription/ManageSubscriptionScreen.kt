@@ -65,7 +65,9 @@ internal fun ManageSubscriptionScreen(
     val colorScheme = MaterialTheme.colorScheme
     val accentPrimary = if (isDark) Color(0xFF2DCF96) else colorScheme.primary
     val darkInnerSurface = if (isDark) Color(0xFF152E1F) else colorScheme.surfaceVariant
-    val activeBadgeBg = if (isDark) Color(0xFF1A3A20) else accentPrimary.copy(alpha = 0.14f)
+    val activeBadgeBg = if (isDark) Color(0xFF1A3A20) else Color(0xFFD1F0E4)
+    val activeBadgeText = if (isDark) accentPrimary else Color(0xFF0F6E56)
+    val activePlanLabelColor = if (isDark) colors.textSecondary else Color(0xFF2D4A30)
     val warningBadgeBg = if (isDark) Color(0xFF2A1F0A) else colorScheme.error.copy(alpha = 0.12f)
     val lifetimeBadgeBg = if (isDark) Color(0xFF1A2A1A) else colorScheme.surfaceVariant
     val activeCardBorder = accentPrimary
@@ -95,9 +97,15 @@ internal fun ManageSubscriptionScreen(
                     val isLifetime = subscriptionState.plan == PremiumPlan.LIFETIME
                     ManageSubscriptionCard(activeCardBorder, 1.5.dp) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                            Text(t("Active plan"), style = MaterialTheme.typography.labelLarge, color = colors.textSecondary)
+                            Text(t("Active plan"), style = MaterialTheme.typography.labelLarge, color = activePlanLabelColor)
                             Surface(color = activeBadgeBg, shape = RoundedCornerShape(999.dp)) {
-                                Text(t("Active"), color = accentPrimary, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
+                                Text(
+                                    t("Active"),
+                                    color = activeBadgeText,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp)
+                                )
                             }
                         }
                         Spacer(Modifier.height(6.dp))
@@ -118,8 +126,18 @@ internal fun ManageSubscriptionScreen(
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
                                 Text(t("Next billing"), color = colors.textSecondary, style = MaterialTheme.typography.bodyMedium)
                                 Column(horizontalAlignment = Alignment.End) {
-                                    Text(subscriptionState.nextBillingAmount.orEmpty(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                                    Text(subscriptionState.nextBillingDate?.format(dateFormatter).orEmpty(), style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
+                                    Text(
+                                        subscriptionState.nextBillingAmount.orEmpty(),
+                                        fontSize = 28.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        lineHeight = 30.sp
+                                    )
+                                    Text(
+                                        subscriptionState.nextBillingDate?.format(dateFormatter).orEmpty(),
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = colors.textSecondary
+                                    )
                                 }
                             }
                         }
@@ -166,7 +184,7 @@ internal fun ManageSubscriptionScreen(
                             opacity = 1f,
                             badge = t("plan_lifetime_yours"),
                             badgeBackground = lifetimeBadgeBg,
-                            badgeColor = Color(0xFFF59E42),
+                            badgeColor = Color(0xFFB45309),
                             onClick = {}
                         )
                         Spacer(Modifier.height(10.dp))
@@ -201,7 +219,7 @@ internal fun ManageSubscriptionScreen(
                             enabled = true,
                             badge = t("plan_lifetime_forever_badge"),
                             badgeBackground = lifetimeBadgeBg,
-                            badgeColor = Color(0xFFF59E42),
+                            badgeColor = Color(0xFFB45309),
                             onClick = { selectedPlan = PremiumPlan.LIFETIME }
                         )
                         Spacer(Modifier.height(12.dp))
@@ -373,9 +391,9 @@ internal fun ManagePlanSwitchRow(
     val checkFill = if (isDark) Color(0xFF2DCF96) else colorScheme.primary
     val unselectedRing = if (isDark) Color(0xFF2A5A3A) else colorScheme.outline
     val baseBadgeBackground = if (badgeBackground == Color.Unspecified) Color(0xFF1A3A20) else badgeBackground
-    val baseBadgeColor = if (badgeColor == Color.Unspecified) { if (isDark) Color(0xFF2DCF96) else colorScheme.primaryContainer } else badgeColor
-    val badgeBg = if (isDark) baseBadgeBackground else colorScheme.surfaceVariant
-    val badgeFg = if (isDark) baseBadgeColor else colorScheme.primaryContainer
+    val baseBadgeColor = if (badgeColor == Color.Unspecified) { if (isDark) Color(0xFF2DCF96) else Color(0xFF0F6E56) } else badgeColor
+    val badgeBg = if (isDark) baseBadgeBackground else Color(0xFFD1F0E4)
+    val badgeFg = if (isDark) baseBadgeColor else baseBadgeColor
     val selectedTitleColor = if (isDark) Color(0xFFE8F5EF) else AppTheme.colors.textPrimary
     val unselectedTitleColor = if (isDark) Color(0xFF9ECFB4) else AppTheme.colors.textSecondary
     val selectedPriceColor = if (isDark) Color(0xFF2DCF96) else AppTheme.colors.primary
@@ -401,12 +419,25 @@ internal fun ManagePlanSwitchRow(
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text(title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = if (selected) selectedTitleColor else unselectedTitleColor)
+                    Text(title, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = if (selected) selectedTitleColor else unselectedTitleColor)
                     if (!badge.isNullOrBlank()) {
-                        Text(badge, color = badgeFg, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.background(badgeBg, RoundedCornerShape(5.dp)).padding(horizontal = 7.dp, vertical = 2.dp))
+                        Text(
+                            badge,
+                            color = badgeFg,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .background(badgeBg, RoundedCornerShape(8.dp))
+                                .padding(horizontal = 12.dp, vertical = 5.dp)
+                        )
                     }
                 }
-                Text(price, fontSize = 13.sp, color = if (selected) selectedPriceColor else unselectedPriceColor)
+                Text(
+                    price,
+                    fontSize = 17.sp,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                    color = if (selected) selectedPriceColor else unselectedPriceColor
+                )
             }
         }
     }
@@ -625,5 +656,6 @@ internal fun managePlanHintText(currentPlan: PremiumPlan, targetPlan: PremiumPla
         else -> t("plan_switcher_select_hint")
     }
 }
+
 
 

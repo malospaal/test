@@ -120,6 +120,22 @@
   - для `TIMES_PER_WEEK`: максимум по непрерывным валидным неделям.
 - История streak — сегменты завершённых серий.
 
+### 7.4 Streak Milestone Celebration
+Источник: `MainActivity`, `StreakMilestoneQueue`, `HabitWidget`.
+
+Пороги milestone:
+- `1, 3, 7, 14, 21, 30, 50, 66, 100, 180, 365, 500, 1000`.
+
+Показ milestone:
+- milestone-экран — полноэкранный celebration screen (не partial dialog), перекрывающий весь UI без background bleed-through;
+- запуск при completion действии из Tracker или Home Widget, когда текущий streak после действия попадает в milestone-порог;
+- для каждой пары `(habitId, days)` показ выполняется только один раз.
+
+Персистентность и очередь:
+- факт показа хранится в `SharedPreferences` ключом `milestone_shown_{habitId}_{days}`;
+- pending milestone события ставятся в очередь и показываются последовательно (по одному экрану за раз);
+- если несколько milestone достигнуты почти одновременно, они не теряются и открываются после закрытия предыдущего.
+
 ## 8. Streak Saver
 Источник: `MainViewModel` + `HabitRepository`.
 
@@ -636,3 +652,6 @@ Unit label UX для `COUNT`:
 - прочитать `PRODUCT_LOGIC.md`,
 - сверить задачу с инвариантами,
 - реализовать изменения согласованно во всех затронутых частях приложения.
+
+
+

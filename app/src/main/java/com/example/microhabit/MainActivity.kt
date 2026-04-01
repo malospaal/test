@@ -206,6 +206,7 @@ import com.example.microhabit.i18n.LocalAppLanguage
 import com.example.microhabit.i18n.appLocale
 import com.example.microhabit.i18n.formatTranslate
 import com.example.microhabit.i18n.languageNativeLabel
+import com.example.microhabit.i18n.streakDaysUnit
 import com.example.microhabit.i18n.t
 import com.example.microhabit.i18n.tf
 import com.example.microhabit.i18n.translate
@@ -363,6 +364,58 @@ private data class StreakOverlayModel(
     val milestone: Boolean
 )
 
+private data class StreakMilestoneTier(
+    val days: Int,
+    val badgeLabel: String,
+    val headline: String,
+    val message: String,
+    val ctaLabel: String,
+    val accentColor: Color,
+    val backgroundColor: Color,
+    val nextMilestoneDays: Int?,
+    val nextMilestoneIcon: String
+)
+
+private data class StreakMilestoneTierDefinition(
+    val days: Int,
+    val accentColor: Color,
+    val backgroundColor: Color,
+    val nextMilestoneDays: Int?,
+    val nextMilestoneIcon: String
+)
+
+private val streakMilestoneTierDefinitions = listOf(
+    StreakMilestoneTierDefinition(1, Color(0xFF2DCF96), Color(0xFF0A2318), 3, "🎯"),
+    StreakMilestoneTierDefinition(3, Color(0xFF2DCF96), Color(0xFF0A2318), 7, "🔥"),
+    StreakMilestoneTierDefinition(7, Color(0xFFF59E42), Color(0xFF1F1008), 14, "⚡"),
+    StreakMilestoneTierDefinition(14, Color(0xFFF59E42), Color(0xFF1F1008), 21, "⭐"),
+    StreakMilestoneTierDefinition(21, Color(0xFFEAB308), Color(0xFF1A1200), 30, "🏅"),
+    StreakMilestoneTierDefinition(30, Color(0xFFEAB308), Color(0xFF1A1200), 50, "💪"),
+    StreakMilestoneTierDefinition(50, Color(0xFFFBBF24), Color(0xFF160E00), 66, "⚡"),
+    StreakMilestoneTierDefinition(66, Color(0xFFFBBF24), Color(0xFF160E00), 100, "💎"),
+    StreakMilestoneTierDefinition(100, Color(0xFFFBBF24), Color(0xFF160E00), 180, "🌟"),
+    StreakMilestoneTierDefinition(180, Color(0xFFA78BFA), Color(0xFF0F0820), 365, "👑"),
+    StreakMilestoneTierDefinition(365, Color(0xFFA78BFA), Color(0xFF0F0820), 500, "🔮"),
+    StreakMilestoneTierDefinition(500, Color(0xFFC084FC), Color(0xFF0C0618), 1000, "∞"),
+    StreakMilestoneTierDefinition(1000, Color(0xFFE879F9), Color(0xFF080818), null, "")
+)
+
+@Composable
+private fun streakMilestoneTier(days: Int): StreakMilestoneTier? {
+    val definition = streakMilestoneTierDefinitions.firstOrNull { it.days == days } ?: return null
+    return StreakMilestoneTier(
+        days = definition.days,
+        badgeLabel = t("milestone_badge_${definition.days}"),
+        headline = t("milestone_headline_${definition.days}"),
+        message = t("milestone_message_${definition.days}"),
+        ctaLabel = t("milestone_cta_${definition.days}"),
+        accentColor = definition.accentColor,
+        backgroundColor = definition.backgroundColor,
+        nextMilestoneDays = definition.nextMilestoneDays,
+        nextMilestoneIcon = definition.nextMilestoneIcon
+    )
+}
+
 private data class OnboardingHabitDraft(
     val name: String,
     val category: HabitCategory,
@@ -446,6 +499,8 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
     var templateDraft by remember { mutableStateOf<TemplateConfirmDraft?>(null) }
     var pendingTemplateReminderPicker by remember { mutableStateOf<(() -> Unit)?>(null) }
     var habitsEditMode by rememberSaveable { mutableStateOf(false) }
+    var activeMilestoneEvent by remember { mutableStateOf<StreakMilestoneEvent?>(null) }
+    var milestoneQueueRefreshSignal by remember { mutableStateOf(0) }
     val semantic = AppTheme.colors
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -515,6 +570,12 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
         showTemplatePicker = true
     }
 
+    val pullPendingMilestoneIfIdle = {
+        if (activeMilestoneEvent == null) {
+            activeMilestoneEvent = StreakMilestoneQueue.peekPending(context)
+        }
+    }
+
     LaunchedEffect(state.isLoaded, state.tasks, state.allTasks) {
         val activity = context.findActivity() ?: return@LaunchedEffect
         val paywallTriggerExtra = activity.intent?.getStringExtra(EXTRA_OPEN_PAYWALL_TRIGGER)
@@ -539,6 +600,7 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 vm.onHostResumed()
+                milestoneQueueRefreshSignal += 1
             }
             if (
                 event == Lifecycle.Event.ON_RESUME &&
@@ -576,6 +638,10 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
     }
     LaunchedEffect(page) {
         if (page != AppPage.HABITS) habitsEditMode = false
+    }
+    LaunchedEffect(milestoneQueueRefreshSignal, state.totalCompletions, state.streak) {
+        delay(80)
+        pullPendingMilestoneIfIdle()
     }
 
     CompositionLocalProvider(LocalAppLanguage provides state.language) {
@@ -1265,6 +1331,17 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                 }
             )
         }
+        activeMilestoneEvent?.let { event ->
+            StreakMilestoneScreen(
+                habitId = event.habitId,
+                days = event.days,
+                onDismiss = {
+                    StreakMilestoneQueue.markShownAndRemove(context, event)
+                    activeMilestoneEvent = null
+                    milestoneQueueRefreshSignal += 1
+                }
+            )
+        }
     }
 }
 
@@ -1389,21 +1466,18 @@ private fun TrackerPage(
     scrollToTopSignal: Int
 ) {
     val spacing = AppTheme.spacing
+    val context = LocalContext.current
     val listState = rememberLazyListState()
     val selectorListState = rememberLazyListState()
     var previousTotalCompletions by remember(state.selectedTaskId) { mutableStateOf(state.totalCompletions) }
     var streakOverlay by remember { mutableStateOf<StreakOverlayModel?>(null) }
     var overlayVisible by remember { mutableStateOf(false) }
-    var pendingMilestone by remember { mutableStateOf<StreakOverlayModel?>(null) }
-    var milestoneCelebration by remember { mutableStateOf<StreakOverlayModel?>(null) }
     var habitSwitchDirection by remember { mutableStateOf(0) }
 
     LaunchedEffect(state.selectedTaskId) {
         previousTotalCompletions = state.totalCompletions
         streakOverlay = null
         overlayVisible = false
-        pendingMilestone = null
-        milestoneCelebration = null
         if (habitSwitchDirection != 0) {
             delay(16L)
             habitSwitchDirection = 0
@@ -1418,16 +1492,12 @@ private fun TrackerPage(
             streakOverlay = model
             overlayVisible = true
             if (model.milestone) {
-                pendingMilestone = model
+                state.selectedTaskId?.let { taskId ->
+                    StreakMilestoneQueue.enqueueIfEligible(context, taskId, state.streak)
+                }
             }
         }
         previousTotalCompletions = state.totalCompletions
-    }
-    LaunchedEffect(pendingMilestone) {
-        val model = pendingMilestone ?: return@LaunchedEffect
-        delay(260)
-        milestoneCelebration = model
-        pendingMilestone = null
     }
     LaunchedEffect(streakOverlay, overlayVisible) {
         if (overlayVisible && streakOverlay != null) {
@@ -1622,17 +1692,6 @@ private fun TrackerPage(
             streakOverlay?.let { model ->
                 StreakRewardOverlay(model = model)
             }
-        }
-
-        milestoneCelebration?.let { model ->
-            MilestoneCelebrationDialog(
-                model = model,
-                currentStreak = state.streak,
-                bestStreak = state.bestStreak,
-                completion30Day = state.progressPercent,
-                points = state.last7Days,
-                onDismiss = { milestoneCelebration = null }
-            )
         }
     }
 
@@ -3660,6 +3719,8 @@ private fun ManageSubscriptionScreen(
     val locale = appLocale()
     val dateFormatter = remember(locale) { DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale) }
     var showCancelSheet by rememberSaveable { mutableStateOf(false) }
+    var showMilestonePreview by remember { mutableStateOf(false) }
+    var previewDays by remember { mutableStateOf<Int?>(null) }
     val subscriptionState = state.subscriptionState
     val activeState = subscriptionState as? SubscriptionState.PremiumActive
     var selectedPlan by rememberSaveable(subscriptionState) { mutableStateOf(activeState?.plan ?: PremiumPlan.YEARLY) }
@@ -3888,6 +3949,10 @@ private fun ManageSubscriptionScreen(
                     OutlinedButton(onClick = onDebugForceFree, modifier = Modifier.fillMaxWidth(), border = BorderStroke(1.dp, Color(0xFF3A3A10))) {
                         Text(t("Switch to Free plan"))
                     }
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(onClick = { showMilestonePreview = true }, modifier = Modifier.fillMaxWidth(), border = BorderStroke(1.dp, Color(0xFF3A3A10))) {
+                        Text("Preview milestones →")
+                    }
                 }
             }
         }
@@ -3902,6 +3967,27 @@ private fun ManageSubscriptionScreen(
                 showCancelSheet = false
             }
         )
+    }
+
+    if (isDebugBuild && showMilestonePreview) {
+        MilestonePreviewSheet(
+            onDismiss = { showMilestonePreview = false },
+            onSelect = { days ->
+                showMilestonePreview = false
+                previewDays = days
+            }
+        )
+    }
+
+    if (isDebugBuild) {
+        previewDays?.let { days ->
+            StreakMilestoneScreen(
+                habitId = "",
+                days = days,
+                forceShow = true,
+                onDismiss = { previewDays = null }
+            )
+        }
     }
 }
 
@@ -3965,6 +4051,105 @@ private fun ManagePlanSwitchRow(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MilestonePreviewSheet(
+    onDismiss: () -> Unit,
+    onSelect: (Int) -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val rows = remember {
+        streakMilestoneTierDefinitions.map { definition ->
+            definition.days to definition.accentColor
+        }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        dragHandle = null,
+        containerColor = AppTheme.colors.backgroundCanvas
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 10.dp)
+        ) {
+            Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                Box(
+                    modifier = Modifier
+                        .size(width = 36.dp, height = 4.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(Color(0xFF2A4A38))
+                )
+            }
+            Spacer(Modifier.height(16.dp))
+            Text(
+                text = "Preview milestone screens",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFFE8F5EF),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+            )
+            Spacer(Modifier.height(4.dp))
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 430.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                rows.forEachIndexed { index, row ->
+                    val days = row.first
+                    val accent = row.second
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelect(days) }
+                            .padding(horizontal = 14.dp, vertical = 13.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(12.dp)
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(accent)
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            Text(
+                                text = "$days ${streakDaysUnit(days)}",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFE8F5EF)
+                            )
+                            Text(
+                                text = t("milestone_badge_${days}"),
+                                fontSize = 11.sp,
+                                color = Color(0xFF6AAA85),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        Text(
+                            text = "›",
+                            fontSize = 16.sp,
+                            color = Color(0xFF6AAA85)
+                        )
+                    }
+                    if (index != rows.lastIndex) {
+                        HorizontalDivider(color = Color(0xFF1A3528), thickness = 1.dp)
+                    }
+                }
+            }
+        }
+    }
+}
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CancelSubscriptionSheet(
@@ -6785,332 +6970,208 @@ private fun StreakRewardOverlay(model: StreakOverlayModel) {
 }
 
 @Composable
-private fun MilestoneCelebrationDialog(
-    model: StreakOverlayModel,
-    currentStreak: Int,
-    bestStreak: Int,
-    completion30Day: Int,
-    points: List<Int>,
-    onDismiss: () -> Unit
+private fun StreakMilestoneScreen(
+    habitId: String,
+    days: Int,
+    onDismiss: () -> Unit,
+    forceShow: Boolean = false
 ) {
-    val spacing = AppTheme.spacing
-    val radius = AppTheme.radius
-    val colors = AppTheme.colors
+    val context = LocalContext.current
+    val prefs = remember(context) { context.getSharedPreferences("habit_prefs", Context.MODE_PRIVATE) }
+    val shownKey = remember(habitId, days) { "milestone_shown_${habitId}_${days}" }
+    val alreadyShown = remember(habitId, days, forceShow) {
+        if (forceShow || habitId.isBlank()) false else prefs.getBoolean(shownKey, false)
+    }
+    if (alreadyShown) {
+        LaunchedEffect(shownKey) { onDismiss() }
+        return
+    }
+    val dismissAndTrack: () -> Unit = {
+        if (!forceShow && habitId.isNotBlank()) {
+            prefs.edit().putBoolean(shownKey, true).apply()
+        }
+        onDismiss()
+    }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            Button(onClick = onDismiss) {
-                Text(t("Continue"))
-            }
-        },
-        title = {
-            Text(
-                text = t("Streak milestone"),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold
-            )
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(spacing.x1_5)) {
-                MilestoneFlameHero(streak = model.streak)
-
-                Text(
-                    text = t("Amazing consistency"),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = colors.textPrimary
-                )
-                Text(
-                    text = t("You're building momentum"),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = colors.textSecondary
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(spacing.x1)
-                ) {
-                    MilestoneMetric(
-                        modifier = Modifier.weight(1f),
-                        label = t("Current streak"),
-                        value = "${currentStreak}d"
-                    )
-                    MilestoneMetric(
-                        modifier = Modifier.weight(1f),
-                        label = t("Best streak"),
-                        value = "${bestStreak}d"
-                    )
-                    MilestoneMetric(
-                        modifier = Modifier.weight(1f),
-                        label = t("30 day completion"),
-                        value = "${completion30Day}%"
-                    )
-                }
-
-                MilestonePreview(points = points)
-            }
-        },
-        shape = RoundedCornerShape(radius.lg),
-        containerColor = colors.backgroundSurface
-    )
-}
-
-@Composable
-private fun MilestoneFlameHero(streak: Int) {
-    val spacing = AppTheme.spacing
-    val radius = AppTheme.radius
-    val colors = AppTheme.colors
-    val flameSize = spacing.x6 * 2f
+    val tier = streakMilestoneTier(days) ?: return
     val lottieComposition by rememberLottieComposition(
         LottieCompositionSpec.RawRes(R.raw.streak_milestone_lottie)
     )
     val lottieProgress by animateLottieCompositionAsState(
         composition = lottieComposition,
-        iterations = LottieConstants.IterateForever,
-        isPlaying = lottieComposition != null,
+        iterations = 1,
+        isPlaying = true,
         speed = 1f
     )
-    val infinite = rememberInfiniteTransition(label = "milestoneFlameMotion")
-    val flamePulse by infinite.animateFloat(
-        initialValue = 0.98f,
-        targetValue = 1.07f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 920, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "flamePulse"
-    )
-    val flameFlicker by infinite.animateFloat(
-        initialValue = 0.9f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 360, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "flameFlicker"
-    )
-    val flameDriftY by infinite.animateFloat(
-        initialValue = -2f,
-        targetValue = 2f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1100, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "flameDriftY"
-    )
-    val glowPulse by infinite.animateFloat(
-        initialValue = 0.88f,
-        targetValue = 1.08f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "flameGlowPulse"
-    )
-    val sweepProgress = remember(streak) { Animatable(-1.2f) }
-    val sweepAlpha = remember(streak) { Animatable(0f) }
-    LaunchedEffect(streak) {
-        sweepProgress.snapTo(-1.2f)
-        sweepAlpha.snapTo(0f)
-        sweepAlpha.animateTo(
-            targetValue = 0.78f,
-            animationSpec = tween(durationMillis = 120, easing = FastOutSlowInEasing)
-        )
-        sweepProgress.animateTo(
-            targetValue = 1.2f,
-            animationSpec = tween(durationMillis = 460, easing = FastOutSlowInEasing)
-        )
-        sweepAlpha.animateTo(targetValue = 0f, animationSpec = tween(durationMillis = 180))
-        delay(560)
-        sweepProgress.snapTo(-1.2f)
-        sweepAlpha.snapTo(0f)
-        sweepAlpha.animateTo(
-            targetValue = 0.52f,
-            animationSpec = tween(durationMillis = 100, easing = FastOutSlowInEasing)
-        )
-        sweepProgress.animateTo(
-            targetValue = 1.2f,
-            animationSpec = tween(durationMillis = 420, easing = FastOutSlowInEasing)
-        )
-        sweepAlpha.animateTo(targetValue = 0f, animationSpec = tween(durationMillis = 160))
+    val flameFilter = remember(tier.accentColor) {
+        PorterDuffColorFilter(tier.accentColor.toArgb(), PorterDuff.Mode.SRC_ATOP)
     }
+    val lottieDynamicProperties = rememberLottieDynamicProperties(
+        rememberLottieDynamicProperty(
+            property = LottieProperty.COLOR_FILTER,
+            value = flameFilter,
+            keyPath = arrayOf("**")
+        )
+    )
 
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(spacing.x0_5)
+    BackHandler(onBack = dismissAndTrack)
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(tier.backgroundColor)
     ) {
-        Box(
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(spacing.x6 * 2.4f),
-            contentAlignment = Alignment.Center
+                .fillMaxSize()
+                .padding(horizontal = 24.dp, vertical = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceEvenly
         ) {
             Box(
                 modifier = Modifier
-                    .size(flameSize * 1.64f)
-                    .graphicsLayer {
-                        scaleX = glowPulse
-                        scaleY = glowPulse
-                        alpha = 0.12f
-                    }
-                    .clip(RoundedCornerShape(radius.full))
-                    .background(colors.success.copy(alpha = 0.24f))
-            )
-            Box(
-                modifier = Modifier
-                    .size(flameSize * 1.28f)
-                    .graphicsLayer {
-                        scaleX = glowPulse
-                        scaleY = glowPulse
-                        alpha = 0.2f
-                    }
-                    .clip(RoundedCornerShape(radius.full))
-                    .background(colors.primary.copy(alpha = 0.34f))
-            )
-            Box(
-                modifier = Modifier
-                    .size(flameSize)
-                    .graphicsLayer {
-                        translationY = flameDriftY
-                        scaleX = flamePulse
-                        scaleY = flamePulse
-                        alpha = flameFlicker
-                    }
-                    .clip(RoundedCornerShape(radius.full))
-                    .background(colors.backgroundSurface)
-                    .border(
-                        border = BorderStroke(2.dp, colors.primary.copy(alpha = 0.28f)),
-                        shape = RoundedCornerShape(radius.full)
-                    )
-                    .drawWithContent {
-                        drawContent()
-                        if (sweepAlpha.value > 0.01f) {
-                            val band = size.width * 0.34f
-                            val centerX = sweepProgress.value * size.width
-                            drawRect(
-                                brush = Brush.linearGradient(
-                                    colors = listOf(
-                                        Color.Transparent,
-                                        Color.White.copy(alpha = sweepAlpha.value),
-                                        Color.Transparent
-                                    ),
-                                    start = Offset(centerX - band, 0f),
-                                    end = Offset(centerX + band, size.height)
-                                ),
-                                alpha = 0.95f
-                            )
-                        }
-                    },
+                    .fillMaxWidth()
+                    .height(180.dp),
                 contentAlignment = Alignment.Center
             ) {
                 if (lottieComposition != null) {
                     LottieAnimation(
                         composition = lottieComposition,
-                        progress = { lottieProgress },
-                        modifier = Modifier
-                            .fillMaxSize(0.8f)
-                            .padding(spacing.x0_5)
+                        progress = { lottieProgress.coerceIn(0f, 1f) },
+                        dynamicProperties = lottieDynamicProperties,
+                        modifier = Modifier.size(140.dp)
                     )
                 } else {
                     Text(
                         text = "🔥",
-                        style = MaterialTheme.typography.displaySmall
+                        fontSize = 44.sp,
+                        color = tier.accentColor
                     )
                 }
             }
-        }
 
-        Text(
-            text = tf("%d day streak", streak),
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.ExtraBold,
-            color = colors.textPrimary
-        )
-    }
-}
-
-@Composable
-private fun MilestoneMetric(
-    modifier: Modifier = Modifier,
-    label: String,
-    value: String
-) {
-    val spacing = AppTheme.spacing
-    val radius = AppTheme.radius
-    val colors = AppTheme.colors
-
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(radius.md))
-            .background(colors.backgroundSurfaceMuted)
-            .padding(horizontal = spacing.x1, vertical = spacing.x1),
-        verticalArrangement = Arrangement.spacedBy(spacing.x0_5),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            color = colors.textPrimary
-        )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = colors.textSecondary,
-            textAlign = TextAlign.Center
-        )
-    }
-}
-
-@Composable
-private fun MilestonePreview(points: List<Int>) {
-    val spacing = AppTheme.spacing
-    val radius = AppTheme.radius
-    val colors = AppTheme.colors
-    val safe = if (points.size == 7) points else List(7) { 0 }
-
-    Column(verticalArrangement = Arrangement.spacedBy(spacing.x0_5)) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(radius.md))
-                .background(colors.backgroundSurfaceMuted)
-                .padding(horizontal = spacing.x1, vertical = spacing.x1),
-            verticalArrangement = Arrangement.spacedBy(spacing.x1)
-        ) {
-            Text(
-                text = t("7 day chart"),
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
-                color = colors.textPrimary
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(2.dp)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                safe.forEach { point ->
-                    Box(
+                Text(
+                    text = tier.badgeLabel,
+                    color = tier.accentColor,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .background(Color.Black.copy(alpha = 0.22f))
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                )
+                Text(
+                    text = tier.days.toString(),
+                    fontSize = when {
+                        tier.days >= 1000 -> 48.sp
+                        tier.days >= 100 -> 52.sp
+                        else -> 64.sp
+                    },
+                    fontWeight = FontWeight.ExtraBold,
+                    color = tier.accentColor
+                )
+                Text(
+                    text = streakDaysUnit(tier.days),
+                    fontSize = 15.sp,
+                    color = tier.accentColor.copy(alpha = 0.65f)
+                )
+            }
+
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = tier.headline,
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White.copy(alpha = 0.95f),
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = tier.message,
+                    fontSize = 13.sp,
+                    color = tier.accentColor.copy(alpha = 0.75f),
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            if (tier.nextMilestoneDays != null) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color.Black.copy(alpha = 0.2f))
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = t("milestone_next_goal"),
+                            fontSize = 11.sp,
+                            color = tier.accentColor.copy(alpha = 0.65f)
+                        )
+                        Text(
+                            text = "${tier.nextMilestoneIcon} ${tier.nextMilestoneDays} ${streakDaysUnit(tier.nextMilestoneDays)}",
+                            fontSize = 11.sp,
+                            color = tier.accentColor,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    LinearProgressIndicator(
+                        progress = { (tier.days.toFloat() / tier.nextMilestoneDays.toFloat()).coerceIn(0f, 1f) },
+                        color = tier.accentColor,
+                        trackColor = Color.Black.copy(alpha = 0.3f),
                         modifier = Modifier
-                            .weight(1f)
-                            .height(spacing.x2)
-                            .clip(RoundedCornerShape(radius.full))
-                            .background(
-                                if (point > 0) colors.success.copy(alpha = 0.9f)
-                                else colors.borderSubtle.copy(alpha = 0.6f)
-                            )
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp))
                     )
                 }
+            } else {
+                Text(
+                    text = t("milestone_top_percent"),
+                    fontSize = 12.sp,
+                    color = tier.accentColor,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            Button(
+                onClick = dismissAndTrack,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = tier.accentColor,
+                    contentColor = Color(0xFF051E16)
+                )
+            ) {
+                Text(
+                    text = tier.ctaLabel,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
             }
         }
     }
 }
 
 private fun isStreakMilestone(streak: Int): Boolean {
-    if (streak <= 0) return false
-    if (streak in setOf(1, 7, 15, 30, 60, 90, 120)) return true
-    return streak > 120 && streak % 30 == 0
+    return streak in StreakMilestoneQueue.milestoneSet()
 }
 
 @Composable
@@ -9093,6 +9154,9 @@ private fun monthGrid(month: YearMonth): List<List<LocalDate?>> {
     while (days.size % 7 != 0) days += null
     return days.chunked(7)
 }
+
+
+
 
 
 

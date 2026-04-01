@@ -46,6 +46,7 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.example.microhabit.MainActivity
+import com.example.microhabit.StreakMilestoneQueue
 import com.example.microhabit.R
 import com.example.microhabit.data.AppLanguage
 import com.example.microhabit.data.HabitRepository
@@ -149,6 +150,11 @@ class MarkDoneAction : ActionCallback {
                     "isDoneToday=$isDoneToday targetValue=$targetValue writeValue=$newValue"
             )
             repository.setDayValue(task, today, newValue, refreshWidgets = false)
+
+            if (!isDoneToday && newValue > 0) {
+                val streakAfterAction = repository.calculateStreak(task, today)
+                StreakMilestoneQueue.enqueueIfEligible(context, task.id, streakAfterAction)
+            }
 
             val postValue = repository.getDayValue(task, today)
             val postDoneScheduled = repository.isCompletedOn(task, today)
@@ -1176,7 +1182,14 @@ class IncrementValueAction : ActionCallback {
             val task = repository.getTasks().firstOrNull { it.id == habitId } ?: return
             val today = LocalDate.now()
             val current = repository.getDayValue(task, today)
-            repository.setDayValue(task, today, (current + delta).coerceAtLeast(0), refreshWidgets = false)
+            val wasCompleted = repository.isCompletedOn(task, today)
+            val updatedValue = (current + delta).coerceAtLeast(0)
+            repository.setDayValue(task, today, updatedValue, refreshWidgets = false)
+            val isCompletedNow = repository.isCompletedOn(task, today)
+            if (!wasCompleted && isCompletedNow) {
+                val streakAfterAction = repository.calculateStreak(task, today)
+                StreakMilestoneQueue.enqueueIfEligible(context, task.id, streakAfterAction)
+            }
 
             updateAppWidgetState(context, glanceId) { prefs ->
                 prefs[WidgetRefreshNonceKey] = System.currentTimeMillis()

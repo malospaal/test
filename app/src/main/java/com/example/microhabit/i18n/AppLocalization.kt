@@ -1379,6 +1379,222 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "unit_cup" to (v("Glas", "tasse", "taza", "tazza", "стакан") + mapOf(AppLanguage.EN to "cup", AppLanguage.CS to "sklenice")),
     "unit_min" to (v("Min", "min", "min", "min", "мин") + mapOf(AppLanguage.EN to "min", AppLanguage.CS to "min")),
     "unit_steps" to (v("Schritte", "pas", "pasos", "passi", "шагов") + mapOf(AppLanguage.EN to "steps", AppLanguage.CS to "kroků")),
+    "milestone_next_goal" to (
+        v("Next milestone", "Next milestone", "Next milestone", "Next milestone", "До следующей цели") +
+            mapOf(AppLanguage.EN to "Next milestone", AppLanguage.CS to "Next milestone")
+    ),
+    "milestone_top_percent" to (
+        v("You're in the top 0.01%", "You're in the top 0.01%", "You're in the top 0.01%", "You're in the top 0.01%", "Ты в 0.01% людей на планете") +
+            mapOf(AppLanguage.EN to "You're in the top 0.01%", AppLanguage.CS to "You're in the top 0.01%")
+    ),
+    "milestone_badge_1" to (
+        v("First step 🎉", "First step 🎉", "First step 🎉", "First step 🎉", "Первый шаг 🎉") +
+            mapOf(AppLanguage.EN to "First step 🎉", AppLanguage.CS to "First step 🎉")
+    ),
+    "milestone_headline_1" to (
+        v("Great start!", "Great start!", "Great start!", "Great start!", "Отличное начало!") +
+            mapOf(AppLanguage.EN to "Great start!", AppLanguage.CS to "Great start!")
+    ),
+    "milestone_message_1" to (
+        v("Every long journey begins with a single step. Come back tomorrow!", "Every long journey begins with a single step. Come back tomorrow!", "Every long journey begins with a single step. Come back tomorrow!", "Every long journey begins with a single step. Come back tomorrow!", "Самый длинный путь начинается с первого шага. Вернись завтра!") +
+            mapOf(AppLanguage.EN to "Every long journey begins with a single step. Come back tomorrow!", AppLanguage.CS to "Every long journey begins with a single step. Come back tomorrow!")
+    ),
+    "milestone_cta_1" to (
+        v("See you tomorrow 💪", "See you tomorrow 💪", "See you tomorrow 💪", "See you tomorrow 💪", "Буду завтра 💪") +
+            mapOf(AppLanguage.EN to "See you tomorrow 💪", AppLanguage.CS to "See you tomorrow 💪")
+    ),
+    "milestone_badge_3" to (
+        v("3 days done", "3 days done", "3 days done", "3 days done", "3 дня позади") +
+            mapOf(AppLanguage.EN to "3 days done", AppLanguage.CS to "3 days done")
+    ),
+    "milestone_headline_3" to (
+        v("Past the hard part!", "Past the hard part!", "Past the hard part!", "Past the hard part!", "Первые 3 — позади!") +
+            mapOf(AppLanguage.EN to "Past the hard part!", AppLanguage.CS to "Past the hard part!")
+    ),
+    "milestone_message_3" to (
+        v("Most people quit here. You didn't. Keep going!", "Most people quit here. You didn't. Keep going!", "Most people quit here. You didn't. Keep going!", "Most people quit here. You didn't. Keep going!", "Именно здесь большинство сдаётся. Ты — нет. Продолжай!") +
+            mapOf(AppLanguage.EN to "Most people quit here. You didn't. Keep going!", AppLanguage.CS to "Most people quit here. You didn't. Keep going!")
+    ),
+    "milestone_cta_3" to (
+        v("Keeping it up! 🔥", "Keeping it up! 🔥", "Keeping it up! 🔥", "Keeping it up! 🔥", "Продолжаю! 🔥") +
+            mapOf(AppLanguage.EN to "Keeping it up! 🔥", AppLanguage.CS to "Keeping it up! 🔥")
+    ),
+    "milestone_badge_7" to (
+        v("One week! 🔥", "One week! 🔥", "One week! 🔥", "One week! 🔥", "Неделя! 🔥") +
+            mapOf(AppLanguage.EN to "One week! 🔥", AppLanguage.CS to "One week! 🔥")
+    ),
+    "milestone_headline_7" to (
+        v("A whole week!", "A whole week!", "A whole week!", "A whole week!", "Целая неделя!") +
+            mapOf(AppLanguage.EN to "A whole week!", AppLanguage.CS to "A whole week!")
+    ),
+    "milestone_message_7" to (
+        v("You've proven you can. 21 days and it becomes automatic.", "You've proven you can. 21 days and it becomes automatic.", "You've proven you can. 21 days and it becomes automatic.", "You've proven you can. 21 days and it becomes automatic.", "Ты доказал себе что можешь. 21 день — и привычка станет автоматической.") +
+            mapOf(AppLanguage.EN to "You've proven you can. 21 days and it becomes automatic.", AppLanguage.CS to "You've proven you can. 21 days and it becomes automatic.")
+    ),
+    "milestone_cta_7" to (
+        v("Week one done 🔥", "Week one done 🔥", "Week one done 🔥", "Week one done 🔥", "Неделя пройдена 🔥") +
+            mapOf(AppLanguage.EN to "Week one done 🔥", AppLanguage.CS to "Week one done 🔥")
+    ),
+    "milestone_badge_14" to (
+        v("Two weeks", "Two weeks", "Two weeks", "Two weeks", "2 недели") +
+            mapOf(AppLanguage.EN to "Two weeks", AppLanguage.CS to "Two weeks")
+    ),
+    "milestone_headline_14" to (
+        v("Two weeks strong!", "Two weeks strong!", "Two weeks strong!", "Two weeks strong!", "Две недели силы!") +
+            mapOf(AppLanguage.EN to "Two weeks strong!", AppLanguage.CS to "Two weeks strong!")
+    ),
+    "milestone_message_14" to (
+        v("Your brain is rewiring. Neural pathways strengthen every day.", "Your brain is rewiring. Neural pathways strengthen every day.", "Your brain is rewiring. Neural pathways strengthen every day.", "Your brain is rewiring. Neural pathways strengthen every day.", "Твой мозг уже перестраивается. Нейронные связи крепнут с каждым днём.") +
+            mapOf(AppLanguage.EN to "Your brain is rewiring. Neural pathways strengthen every day.", AppLanguage.CS to "Your brain is rewiring. Neural pathways strengthen every day.")
+    ),
+    "milestone_cta_14" to (
+        v("On fire! 🔥", "On fire! 🔥", "On fire! 🔥", "On fire! 🔥", "Горю! 🔥") +
+            mapOf(AppLanguage.EN to "On fire! 🔥", AppLanguage.CS to "On fire! 🔥")
+    ),
+    "milestone_badge_21" to (
+        v("Magic number ⭐", "Magic number ⭐", "Magic number ⭐", "Magic number ⭐", "Магическое число ⭐") +
+            mapOf(AppLanguage.EN to "Magic number ⭐", AppLanguage.CS to "Magic number ⭐")
+    ),
+    "milestone_headline_21" to (
+        v("Habit forming!", "Habit forming!", "Habit forming!", "Habit forming!", "Привычка формируется!") +
+            mapOf(AppLanguage.EN to "Habit forming!", AppLanguage.CS to "Habit forming!")
+    ),
+    "milestone_message_21" to (
+        v("21 days — the number everyone knows. You're here. This is you now.", "21 days — the number everyone knows. You're here. This is you now.", "21 days — the number everyone knows. You're here. This is you now.", "21 days — the number everyone knows. You're here. This is you now.", "21 день — число которое все знают. Ты здесь. Это уже часть тебя.") +
+            mapOf(AppLanguage.EN to "21 days — the number everyone knows. You're here. This is you now.", AppLanguage.CS to "21 days — the number everyone knows. You're here. This is you now.")
+    ),
+    "milestone_cta_21" to (
+        v("21! Keeping going ⭐", "21! Keeping going ⭐", "21! Keeping going ⭐", "21! Keeping going ⭐", "21! Продолжаю ⭐") +
+            mapOf(AppLanguage.EN to "21! Keeping going ⭐", AppLanguage.CS to "21! Keeping going ⭐")
+    ),
+    "milestone_badge_30" to (
+        v("One month! 🏅", "One month! 🏅", "One month! 🏅", "One month! 🏅", "Месяц! 🏅") +
+            mapOf(AppLanguage.EN to "One month! 🏅", AppLanguage.CS to "One month! 🏅")
+    ),
+    "milestone_headline_30" to (
+        v("A full month!", "A full month!", "A full month!", "A full month!", "Целый месяц!") +
+            mapOf(AppLanguage.EN to "A full month!", AppLanguage.CS to "A full month!")
+    ),
+    "milestone_message_30" to (
+        v("This isn't luck anymore — it's you. A real achievement to be proud of.", "This isn't luck anymore — it's you. A real achievement to be proud of.", "This isn't luck anymore — it's you. A real achievement to be proud of.", "This isn't luck anymore — it's you. A real achievement to be proud of.", "Это уже не случайность — это ты. Серьёзное достижение которым стоит гордиться.") +
+            mapOf(AppLanguage.EN to "This isn't luck anymore — it's you. A real achievement to be proud of.", AppLanguage.CS to "This isn't luck anymore — it's you. A real achievement to be proud of.")
+    ),
+    "milestone_cta_30" to (
+        v("30 days — I'm good! ⭐", "30 days — I'm good! ⭐", "30 days — I'm good! ⭐", "30 days — I'm good! ⭐", "30 дней — я крут! ⭐") +
+            mapOf(AppLanguage.EN to "30 days — I'm good! ⭐", AppLanguage.CS to "30 days — I'm good! ⭐")
+    ),
+    "milestone_badge_50" to (
+        v("50 days 💪", "50 days 💪", "50 days 💪", "50 days 💪", "50 дней 💪") +
+            mapOf(AppLanguage.EN to "50 days 💪", AppLanguage.CS to "50 days 💪")
+    ),
+    "milestone_headline_50" to (
+        v("Halfway to legendary!", "Halfway to legendary!", "Halfway to legendary!", "Halfway to legendary!", "Полпути к легенде!") +
+            mapOf(AppLanguage.EN to "Halfway to legendary!", AppLanguage.CS to "Halfway to legendary!")
+    ),
+    "milestone_message_50" to (
+        v("50 days of pure discipline. Most people never get here.", "50 days of pure discipline. Most people never get here.", "50 days of pure discipline. Most people never get here.", "50 days of pure discipline. Most people never get here.", "50 дней чистой дисциплины. Большинство людей до этого не доходят.") +
+            mapOf(AppLanguage.EN to "50 days of pure discipline. Most people never get here.", AppLanguage.CS to "50 days of pure discipline. Most people never get here.")
+    ),
+    "milestone_cta_50" to (
+        v("On to 66! ⚡", "On to 66! ⚡", "On to 66! ⚡", "On to 66! ⚡", "Продолжаю к 66 ⚡") +
+            mapOf(AppLanguage.EN to "On to 66! ⚡", AppLanguage.CS to "On to 66! ⚡")
+    ),
+    "milestone_badge_66" to (
+        v("Science confirmed ⚡", "Science confirmed ⚡", "Science confirmed ⚡", "Science confirmed ⚡", "Наука доказала ⚡") +
+            mapOf(AppLanguage.EN to "Science confirmed ⚡", AppLanguage.CS to "Science confirmed ⚡")
+    ),
+    "milestone_headline_66" to (
+        v("Autopilot on!", "Autopilot on!", "Autopilot on!", "Autopilot on!", "Автопилот включён!") +
+            mapOf(AppLanguage.EN to "Autopilot on!", AppLanguage.CS to "Autopilot on!")
+    ),
+    "milestone_message_66" to (
+        v("UCL researchers found 66 days is the real habit threshold. You're there.", "UCL researchers found 66 days is the real habit threshold. You're there.", "UCL researchers found 66 days is the real habit threshold. You're there.", "UCL researchers found 66 days is the real habit threshold. You're there.", "Учёные UCL выяснили: именно 66 дней нужно для автоматизма. Ты там.") +
+            mapOf(AppLanguage.EN to "UCL researchers found 66 days is the real habit threshold. You're there.", AppLanguage.CS to "UCL researchers found 66 days is the real habit threshold. You're there.")
+    ),
+    "milestone_cta_66" to (
+        v("Running on autopilot! ⚡", "Running on autopilot! ⚡", "Running on autopilot! ⚡", "Running on autopilot! ⚡", "Это уже автоматически! ⚡") +
+            mapOf(AppLanguage.EN to "Running on autopilot! ⚡", AppLanguage.CS to "Running on autopilot! ⚡")
+    ),
+    "milestone_badge_100" to (
+        v("100! 💎", "100! 💎", "100! 💎", "100! 💎", "100! 💎") +
+            mapOf(AppLanguage.EN to "100! 💎", AppLanguage.CS to "100! 💎")
+    ),
+    "milestone_headline_100" to (
+        v("Triple digits.", "Triple digits.", "Triple digits.", "Triple digits.", "Три значки. Сотня.") +
+            mapOf(AppLanguage.EN to "Triple digits.", AppLanguage.CS to "Triple digits.")
+    ),
+    "milestone_message_100" to (
+        v("100 days isn't just a habit. It's a new version of you.", "100 days isn't just a habit. It's a new version of you.", "100 days isn't just a habit. It's a new version of you.", "100 days isn't just a habit. It's a new version of you.", "100 дней — это не просто привычка. Это новая версия тебя.") +
+            mapOf(AppLanguage.EN to "100 days isn't just a habit. It's a new version of you.", AppLanguage.CS to "100 days isn't just a habit. It's a new version of you.")
+    ),
+    "milestone_cta_100" to (
+        v("100 days — legendary! 💎", "100 days — legendary! 💎", "100 days — legendary! 💎", "100 days — legendary! 💎", "100 дней — легенда! 💎") +
+            mapOf(AppLanguage.EN to "100 days — legendary! 💎", AppLanguage.CS to "100 days — legendary! 💎")
+    ),
+    "milestone_badge_180" to (
+        v("Half a year 🌟", "Half a year 🌟", "Half a year 🌟", "Half a year 🌟", "Полгода 🌟") +
+            mapOf(AppLanguage.EN to "Half a year 🌟", AppLanguage.CS to "Half a year 🌟")
+    ),
+    "milestone_headline_180" to (
+        v("Six months straight!", "Six months straight!", "Six months straight!", "Six months straight!", "Полгода без остановок!") +
+            mapOf(AppLanguage.EN to "Six months straight!", AppLanguage.CS to "Six months straight!")
+    ),
+    "milestone_message_180" to (
+        v("180 days. You've changed yourself at the cellular level.", "180 days. You've changed yourself at the cellular level.", "180 days. You've changed yourself at the cellular level.", "180 days. You've changed yourself at the cellular level.", "180 дней — это серьёзно. Ты изменил себя на клеточном уровне.") +
+            mapOf(AppLanguage.EN to "180 days. You've changed yourself at the cellular level.", AppLanguage.CS to "180 days. You've changed yourself at the cellular level.")
+    ),
+    "milestone_cta_180" to (
+        v("Half a year! 🌟", "Half a year! 🌟", "Half a year! 🌟", "Half a year! 🌟", "Полгода! Продолжаю 🌟") +
+            mapOf(AppLanguage.EN to "Half a year! 🌟", AppLanguage.CS to "Half a year! 🌟")
+    ),
+    "milestone_badge_365" to (
+        v("One year! 👑", "One year! 👑", "One year! 👑", "One year! 👑", "Год! 👑") +
+            mapOf(AppLanguage.EN to "One year! 👑", AppLanguage.CS to "One year! 👑")
+    ),
+    "milestone_headline_365" to (
+        v("A full year. No breaks.", "A full year. No breaks.", "A full year. No breaks.", "A full year. No breaks.", "Целый год. Без остановок.") +
+            mapOf(AppLanguage.EN to "A full year. No breaks.", AppLanguage.CS to "A full year. No breaks.")
+    ),
+    "milestone_message_365" to (
+        v("Only 1% of people get here. You changed your life.", "Only 1% of people get here. You changed your life.", "Only 1% of people get here. You changed your life.", "Only 1% of people get here. You changed your life.", "Только 1% людей достигают этого. Ты изменил свою жизнь.") +
+            mapOf(AppLanguage.EN to "Only 1% of people get here. You changed your life.", AppLanguage.CS to "Only 1% of people get here. You changed your life.")
+    ),
+    "milestone_cta_365" to (
+        v("I'm a legend 👑", "I'm a legend 👑", "I'm a legend 👑", "I'm a legend 👑", "Я — легенда 👑") +
+            mapOf(AppLanguage.EN to "I'm a legend 👑", AppLanguage.CS to "I'm a legend 👑")
+    ),
+    "milestone_badge_500" to (
+        v("500 days 🔮", "500 days 🔮", "500 days 🔮", "500 days 🔮", "500 дней 🔮") +
+            mapOf(AppLanguage.EN to "500 days 🔮", AppLanguage.CS to "500 days 🔮")
+    ),
+    "milestone_headline_500" to (
+        v("Five hundred.", "Five hundred.", "Five hundred.", "Five hundred.", "Пятьсот.") +
+            mapOf(AppLanguage.EN to "Five hundred.", AppLanguage.CS to "Five hundred.")
+    ),
+    "milestone_message_500" to (
+        v("500 decisions. Every single day — your choice.", "500 decisions. Every single day — your choice.", "500 decisions. Every single day — your choice.", "500 decisions. Every single day — your choice.", "За этой цифрой стоят 500 решений. Каждый день — твой выбор.") +
+            mapOf(AppLanguage.EN to "500 decisions. Every single day — your choice.", AppLanguage.CS to "500 decisions. Every single day — your choice.")
+    ),
+    "milestone_cta_500" to (
+        v("500. And beyond 🔮", "500. And beyond 🔮", "500. And beyond 🔮", "500. And beyond 🔮", "500. И дальше 🔮") +
+            mapOf(AppLanguage.EN to "500. And beyond 🔮", AppLanguage.CS to "500. And beyond 🔮")
+    ),
+    "milestone_badge_1000" to (
+        v("One thousand ∞", "One thousand ∞", "One thousand ∞", "One thousand ∞", "Тысяча ∞") +
+            mapOf(AppLanguage.EN to "One thousand ∞", AppLanguage.CS to "One thousand ∞")
+    ),
+    "milestone_headline_1000" to (
+        v("This is who you are.", "This is who you are.", "This is who you are.", "This is who you are.", "Это больше не привычка.") +
+            mapOf(AppLanguage.EN to "This is who you are.", AppLanguage.CS to "This is who you are.")
+    ),
+    "milestone_message_1000" to (
+        v("It's part of you at a cellular level. Nearly 3 years. No words.", "It's part of you at a cellular level. Nearly 3 years. No words.", "It's part of you at a cellular level. Nearly 3 years. No words.", "It's part of you at a cellular level. Nearly 3 years. No words.", "Это часть тебя на клеточном уровне. Почти 3 года. Слов нет.") +
+            mapOf(AppLanguage.EN to "It's part of you at a cellular level. Nearly 3 years. No words.", AppLanguage.CS to "It's part of you at a cellular level. Nearly 3 years. No words.")
+    ),
+    "milestone_cta_1000" to (
+        v("1000. Unbelievable ∞", "1000. Unbelievable ∞", "1000. Unbelievable ∞", "1000. Unbelievable ∞", "1000. Это невероятно ∞") +
+            mapOf(AppLanguage.EN to "1000. Unbelievable ∞", AppLanguage.CS to "1000. Unbelievable ∞")
+    ),
     "dd MMM yyyy" to v("dd MMM yyyy", "dd MMM yyyy", "dd MMM yyyy", "dd MMM yyyy", "dd MMM yyyy"),
     "LLLL yyyy" to v("LLLL yyyy", "LLLL yyyy", "LLLL yyyy", "LLLL yyyy", "LLLL yyyy")
 )
@@ -1445,6 +1661,38 @@ fun widgetCtaDone(language: AppLanguage): String {
 fun widgetIncBtn(language: AppLanguage, n: Int, unit: String): String {
     return formatTranslate(language, "widget_inc_btn_min", n, unit)
 }
+
+fun streakDaysUnit(language: AppLanguage, n: Int): String {
+    val value = n.coerceAtLeast(0)
+    val mod10 = value % 10
+    val mod100 = value % 100
+    return when (language) {
+        AppLanguage.RU -> when {
+            mod10 == 1 && mod100 != 11 -> "день"
+            mod10 in 2..4 && mod100 !in 12..14 -> "дня"
+            else -> "дней"
+        }
+        AppLanguage.UK -> when {
+            mod10 == 1 && mod100 != 11 -> "день"
+            mod10 in 2..4 && mod100 !in 12..14 -> "дні"
+            else -> "днів"
+        }
+        AppLanguage.CS -> when {
+            value == 1 -> "den"
+            mod10 in 2..4 && mod100 !in 12..14 -> "dny"
+            else -> "dní"
+        }
+        AppLanguage.DE -> if (value == 1) "Tag" else "Tage"
+        AppLanguage.FR -> if (value <= 1) "jour" else "jours"
+        AppLanguage.ES -> if (value == 1) "día" else "días"
+        AppLanguage.IT -> if (value == 1) "giorno" else "giorni"
+        AppLanguage.EN -> if (value == 1) "day" else "days"
+    }
+}
+
+@Composable
+@ReadOnlyComposable
+fun streakDaysUnit(n: Int): String = streakDaysUnit(LocalAppLanguage.current, n)
 
 fun weekdayLabels(language: AppLanguage): List<String> {
     val locale = localeForLanguage(language)

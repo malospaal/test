@@ -418,6 +418,11 @@ class HabitRepository(private val context: Context) {
         syncLegacyPlanCache()
     }
 
+    fun changeSubscriptionPlan(targetPlan: PremiumPlan) {
+        subscriptionRepository.changeActivePlan(targetPlan)
+        syncLegacyPlanCache()
+    }
+
     fun debugForceFreePlan() {
         subscriptionRepository.debugForceFreePlan()
         syncLegacyPlanCache()

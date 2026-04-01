@@ -94,6 +94,43 @@ class SubscriptionRepository(context: Context) {
             .apply()
     }
 
+    fun changeActivePlan(targetPlan: PremiumPlan) {
+        val current = getSubscriptionState() as? SubscriptionState.PremiumActive ?: return
+        if (current.plan == targetPlan || current.plan == PremiumPlan.LIFETIME) return
+        when (targetPlan) {
+            PremiumPlan.MONTHLY -> {
+                val nextBillingDate = current.nextBillingDate ?: LocalDate.now().plusMonths(1)
+                activatePremium(
+                    plan = PremiumPlan.MONTHLY,
+                    nextBillingDate = nextBillingDate,
+                    nextBillingAmount = "$3.99"
+                )
+            }
+
+            PremiumPlan.YEARLY -> {
+                val baseDate = current.nextBillingDate ?: LocalDate.now()
+                val nextBillingDate = if (current.plan == PremiumPlan.MONTHLY) {
+                    baseDate.plusYears(1)
+                } else {
+                    baseDate
+                }
+                activatePremium(
+                    plan = PremiumPlan.YEARLY,
+                    nextBillingDate = nextBillingDate,
+                    nextBillingAmount = "$24.99"
+                )
+            }
+
+            PremiumPlan.LIFETIME -> {
+                activatePremium(
+                    plan = PremiumPlan.LIFETIME,
+                    nextBillingDate = null,
+                    nextBillingAmount = null
+                )
+            }
+        }
+    }
+
     fun debugForceFreePlan() {
         setFree(debugForced = true)
     }

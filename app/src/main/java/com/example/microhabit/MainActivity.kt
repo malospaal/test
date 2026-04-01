@@ -175,6 +175,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -886,6 +887,7 @@ private fun HabitApp(state: HabitUiState, vm: MainViewModel) {
                             },
                             onCancelSubscription = vm::cancelSubscription,
                             onRenewSubscription = vm::renewSubscription,
+                            onSwitchPlan = vm::changeSubscriptionPlan,
                             onDebugForceFree = vm::debugForceFreePlan
                         )
                         AppPage.SETTINGS -> SettingsPage(
@@ -2977,7 +2979,15 @@ private fun AccountPage(
                             modifier = Modifier.fillMaxWidth(),
                             border = BorderStroke(1.dp, semantic.primary)
                         ) {
-                            Text("${t("Manage subscription")} →")
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(t("Manage subscription"))
+                                Text("→", fontSize = 18.sp, color = AppTheme.colors.textSecondary)
+
+                            }
                         }
                     }
 
@@ -3030,7 +3040,15 @@ private fun AccountPage(
                             modifier = Modifier.fillMaxWidth(),
                             border = BorderStroke(1.dp, semantic.primary)
                         ) {
-                            Text("${t("Manage subscription")} →")
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(t("Manage subscription"))
+                                Text("→", fontSize = 18.sp, color = AppTheme.colors.textSecondary)
+
+                            }
                         }
                     }
                 }
@@ -3448,7 +3466,6 @@ private fun PaywallPage(
     onRestorePurchase: () -> Unit,
     onClose: () -> Unit
 ) {
-    val spacing = AppTheme.spacing
     val colors = AppTheme.colors
     val subtitle = when (trigger) {
         PaywallTrigger.HABIT_LIMIT -> t("You reached the limit of 3 habits.")
@@ -3456,143 +3473,173 @@ private fun PaywallPage(
         PaywallTrigger.WIDGETS -> t("Add widgets on your home screen.")
         PaywallTrigger.DEFAULT -> t("Get access to all features.")
     }
-
     val ctaLabel = when (selectedBilling) {
-        BillingCycle.YEARLY -> "${t("Get Premium")} — \$24.99 / ${t("year")}"
-        BillingCycle.MONTHLY -> "${t("Get Premium")} — \$3.99 / ${t("month")}"
-        BillingCycle.LIFETIME -> "${t("Get Premium")} — \$59.99"
+        BillingCycle.YEARLY -> "${t("Get Premium")} — \$24.99 / ${t("year")}".replace('$', '$')
+        BillingCycle.MONTHLY -> "${t("Get Premium")} — \$3.99 / ${t("month")}".replace('$', '$')
+        BillingCycle.LIFETIME -> "${t("Get Premium")} — \$59.99".replace('$', '$')
     }
+    val legalColor = Color(0xFF6AAA85)
+    val _ignore = onClose
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(spacing.x2),
-        verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
-    ) {
-        item {
-            GlassCard {
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    IconButton(
-                        onClick = onClose,
-                        modifier = Modifier.align(Alignment.TopStart)
-                    ) {
-                        Icon(Icons.Rounded.Close, contentDescription = t("Close"))
-                    }
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = spacing.x1),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(spacing.x0_5)
-                    ) {
-                        Text(
-                            text = "✦",
-                            style = MaterialTheme.typography.displaySmall,
-                            color = colors.primary
-                        )
-                        Text(
-                            text = t("Unlock Premium"),
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = subtitle,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = colors.textSecondary
-                        )
+    Column(Modifier.fillMaxSize().background(colors.backgroundCanvas)) {
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text("✦", fontSize = 26.sp, color = colors.primary)
+                    Text(t("Unlock Premium"), fontSize = 19.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
+                    Text(subtitle, fontSize = 12.sp, color = colors.textSecondary)
+                }
+            }
+            item {
+                Surface(Modifier.fillMaxWidth(), color = colors.backgroundSurface, shape = RoundedCornerShape(16.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 12.dp)) {
+                        PremiumFeatureRow(t("Unlimited habits"), t("Track as many goals as you want"), showSubtitle = false)
+                        PremiumFeatureRow(t("Home screen widgets"), t("Progress right on your home screen"), showSubtitle = false)
+                        PremiumFeatureRow(t("Advanced analytics"), t("Patterns, consistency, best time insights"), showSubtitle = false)
                     }
                 }
             }
-        }
-
-        item {
-            GlassCard {
-                Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
-                    PremiumFeatureRow(
-                        title = t("Unlimited habits"),
-                        subtitle = t("Track as many goals as you want")
-                    )
-                    PremiumFeatureRow(
-                        title = t("Home screen widgets"),
-                        subtitle = t("Progress right on your home screen")
-                    )
-                    PremiumFeatureRow(
-                        title = t("Advanced analytics"),
-                        subtitle = t("Patterns, consistency, and best time insights")
-                    )
-                    PremiumFeatureRow(
-                        title = t("Priority support"),
-                        subtitle = t("Response within 24 hours")
-                    )
-                }
-            }
-        }
-
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
-                PricingPlanCard(
-                    model = PricingCardModel(
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    PaywallPlanCard(
                         title = t("Yearly"),
-                        priceLabel = "\$24.99 / ${t("year")}",
-                        subtitle = "\$2.08 / ${t("month")}",
-                        badge = t("Best value")
-                    ),
-                    selected = selectedBilling == BillingCycle.YEARLY,
-                    recommended = true,
-                    onClick = { onSelectBilling(BillingCycle.YEARLY) }
-                )
-                PricingPlanCard(
-                    model = PricingCardModel(
+                        price = "\$24.99",
+                        meta = "/ ${t("year")} · \$2.08 / mo".replace('$', '$'),
+                        selected = selectedBilling == BillingCycle.YEARLY,
+                        isLifetime = false,
+                        badge = t("paywall_savings_badge"),
+                        onClick = { onSelectBilling(BillingCycle.YEARLY) }
+                    )
+                    PaywallPlanCard(
                         title = t("Monthly"),
-                        priceLabel = "\$3.99 / ${t("month")}",
-                        subtitle = t("Flexible monthly billing")
-                    ),
-                    selected = selectedBilling == BillingCycle.MONTHLY,
-                    onClick = { onSelectBilling(BillingCycle.MONTHLY) }
-                )
-                PricingPlanCard(
-                    model = PricingCardModel(
+                        price = "\$3.99",
+                        meta = "/ ${t("month")}",
+                        selected = selectedBilling == BillingCycle.MONTHLY,
+                        isLifetime = false,
+                        onClick = { onSelectBilling(BillingCycle.MONTHLY) }
+                    )
+                    PaywallPlanCard(
                         title = t("Lifetime"),
-                        priceLabel = "\$59.99",
-                        subtitle = t("Forever, no recurring payments")
-                    ),
-                    selected = selectedBilling == BillingCycle.LIFETIME,
-                    onClick = { onSelectBilling(BillingCycle.LIFETIME) }
-                )
+                        price = "\$59.99",
+                        meta = "· ${t("plan_lifetime_subtitle")}",
+                        selected = selectedBilling == BillingCycle.LIFETIME,
+                        isLifetime = true,
+                        badge = t("plan_lifetime_forever_badge"),
+                        onClick = { onSelectBilling(BillingCycle.LIFETIME) }
+                    )
+                }
             }
         }
 
-        item {
+        HorizontalDivider(color = Color(0xFF1A3528), thickness = 1.dp)
+        Column(
+            modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             Button(
                 onClick = onSubscribe,
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF2DCF96),
-                    contentColor = Color(0xFF04342C)
-                ),
-                enabled = !currentPlan.hasPremiumAccess()
-            ) {
-                Text(
-                    text = ctaLabel,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
+                enabled = !currentPlan.hasPremiumAccess(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2DCF96), contentColor = Color(0xFF04342C)),
+                shape = RoundedCornerShape(14.dp)
+            ) { Text(ctaLabel, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(vertical = 2.dp)) }
+
+            Text(
+                text = t("Restore purchase"),
+                fontSize = 12.sp,
+                color = Color(0xFF2DCF96),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 6.dp).clickable(onClick = onRestorePurchase)
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(t("Auto-renewal. Cancel anytime."), fontSize = 11.sp, lineHeight = 16.5.sp, color = legalColor, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+            Row(modifier = Modifier.padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                Text(t("Terms"), fontSize = 11.sp, color = legalColor, textDecoration = TextDecoration.Underline, modifier = Modifier.clickable { })
+                Text(" · ", fontSize = 11.sp, color = legalColor)
+                Text(t("Privacy"), fontSize = 11.sp, color = legalColor, textDecoration = TextDecoration.Underline, modifier = Modifier.clickable { })
             }
         }
+    }
+}
 
-        item {
-            TextButton(
-                onClick = onRestorePurchase,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(t("Restore purchase"))
+@Composable
+private fun PaywallPlanCard(
+    title: String,
+    price: String,
+    meta: String,
+    selected: Boolean,
+    isLifetime: Boolean,
+    onClick: () -> Unit,
+    badge: String? = null
+) {
+    val colors = AppTheme.colors
+    val isDark = isSystemInDarkTheme()
+    val selectedBorder = if (isDark) Color(0xFF2DCF96) else Color(0xFF1D9E75)
+    val selectedTitle = if (isDark) Color(0xFFE8F5EF) else Color(0xFF0F2318)
+    val selectedPrice = if (isDark) Color(0xFF2DCF96) else Color(0xFF0F6E56)
+    val selectedMeta = if (isDark) Color(0xFF6AAA85) else Color(0xFF3A7A5E)
+    val selectedBadgeBg = if (isDark) Color(0xFF1A3A20) else Color(0xFFC8EFE0)
+    val selectedBadgeText = if (isDark) Color(0xFF2DCF96) else Color(0xFF0F6E56)
+    val lifetimeSelectedBadgeBg = if (isDark) Color(0xFF1A2A1A) else Color(0xFFFEF3E0)
+    val lifetimeSelectedBadgeText = if (isDark) Color(0xFFF59E42) else Color(0xFFB07010)
+    val unselectedTitle = if (isDark) Color(0xFF9ECFB4) else Color(0xFF9A9A9A)
+    val unselectedPrice = if (isDark) Color(0xFF9ECFB4) else Color(0xFF9A9A9A)
+    val unselectedMeta = if (isDark) Color(0xFF4A7A5E) else Color(0xFFBBBBBB)
+    val unselectedBadgeBg = if (isDark) Color(0xFF152E1F) else Color(0xFFE8E8E8)
+    val unselectedBadgeText = if (isDark) Color(0xFF4A7A5E) else Color(0xFFAAAAAA)
+    val lifetimeUnselectedBadgeBg = if (isDark) Color(0xFF151E15) else Color(0xFFF5F5F5)
+    val lifetimeUnselectedBadgeText = if (isDark) Color(0xFF7A6030) else Color(0xFFBBBBBB)
+
+    val titleColor = if (selected) selectedTitle else unselectedTitle
+    val priceColor = if (selected) selectedPrice else unselectedPrice
+    val metaColor = if (selected) selectedMeta else unselectedMeta
+    val badgeBgColor = when {
+        badge == null -> Color.Transparent
+        isLifetime && selected -> lifetimeSelectedBadgeBg
+        isLifetime && !selected -> lifetimeUnselectedBadgeBg
+        selected -> selectedBadgeBg
+        else -> unselectedBadgeBg
+    }
+    val badgeTextColor = when {
+        badge == null -> Color.Transparent
+        isLifetime && selected -> lifetimeSelectedBadgeText
+        isLifetime && !selected -> lifetimeUnselectedBadgeText
+        selected -> selectedBadgeText
+        else -> unselectedBadgeText
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).clickable(onClick = onClick),
+        shape = RoundedCornerShape(14.dp),
+        color = colors.backgroundSurface,
+        border = if (selected) BorderStroke(1.5.dp, selectedBorder) else null
+    ) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 13.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text(title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = titleColor)
+                if (!badge.isNullOrBlank()) {
+                    Text(
+                        badge,
+                        color = badgeTextColor,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.background(badgeBgColor, RoundedCornerShape(5.dp)).padding(horizontal = 7.dp, vertical = 2.dp)
+                    )
+                }
             }
-            Text(
-                text = t("Auto-renewal. Cancel anytime. Terms · Privacy"),
-                style = MaterialTheme.typography.bodySmall,
-                color = colors.textSecondary,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+                Text(price, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = priceColor)
+                Spacer(Modifier.width(4.dp))
+                Text(meta, fontSize = 12.sp, color = metaColor, modifier = Modifier.padding(bottom = 2.dp))
+            }
         }
     }
 }
@@ -3604,141 +3651,173 @@ private fun ManageSubscriptionScreen(
     onRestorePurchase: () -> Unit,
     onCancelSubscription: () -> Unit,
     onRenewSubscription: () -> Unit,
+    onSwitchPlan: (PremiumPlan) -> Unit,
     onDebugForceFree: () -> Unit
 ) {
     val spacing = AppTheme.spacing
     val colors = AppTheme.colors
     val context = LocalContext.current
     val locale = appLocale()
-    val dateFormatter = remember(locale) {
-        DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)
-    }
+    val dateFormatter = remember(locale) { DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale) }
     var showCancelSheet by rememberSaveable { mutableStateOf(false) }
     val subscriptionState = state.subscriptionState
+    val activeState = subscriptionState as? SubscriptionState.PremiumActive
+    var selectedPlan by rememberSaveable(subscriptionState) { mutableStateOf(activeState?.plan ?: PremiumPlan.YEARLY) }
     val isDebugBuild = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(spacing.x2),
-        verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
-    ) {
+    LaunchedEffect(activeState?.plan) { if (activeState != null) selectedPlan = activeState.plan }
+
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(spacing.x2), verticalArrangement = Arrangement.spacedBy(spacing.x1_5)) {
         item {
-            GlassCard {
-                when (subscriptionState) {
-                    SubscriptionState.Free -> {
-                        Text(
-                            text = t("Free"),
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(Modifier.height(spacing.x1))
-                        Text(
-                            text = t("Upgrade to Premium to unlock all features."),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = colors.textSecondary
-                        )
-                        Spacer(Modifier.height(spacing.x1_5))
+            when (subscriptionState) {
+                SubscriptionState.Free -> {
+                    ManageSubscriptionCard(colors.borderSubtle.copy(alpha = 0.45f)) {
+                        Text(t("Free"), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(8.dp))
+                        Text(t("Upgrade to Premium to unlock all features."), style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
+                        Spacer(Modifier.height(14.dp))
                         Button(
                             onClick = { onOpenPaywall(PaywallTrigger.DEFAULT) },
                             modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF2DCF96),
-                                contentColor = Color(0xFF04342C)
-                            )
-                        ) {
-                            Text(text = t("Get Premium"), fontWeight = FontWeight.SemiBold)
-                        }
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2DCF96), contentColor = Color(0xFF04342C)),
+                            shape = RoundedCornerShape(14.dp)
+                        ) { Text(t("Get Premium"), fontWeight = FontWeight.SemiBold) }
                     }
+                }
 
-                    is SubscriptionState.PremiumActive -> {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = t("Active plan"),
-                                style = MaterialTheme.typography.labelLarge,
-                                color = colors.textSecondary
-                            )
-                            Surface(
-                                color = Color(0xFF1A3A20),
-                                shape = RoundedCornerShape(999.dp)
-                            ) {
-                                Text(
-                                    text = t("Active"),
-                                    color = Color(0xFF2DCF96),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    modifier = Modifier.padding(horizontal = spacing.x1, vertical = 2.dp)
-                                )
+                is SubscriptionState.PremiumActive -> {
+                    val isLifetime = subscriptionState.plan == PremiumPlan.LIFETIME
+                    ManageSubscriptionCard(Color(0xFF2DCF96), 1.5.dp) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text(t("Active plan"), style = MaterialTheme.typography.labelLarge, color = colors.textSecondary)
+                            Surface(color = Color(0xFF1A3A20), shape = RoundedCornerShape(999.dp)) {
+                                Text(t("Active"), color = Color(0xFF2DCF96), style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
                             }
                         }
-                        Spacer(Modifier.height(spacing.x0_5))
+                        Spacer(Modifier.height(6.dp))
                         Text(
-                            text = "${subscriptionState.plan.displayName()} · ${planPriceLabel(subscriptionState.plan)}",
+                            if (isLifetime) "${managePlanName(subscriptionState.plan)} ✦" else "${managePlanName(subscriptionState.plan)} · ${managePlanPriceSummary(subscriptionState.plan)}",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
-                        if (subscriptionState.nextBillingDate != null) {
-                            Spacer(Modifier.height(spacing.x1))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.Top
-                            ) {
-                                Text(
-                                    text = t("Next billing"),
-                                    color = colors.textSecondary
-                                )
+                        Spacer(Modifier.height(10.dp))
+                        HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.35f))
+                        Spacer(Modifier.height(10.dp))
+                        if (isLifetime) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Text(t("billing_no_recurring"), color = colors.textSecondary, style = MaterialTheme.typography.bodyMedium)
+                                Text(t("billing_never"), color = Color(0xFF2DCF96), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                            }
+                        } else {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
+                                Text(t("Next billing"), color = colors.textSecondary, style = MaterialTheme.typography.bodyMedium)
                                 Column(horizontalAlignment = Alignment.End) {
-                                    Text(
-                                        text = subscriptionState.nextBillingAmount.orEmpty(),
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(
-                                        text = subscriptionState.nextBillingDate.format(dateFormatter),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = colors.textSecondary
-                                    )
+                                    Text(subscriptionState.nextBillingAmount.orEmpty(), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                    Text(subscriptionState.nextBillingDate?.format(dateFormatter).orEmpty(), style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
                                 }
                             }
                         }
                     }
+                }
 
-                    is SubscriptionState.PremiumCancelled -> {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = t("Subscription cancelled"),
-                                style = MaterialTheme.typography.labelLarge,
-                                color = colors.textSecondary
-                            )
-                            Surface(
-                                color = Color(0xFF2A1F0A),
-                                shape = RoundedCornerShape(999.dp)
-                            ) {
-                                Text(
-                                    text = t("Until expiry"),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color(0xFFF59E42),
-                                    modifier = Modifier.padding(horizontal = spacing.x1, vertical = 2.dp)
-                                )
+                is SubscriptionState.PremiumCancelled -> {
+                    ManageSubscriptionCard(Color(0xFF3A1A1A), 1.5.dp) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text(t("Subscription cancelled"), style = MaterialTheme.typography.labelLarge, color = colors.textSecondary)
+                            Surface(color = Color(0xFF2A1F0A), shape = RoundedCornerShape(999.dp)) {
+                                Text(t("Until expiry"), style = MaterialTheme.typography.labelSmall, color = Color(0xFFF59E42), modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
                             }
                         }
-                        Spacer(Modifier.height(spacing.x1))
-                        Text(
-                            text = "${t("Premium active until")} ${subscriptionState.expiresOn.format(dateFormatter)}",
-                            color = Color(0xFFF59E42),
-                            style = MaterialTheme.typography.bodyMedium
+                        Spacer(Modifier.height(8.dp))
+                        Text(t("cancelled_plan_title").replace("{date}", subscriptionState.expiresOn.format(dateFormatter)), color = Color(0xFFF59E42), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(10.dp))
+                        HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.35f))
+                        Spacer(Modifier.height(10.dp))
+                        Text(t("cancelled_plan_subtitle").replace("{date}", subscriptionState.expiresOn.format(dateFormatter)), style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
+                    }
+                }
+            }
+        }
+
+        if (activeState != null) {
+            if (activeState.plan == PremiumPlan.LIFETIME) {
+                item {
+                    ManageSubscriptionCard(colors.borderSubtle.copy(alpha = 0.45f)) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text(t("plan_switcher_title"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            Text("🔒 ${t("plan_switcher_unavailable")}", fontSize = 11.sp, color = colors.textSecondary)
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        ManagePlanSwitchRow(managePlanName(PremiumPlan.MONTHLY), "\$3.99 / ${t("month")}", selected = false, enabled = false, opacity = 0.45f, onClick = {})
+                        Spacer(Modifier.height(8.dp))
+                        ManagePlanSwitchRow(managePlanName(PremiumPlan.YEARLY), "\$24.99 / ${t("year")}", selected = false, enabled = false, opacity = 0.45f, badge = "-48%", onClick = {})
+                        Spacer(Modifier.height(8.dp))
+                        ManagePlanSwitchRow(
+                            title = managePlanName(PremiumPlan.LIFETIME),
+                            price = "\$59.99 · ${t("plan_lifetime_subtitle")}",
+                            selected = true,
+                            enabled = false,
+                            opacity = 1f,
+                            badge = t("plan_lifetime_yours"),
+                            badgeBackground = Color(0xFF1A2A1A),
+                            badgeColor = Color(0xFFF59E42),
+                            onClick = {}
                         )
+                        Spacer(Modifier.height(10.dp))
+                        Surface(color = Color(0xFF0A1A10), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("✦", color = Color(0xFFF59E42))
+                                Text(t("plan_lifetime_locked"), fontSize = 12.sp, color = colors.textSecondary)
+                            }
+                        }
+                    }
+                }
+            } else {
+                item {
+                    val ctaEnabled = selectedPlan != activeState.plan
+                    ManageSubscriptionCard(colors.borderSubtle.copy(alpha = 0.45f)) {
+                        Text(t("plan_switcher_title"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                         Spacer(Modifier.height(2.dp))
+                        Text(t("plan_switcher_credit"), fontSize = 12.sp, color = colors.textSecondary)
+                        Spacer(Modifier.height(10.dp))
+                        ManagePlanSwitchRow(managePlanName(PremiumPlan.MONTHLY), "\$3.99 / ${t("month")}", selected = selectedPlan == PremiumPlan.MONTHLY, enabled = true, onClick = { selectedPlan = PremiumPlan.MONTHLY })
+                        Spacer(Modifier.height(8.dp))
+                        ManagePlanSwitchRow(managePlanName(PremiumPlan.YEARLY), "\$24.99 / ${t("year")}", selected = selectedPlan == PremiumPlan.YEARLY, enabled = true, badge = "-48%", onClick = { selectedPlan = PremiumPlan.YEARLY })
+                        Spacer(Modifier.height(8.dp))
+                        ManagePlanSwitchRow(
+                            title = managePlanName(PremiumPlan.LIFETIME),
+                            price = "\$59.99 · ${t("plan_lifetime_subtitle")}",
+                            selected = selectedPlan == PremiumPlan.LIFETIME,
+                            enabled = true,
+                            badge = t("plan_lifetime_forever_badge"),
+                            badgeBackground = Color(0xFF1A2A1A),
+                            badgeColor = Color(0xFFF59E42),
+                            onClick = { selectedPlan = PremiumPlan.LIFETIME }
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Button(
+                            onClick = { onSwitchPlan(selectedPlan) },
+                            enabled = ctaEnabled,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF2DCF96),
+                                contentColor = Color(0xFF04342C),
+                                disabledContainerColor = colors.backgroundSurfaceMuted,
+                                disabledContentColor = colors.textSecondary
+                            )
+                        ) { Text(managePlanCtaLabel(selectedPlan), fontWeight = FontWeight.SemiBold) }
+                        Spacer(Modifier.height(8.dp))
                         Text(
-                            text = t("No charge will happen."),
+                            text = managePlanHintText(activeState.plan, selectedPlan, activeState.nextBillingDate, dateFormatter),
+                            fontSize = 11.sp,
                             color = colors.textSecondary,
-                            style = MaterialTheme.typography.bodySmall
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
                 }
@@ -3747,147 +3826,142 @@ private fun ManageSubscriptionScreen(
 
         if (subscriptionState is SubscriptionState.PremiumCancelled) {
             item {
-                GlassCard {
-                    Text(
-                        text = t("Changed your mind?"),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Spacer(Modifier.height(spacing.x0_5))
-                    Text(
-                        text = tf("Renew before %s and nothing changes.", subscriptionState.expiresOn.format(dateFormatter)),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colors.textSecondary
-                    )
-                    Spacer(Modifier.height(spacing.x1))
+                ManageSubscriptionCard(colors.borderSubtle.copy(alpha = 0.45f)) {
+                    Text(t("Changed your mind?"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(6.dp))
+                    Text(t("cancelled_renew_subtitle").replace("{date}", subscriptionState.expiresOn.format(dateFormatter)), style = MaterialTheme.typography.bodyMedium, color = colors.textSecondary)
+                    Spacer(Modifier.height(10.dp))
                     Button(
                         onClick = onRenewSubscription,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF2DCF96),
-                            contentColor = Color(0xFF04342C)
-                        )
-                    ) {
-                        Text(t("Renew subscription"), fontWeight = FontWeight.SemiBold)
-                    }
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2DCF96), contentColor = Color(0xFF04342C)),
+                        shape = RoundedCornerShape(14.dp)
+                    ) { Text(t("Renew subscription"), fontWeight = FontWeight.SemiBold) }
                 }
             }
         }
 
-        item {
-            GlassCard {
-                Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
-                    Text(
-                        text = t("Included in Premium"),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    FeatureBulletRow(t("Unlimited habits"))
-                    FeatureBulletRow(t("Home screen widgets"))
-                    FeatureBulletRow(t("Advanced analytics"))
-                    FeatureBulletRow(t("Priority support"))
-                }
-            }
-        }
-
-        if (subscriptionState is SubscriptionState.PremiumActive) {
+        if (subscriptionState != SubscriptionState.Free) {
             item {
-                GlassCard {
-                    Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onRestorePurchase() },
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = t("Restore purchase"),
-                                style = MaterialTheme.typography.bodyLarge
-                            )
-                            Text("›", style = MaterialTheme.typography.titleLarge, color = colors.textSecondary)
-                        }
-                        HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.35f))
-                        OutlinedButton(
-                            onClick = { showCancelSheet = true },
-                            modifier = Modifier.fillMaxWidth(),
-                            border = BorderStroke(1.dp, Color(0xFF3A1A1A)),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFE05C5C))
-                        ) {
-                            Text(t("Cancel subscription"))
-                        }
-                    }
+                ManageSubscriptionCard(colors.borderSubtle.copy(alpha = 0.45f)) {
+                    Text(t("Included in Premium"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(8.dp))
+                    FeatureBulletRow(t("Unlimited habits"))
+                    Spacer(Modifier.height(6.dp))
+                    FeatureBulletRow(t("Home screen widgets"))
+                    Spacer(Modifier.height(6.dp))
+                    FeatureBulletRow(t("Advanced analytics"))
                 }
             }
         }
 
-        if (subscriptionState is SubscriptionState.PremiumActive && subscriptionState.plan != PremiumPlan.LIFETIME) {
+        if (activeState != null && activeState.plan != PremiumPlan.LIFETIME) {
             item {
                 Text(
-                    text = tf(
-                        "After cancellation Premium stays active until %s. No charge will happen. Then your account switches to Free.",
-                        subscriptionState.nextBillingDate?.format(dateFormatter).orEmpty()
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = colors.textSecondary
+                    text = t("Cancel subscription"),
+                    fontSize = 13.sp,
+                    color = Color(0xFFE05C5C),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp).clickable { showCancelSheet = true }
+                )
+            }
+        }
+
+        if (subscriptionState != SubscriptionState.Free) {
+            item {
+                Text(
+                    text = t("Restore purchase"),
+                    fontSize = 12.sp,
+                    color = Color(0xFF6AAA85),
+                    textDecoration = TextDecoration.Underline,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).clickable(onClick = onRestorePurchase)
                 )
             }
         }
 
         if (isDebugBuild) {
             item {
-                val strokeWidthPx = with(LocalDensity.current) { 1.dp.toPx() }
-                val cornerRadiusPx = with(LocalDensity.current) { AppTheme.radius.lg.toPx() }
-                val dashPathEffect = remember { PathEffect.dashPathEffect(floatArrayOf(10f, 7f), 0f) }
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(AppTheme.radius.lg))
-                        .background(Color(0xFF1A1A0A))
-                        .drawBehind {
-                            val halfStroke = strokeWidthPx / 2f
-                            drawRoundRect(
-                                color = Color(0xFF3A3A10),
-                                topLeft = Offset(halfStroke, halfStroke),
-                                size = Size(size.width - strokeWidthPx, size.height - strokeWidthPx),
-                                cornerRadius = CornerRadius(
-                                    cornerRadiusPx - halfStroke,
-                                    cornerRadiusPx - halfStroke
-                                ),
-                                style = Stroke(width = strokeWidthPx, pathEffect = dashPathEffect)
-                            )
-                        }
-                        .padding(spacing.x1_5)
-                ) {
-                    Column {
-                        Text(
-                            text = "🛠 ${t("Debug")}",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = Color(0xFF8A8A30)
-                        )
-                        Spacer(Modifier.height(spacing.x0_5))
-                        OutlinedButton(
-                            onClick = onDebugForceFree,
-                            modifier = Modifier.fillMaxWidth(),
-                            border = BorderStroke(1.dp, Color(0xFF3A3A10))
-                        ) {
-                            Text(t("Switch to Free plan"))
-                        }
+                ManageSubscriptionCard(Color(0xFF3A3A10)) {
+                    Text("Debug", style = MaterialTheme.typography.labelMedium, color = Color(0xFF8A8A30))
+                    Spacer(Modifier.height(6.dp))
+                    OutlinedButton(onClick = onDebugForceFree, modifier = Modifier.fillMaxWidth(), border = BorderStroke(1.dp, Color(0xFF3A3A10))) {
+                        Text(t("Switch to Free plan"))
                     }
                 }
             }
         }
     }
 
-    if (showCancelSheet && subscriptionState is SubscriptionState.PremiumActive) {
+    if (showCancelSheet && activeState != null && activeState.plan != PremiumPlan.LIFETIME) {
         CancelSubscriptionSheet(
-            state = subscriptionState,
+            state = activeState,
             onDismiss = { showCancelSheet = false },
             onConfirmCancel = {
                 onCancelSubscription()
                 showCancelSheet = false
             }
         )
+    }
+}
+
+@Composable
+private fun ManageSubscriptionCard(
+    borderColor: Color,
+    borderWidth: androidx.compose.ui.unit.Dp = 1.dp,
+    content: @Composable () -> Unit
+) {
+    val colors = AppTheme.colors
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = colors.backgroundSurface,
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(borderWidth, borderColor)
+    ) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp)) { content() }
+    }
+}
+
+@Composable
+private fun ManagePlanSwitchRow(
+    title: String,
+    price: String,
+    selected: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    badge: String? = null,
+    badgeBackground: Color = Color(0xFF1A3A20),
+    badgeColor: Color = Color(0xFF2DCF96),
+    opacity: Float = 1f
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier).graphicsLayer { alpha = opacity },
+        shape = RoundedCornerShape(14.dp),
+        color = if (selected) Color(0xFF0A1F13) else Color(0xFF152E1F),
+        border = if (selected) BorderStroke(1.5.dp, Color(0xFF2DCF96)) else null
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (selected) {
+                Surface(Modifier.size(20.dp), shape = RoundedCornerShape(999.dp), color = Color(0xFF2DCF96)) {
+                    Box(contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Check, null, tint = Color.White, modifier = Modifier.size(11.dp)) }
+                }
+            } else {
+                Box(Modifier.size(20.dp).border(2.dp, Color(0xFF2A5A3A), RoundedCornerShape(999.dp)))
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Text(title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = AppTheme.colors.textPrimary)
+                    if (!badge.isNullOrBlank()) {
+                        Text(badge, color = badgeColor, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.background(badgeBackground, RoundedCornerShape(5.dp)).padding(horizontal = 7.dp, vertical = 2.dp))
+                    }
+                }
+                Text(price, fontSize = 13.sp, color = AppTheme.colors.textSecondary)
+            }
+        }
     }
 }
 
@@ -3901,74 +3975,63 @@ private fun CancelSubscriptionSheet(
     val spacing = AppTheme.spacing
     val colors = AppTheme.colors
     val locale = appLocale()
-    val dateFormatter = remember(locale) {
-        DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)
-    }
+    val dateFormatter = remember(locale) { DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale) }
     val activeUntil = state.nextBillingDate?.format(dateFormatter).orEmpty()
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = colors.backgroundCanvas
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = spacing.x2, vertical = spacing.x1_5),
-            verticalArrangement = Arrangement.spacedBy(spacing.x1)
-        ) {
-            Text(
-                text = t("Cancel subscription?"),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Center
-            )
-            GlassCard {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(t("Active until"), color = colors.textSecondary)
-                    Text(activeUntil, fontWeight = FontWeight.SemiBold)
-                }
-                Spacer(Modifier.height(spacing.x0_5))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(t("Charge"), color = colors.textSecondary)
-                    Text(t("No charge ✓"), color = Color(0xFF2DCF96), fontWeight = FontWeight.SemiBold)
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(t("cancel_sheet_title"), fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+            Text("${managePlanName(state.plan)} · ${managePlanPriceSummary(state.plan)}", fontSize = 13.sp, color = colors.textSecondary, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+
+            Surface(Modifier.fillMaxWidth(), color = Color(0xFF0A1F13), shape = RoundedCornerShape(16.dp)) {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text(t("Premium active until"), color = colors.textSecondary, fontSize = 12.sp)
+                        Text(activeUntil, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.28f))
+                    Spacer(Modifier.height(10.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text(t("Charge"), color = colors.textSecondary, fontSize = 12.sp)
+                        Text(t("No charge ✓"), color = Color(0xFF2DCF96), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
                 }
             }
-            GlassCard {
-                Text(
-                    text = tf("After %s you lose:", activeUntil),
-                    color = Color(0xFFE05C5C),
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(Modifier.height(spacing.x0_5))
-                Text("✕ ${t("Home screen widgets")}", color = Color(0xFFE05C5C))
-                Spacer(Modifier.height(2.dp))
-                Text("✕ ${t("Advanced analytics")}", color = Color(0xFFE05C5C))
-                Spacer(Modifier.height(2.dp))
-                Text("✕ ${t("More than 3 active habits")}", color = Color(0xFFE05C5C))
+
+            Surface(Modifier.fillMaxWidth(), color = colors.backgroundSurface, shape = RoundedCornerShape(16.dp)) {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(t("cancel_loses_title").replace("{date}", activeUntil), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFE05C5C))
+                    CancelSheetLossRow(t("Home screen widgets"))
+                    CancelSheetLossRow(t("Advanced analytics"))
+                    CancelSheetLossRow(t("More than 3 active habits"))
+                }
             }
+
+            Spacer(Modifier.height(6.dp))
             OutlinedButton(
                 onClick = onDismiss,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(t("Keep Premium"), fontWeight = FontWeight.SemiBold)
-            }
-            OutlinedButton(
-                onClick = onConfirmCancel,
                 modifier = Modifier.fillMaxWidth(),
-                border = BorderStroke(1.dp, Color(0xFF3A1A1A)),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFE05C5C))
-            ) {
-                Text(t("Confirm cancellation"))
-            }
+                border = BorderStroke(1.dp, Color(0xFF1A3A27)),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF9ECFB4)),
+                shape = RoundedCornerShape(14.dp)
+            ) { Text(t("Keep Premium"), fontWeight = FontWeight.SemiBold) }
+
+            Text(t("cancel_confirm_btn"), fontSize = 13.sp, color = Color(0xFFE05C5C), textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp).clickable(onClick = onConfirmCancel))
             Spacer(Modifier.height(spacing.x1))
         }
+    }
+}
+
+@Composable
+private fun CancelSheetLossRow(label: String) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("✕", color = Color(0xFFE05C5C), fontWeight = FontWeight.Bold)
+        Text(label, color = AppTheme.colors.textPrimary)
     }
 }
 
@@ -3981,48 +4044,58 @@ private fun PremiumPlan.displayName(): String = when (this) {
 
 @Composable
 private fun planPriceLabel(plan: PremiumPlan): String = when (plan) {
-    PremiumPlan.MONTHLY -> "\$3.99 / ${t("month")}"
-    PremiumPlan.YEARLY -> "\$24.99 / ${t("year")}"
-    PremiumPlan.LIFETIME -> "\$59.99"
+    PremiumPlan.MONTHLY -> "\$3.99 / ${t("month")}".replace('$', '$')
+    PremiumPlan.YEARLY -> "\$24.99 / ${t("year")}".replace('$', '$')
+    PremiumPlan.LIFETIME -> "\$59.99".replace('$', '$')
 }
 
 @Composable
-private fun PremiumFeatureRow(
-    title: String,
-    subtitle: String
-) {
-    val spacing = AppTheme.spacing
+private fun managePlanName(plan: PremiumPlan): String = when (plan) {
+    PremiumPlan.MONTHLY -> t("plan_monthly")
+    PremiumPlan.YEARLY -> t("plan_yearly")
+    PremiumPlan.LIFETIME -> t("plan_lifetime")
+}
+
+@Composable
+private fun managePlanPriceSummary(plan: PremiumPlan): String = when (plan) {
+    PremiumPlan.MONTHLY -> "\$3.99 / ${t("month")}".replace('$', '$')
+    PremiumPlan.YEARLY -> "\$24.99 / ${t("year")}".replace('$', '$')
+    PremiumPlan.LIFETIME -> "\$59.99".replace('$', '$')
+}
+
+@Composable
+private fun managePlanCtaLabel(plan: PremiumPlan): String = t("switch_to_plan").replace("{plan}", managePlanName(plan))
+
+@Composable
+private fun managePlanHintText(currentPlan: PremiumPlan, targetPlan: PremiumPlan, nextBillingDate: LocalDate?, formatter: DateTimeFormatter): String {
+    if (currentPlan == targetPlan) return t("plan_switcher_select_hint")
+    val baseDate = nextBillingDate ?: LocalDate.now()
+    return when {
+        currentPlan == PremiumPlan.MONTHLY && targetPlan == PremiumPlan.YEARLY -> t("hint_yearly_upgrade").replace("{date}", baseDate.plusYears(1).format(formatter))
+        targetPlan == PremiumPlan.LIFETIME -> t("hint_lifetime_upgrade")
+        currentPlan == PremiumPlan.YEARLY && targetPlan == PremiumPlan.MONTHLY -> t("hint_monthly_downgrade").replace("{date}", baseDate.format(formatter))
+        else -> t("plan_switcher_select_hint")
+    }
+}
+
+@Composable
+private fun PremiumFeatureRow(title: String, subtitle: String, showSubtitle: Boolean = true) {
     val colors = AppTheme.colors
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+        verticalAlignment = if (showSubtitle) Alignment.Top else Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Surface(
-            modifier = Modifier.size(18.dp),
-            shape = RoundedCornerShape(999.dp),
-            color = Color(0xFF2DCF96).copy(alpha = 0.2f)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.Rounded.Check,
-                    contentDescription = null,
-                    tint = Color(0xFF2DCF96),
-                    modifier = Modifier.size(12.dp)
-                )
-            }
+        Surface(Modifier.size(18.dp), shape = RoundedCornerShape(999.dp), color = Color(0xFF2DCF96).copy(alpha = 0.2f)) {
+            Box(contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Check, contentDescription = null, tint = Color(0xFF2DCF96), modifier = Modifier.size(12.dp)) }
         }
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = colors.textSecondary
-            )
+        if (showSubtitle) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                Text(subtitle, fontSize = 12.sp, color = colors.textSecondary)
+            }
+        } else {
+            Text(title, fontSize = 14.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary)
         }
     }
 }
@@ -8518,7 +8591,7 @@ private fun TaskEditorDialog(
                             }
                         }
                         Row(
-                            modifier = Modifier.padding(vertical = 4.dp),
+                            modifier = Modifier.padding(vertical = 2.dp),
                             horizontalArrangement = Arrangement.spacedBy(spacing.x1),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -9020,3 +9093,12 @@ private fun monthGrid(month: YearMonth): List<List<LocalDate?>> {
     while (days.size % 7 != 0) days += null
     return days.chunked(7)
 }
+
+
+
+
+
+
+
+
+

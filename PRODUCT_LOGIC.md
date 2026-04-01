@@ -219,6 +219,26 @@ Paywall billing sources (способ получить `PRO`, не отдель�
 - из Habits при blocked unarchive вызывается `onUpgrade`;
 - закрытие/возврат из paywall возвращает пользователя в сохранённый `previousPage`; для blocked unarchive это контекст Habits.
 
+Текущий paywall UI:
+- top app bar использует системную стрелку `Back`; дополнительная `X/close` кнопка внутри hero-секции не отображается;
+- hero-секция компактная, без card-wrapper, чтобы тарифные карточки обычно были видны без дополнительного скролла;
+- список paywall features содержит ровно 3 пункта: `Unlimited habits`, `Home screen widgets`, `Advanced analytics`;
+- paywall plan cards показывают `Yearly`, `Monthly`, `Lifetime`, при этом `Yearly` выбран по умолчанию и имеет savings badge `Save 48%`/локализованный эквивалент;
+- нижняя зона paywall закреплена (sticky footer) и всегда содержит dynamic CTA по выбранному billing source, `Restore purchase`, legal copy `Auto-renewal. Cancel anytime.` и `Terms · Privacy`.
+
+Manage Subscription UI:
+- `Manage Subscription` показывает текущий subscription state отдельной план-карточкой; для `PremiumActive` monthly/yearly карточка имеет green active border, для `PremiumCancelled` — amber/red cancelled styling, для `Lifetime` вместо next billing показывается строка `No recurring billing / Never ✓`;
+- feature list на `Manage Subscription` содержит ровно 3 пункта: `Unlimited habits`, `Home screen widgets`, `Advanced analytics`;
+- active monthly/yearly subscription показывает plan-switcher с вариантами `Monthly / Yearly / Lifetime`; CTA активен только когда выбранный план отличается от текущего;
+- local switching semantics:
+  - `Monthly -> Yearly`: новый active plan = `YEARLY`, next billing date = текущий `nextBillingDate + 1 year`, next amount = `$24.99`;
+  - `Yearly -> Monthly`: downgrade планируется на текущую renewal date; UI/локальное subscription state обновляется на `MONTHLY` с next billing date = текущая renewal date и next amount = `$3.99`;
+  - `Monthly/Yearly -> Lifetime`: active plan = `LIFETIME`, next billing date = `null`, next amount = `null`;
+- для `Lifetime` plan-switcher отображается в locked-state: lifetime row selected, другие планы dimmed, CTA hidden; cancel action недоступен;
+- cancel action для monthly/yearly оформлен как plain red text link и открывает bottom sheet confirmation; подтверждение вызывает `cancelSubscription()` и не снимает доступ немедленно — доступ остаётся до `expiresOn`/текущей renewal date;
+- cancelled state скрывает plan-switcher и cancel action, показывает renew card; `Renew subscription` вызывает `renewSubscription()` и возвращает subscription в `ACTIVE` state;
+- `Restore purchase` на Manage Subscription отображается как small underlined text link (без card row/chevron).
+
 ## 12. Screen Responsibilities
 Источник: `MainActivity.kt`.
 

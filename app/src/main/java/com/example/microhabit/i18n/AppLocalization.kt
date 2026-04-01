@@ -518,6 +518,10 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
         v("Muster, Konstanz und beste Zeiten", "Tendances, régularité et meilleur moment", "Patrones, constancia y mejor hora", "Pattern, costanza e orario migliore", "Паттерны, стабильность и лучшее время") +
             mapOf(AppLanguage.EN to "Patterns, consistency, and best time insights", AppLanguage.CS to "Vzorce, stabilita a nejlepší čas")
     ),
+    "Patterns, consistency, best time insights" to (
+        v("Muster, Konstanz, beste Zeiten", "Tendances, régularité, meilleur moment", "Patrones, constancia, mejor hora", "Pattern, costanza, orario migliore", "Паттерны, стабильность, лучшее время") +
+            mapOf(AppLanguage.EN to "Patterns, consistency, best time insights", AppLanguage.CS to "Vzorce, stabilita, nejlepší čas")
+    ),
     "Response within 24 hours" to (
         v("Antwort innerhalb von 24 Stunden", "Réponse sous 24 heures", "Respuesta en 24 horas", "Risposta entro 24 ore", "Ответ в течение 24 часов") +
             mapOf(AppLanguage.EN to "Response within 24 hours", AppLanguage.CS to "Odpověď do 24 hodin")
@@ -529,6 +533,22 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "Forever, no recurring payments" to (
         v("Für immer, ohne weitere Zahlungen", "À vie, sans paiements récurrents", "Para siempre, sin pagos recurrentes", "Per sempre, senza pagamenti ricorrenti", "Навсегда, без платежей") +
             mapOf(AppLanguage.EN to "Forever, no recurring payments", AppLanguage.CS to "Navždy, bez opakovaných plateb")
+    ),
+    "plan_lifetime_subtitle" to (
+        v("einmalig, für immer", "paiement unique, pour toujours", "un solo pago, para siempre", "una volta, per sempre", "разово, навсегда") +
+            mapOf(AppLanguage.EN to "one-time, forever", AppLanguage.CS to "jednorázově, navždy")
+    ),
+    "paywall_savings_badge" to (
+        v("48% sparen", "Économisez 48%", "Ahorra 48%", "Risparmia il 48%", "Экономия 48%") +
+            mapOf(AppLanguage.EN to "Save 48%", AppLanguage.CS to "Úspora 48%")
+    ),
+    "Auto-renewal. Cancel anytime." to (
+        v("Automatische Verlängerung. Jederzeit kündbar.", "Renouvellement automatique. Annulation à tout moment.", "Renovación automática. Cancela cuando quieras.", "Rinnovo automatico. Annulla quando vuoi.", "Автопродление. Отмена в любое время.") +
+            mapOf(AppLanguage.EN to "Auto-renewal. Cancel anytime.", AppLanguage.CS to "Automatické obnovení. Zrušení kdykoli.")
+    ),
+    "Terms · Privacy" to (
+        v("Bedingungen · Datenschutz", "Conditions · Confidentialité", "Términos · Privacidad", "Termini · Privacy", "Условия · Конфиденциальность") +
+            mapOf(AppLanguage.EN to "Terms · Privacy", AppLanguage.CS to "Podmínky · Ochrana soukromí")
     ),
     "Auto-renewal. Cancel anytime. Terms · Privacy" to (
         v("Automatische Verlängerung. Jederzeit kündbar. Bedingungen · Datenschutz", "Renouvellement automatique. Annulation à tout moment. Conditions · Confidentialité", "Renovación automática. Cancela cuando quieras. Términos · Privacidad", "Rinnovo automatico. Annulla quando vuoi. Termini · Privacy", "Автопродление. Отмена в любое время. Terms · Privacy") +
@@ -708,6 +728,94 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "Premium active" to v("Premium aktiv", "Premium actif", "Premium activo", "Premium attivo", "Премиум активен"),
     "Continue with %s" to v("Fortfahren mit %s", "Continuer avec %s", "Continuar con %s", "Continua con %s", "Продолжить с %s"),
     "Restore purchase" to v("Kauf wiederherstellen", "Restaurer l'achat", "Restaurar compra", "Ripristina acquisto", "Восстановить покупку"),
+    "plan_switcher_title" to (
+        v("Plan ändern", "Changer de forfait", "Cambiar plan", "Cambia piano", "Сменить план") +
+            mapOf(AppLanguage.EN to "Change plan", AppLanguage.CS to "Změnit plán")
+    ),
+    "plan_switcher_credit" to (
+        v("Aktives Abo wird angerechnet", "L'abonnement actuel sera pris en compte", "La suscripción actual se acreditará", "L'abbonamento attuale sarà accreditato", "Текущая подписка зачтётся") +
+            mapOf(AppLanguage.EN to "Current subscription will be credited", AppLanguage.CS to "Aktuální předplatné bude zohledněno")
+    ),
+    "plan_switcher_unavailable" to (
+        v("Gesperrt", "Verrouillé", "Bloqueado", "Bloccato", "Недоступно") +
+            mapOf(AppLanguage.EN to "Locked", AppLanguage.CS to "Zamčeno")
+    ),
+    "plan_switcher_select_hint" to (
+        v("Wählen Sie einen Plan, um fortzufahren", "Choisissez un forfait pour continuer", "Elige un plan para continuar", "Scegli un piano per continuare", "Выберите план для продолжения") +
+            mapOf(AppLanguage.EN to "Select a plan to continue", AppLanguage.CS to "Vyberte plán pro pokračování")
+    ),
+    "plan_monthly" to (
+        v("Monatlich", "Mensuel", "Mensual", "Mensile", "Monthly") +
+            mapOf(AppLanguage.EN to "Monthly", AppLanguage.CS to "Měsíčně")
+    ),
+    "plan_yearly" to (
+        v("Jährlich", "Annuel", "Anual", "Annuale", "Yearly") +
+            mapOf(AppLanguage.EN to "Yearly", AppLanguage.CS to "Ročně")
+    ),
+    "plan_lifetime" to (
+        v("Lifetime", "À vie", "De por vida", "A vita", "Lifetime") +
+            mapOf(AppLanguage.EN to "Lifetime", AppLanguage.CS to "Doživotně")
+    ),
+    "plan_lifetime_yours" to (
+        v("Ihr Plan", "Votre forfait", "Tu plan", "Il tuo piano", "Ваш план") +
+            mapOf(AppLanguage.EN to "Your plan", AppLanguage.CS to "Váš plán")
+    ),
+    "plan_lifetime_forever_badge" to (
+        v("Für immer", "Pour toujours", "Para siempre", "Per sempre", "Навсегда") +
+            mapOf(AppLanguage.EN to "Forever", AppLanguage.CS to "Navždy")
+    ),
+    "plan_lifetime_locked" to (
+        v("Sie haben Premium für immer. Planwechsel nicht verfügbar.", "Vous avez Premium pour toujours. Le changement de forfait n'est pas disponible.", "Tienes Premium para siempre. Cambiar de plan no está disponible.", "Hai Premium per sempre. Il cambio piano non è disponibile.", "У вас Premium навсегда. Переход на другой план недоступен.") +
+            mapOf(AppLanguage.EN to "You have Premium forever. Switching plans is not available.", AppLanguage.CS to "Máte Premium navždy. Změna plánu není dostupná.")
+    ),
+    "billing_never" to (
+        v("Nie ✓", "Jamais ✓", "Nunca ✓", "Mai ✓", "Никогда ✓") +
+            mapOf(AppLanguage.EN to "Never ✓", AppLanguage.CS to "Nikdy ✓")
+    ),
+    "billing_no_recurring" to (
+        v("Wiederkehrende Zahlung", "Paiement récurrent", "Cobro recurrente", "Addebito ricorrente", "Повторное списание") +
+            mapOf(AppLanguage.EN to "No recurring billing", AppLanguage.CS to "Opakovaná platba")
+    ),
+    "cancel_sheet_title" to (
+        v("Abo kündigen?", "Annuler l'abonnement ?", "¿Cancelar suscripción?", "Annullare l'abbonamento?", "Отменить подписку?") +
+            mapOf(AppLanguage.EN to "Cancel subscription?", AppLanguage.CS to "Zrušit předplatné?")
+    ),
+    "cancel_loses_title" to (
+        v("Ab {date} verlieren Sie:", "À partir du {date}, vous perdez :", "Desde {date} perderás:", "Dal {date} perderai:", "С {date} станет недоступно:") +
+            mapOf(AppLanguage.EN to "From {date} you lose:", AppLanguage.CS to "Od {date} ztratíte:")
+    ),
+    "cancel_confirm_btn" to (
+        v("Kündigung bestätigen", "Confirmer l'annulation", "Confirmar cancelación", "Conferma annullamento", "Подтвердить отмену") +
+            mapOf(AppLanguage.EN to "Confirm cancellation", AppLanguage.CS to "Potvrdit zrušení")
+    ),
+    "switch_to_plan" to (
+        v("Zu {plan} wechseln", "Passer à {plan}", "Cambiar a {plan}", "Passa a {plan}", "Перейти на {plan}") +
+            mapOf(AppLanguage.EN to "Switch to {plan}", AppLanguage.CS to "Přejít na {plan}")
+    ),
+    "hint_yearly_upgrade" to (
+        v("Angerechnet · Nächste Zahlung {date}", "Crédité · Prochain paiement {date}", "Acreditado · Próximo cobro {date}", "Accreditato · Prossimo addebito {date}", "Зачтётся · Новое списание {date}") +
+            mapOf(AppLanguage.EN to "Credited · Next billing {date}", AppLanguage.CS to "Zohledněno · Příští platba {date}")
+    ),
+    "hint_lifetime_upgrade" to (
+        v("Jetzt \$59.99 zahlen · Keine weiteren Abbuchungen", "Payez \$59.99 maintenant · Plus de facturation", "Paga \$59.99 ahora · No habrá más cobros", "Paga \$59.99 ora · Nessun altro addebito", "Оплата \$59.99 сейчас · Списаний больше не будет") +
+            mapOf(AppLanguage.EN to "Pay \$59.99 now · No more billing", AppLanguage.CS to "Nyní zaplatit \$59.99 · Žádné další platby")
+    ),
+    "hint_monthly_downgrade" to (
+        v("Wechsel zu Monatlich ab {date}", "Passage à Mensuel à partir du {date}", "Cambio a Monthly desde {date}", "Passaggio a Monthly dal {date}", "Переход на Monthly с {date}") +
+            mapOf(AppLanguage.EN to "Switch to Monthly from {date}", AppLanguage.CS to "Přechod na Měsíčně od {date}")
+    ),
+    "cancelled_renew_subtitle" to (
+        v("Erneuern Sie bis {date} — nichts ändert sich.", "Renouvelez avant {date} — rien ne change.", "Renueva antes del {date} y no cambiará nada.", "Rinnova entro il {date} e non cambia nulla.", "Возобновите до {date} — ничего не изменится.") +
+            mapOf(AppLanguage.EN to "Renew before {date} and nothing changes.", AppLanguage.CS to "Obnovte do {date} — nic se nezmění.")
+    ),
+    "cancelled_plan_title" to (
+        v("Premium bis {date}", "Premium jusqu'au {date}", "Premium hasta {date}", "Premium fino al {date}", "Premium до {date}") +
+            mapOf(AppLanguage.EN to "Premium until {date}", AppLanguage.CS to "Premium do {date}")
+    ),
+    "cancelled_plan_subtitle" to (
+        v("Es erfolgt keine Abbuchung. Nach {date} — Free-Plan.", "Aucun débit n'aura lieu. Après {date} — forfait Free.", "No habrá cobro. Después de {date} — plan Free.", "Nessun addebito. Dopo {date} — piano Free.", "Списание не произойдёт. После {date} — Free план.") +
+            mapOf(AppLanguage.EN to "No charge will happen. After {date} — Free plan.", AppLanguage.CS to "Platba neproběhne. Po {date} — Free plán.")
+    ),
     "Billing integration is shown in debug mode for now." to v(
         "Zahlungsintegration wird derzeit im Debug-Modus gezeigt.",
         "L'integration de paiement est actuellement en mode debug.",

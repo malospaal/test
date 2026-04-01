@@ -14,6 +14,7 @@ import com.example.microhabit.data.HabitTask
 import com.example.microhabit.data.HabitTemplate
 import com.example.microhabit.data.HabitTemplateCatalog
 import com.example.microhabit.data.ProAccessSource
+import com.example.microhabit.data.PremiumPlan
 import com.example.microhabit.data.SubscriptionState
 import com.example.microhabit.data.SubscriptionPlan
 import com.example.microhabit.data.TaskFrequency
@@ -283,6 +284,13 @@ class MainViewModel(
     fun renewSubscription() {
         viewModelScope.launch {
             repository.renewSubscription()
+            refresh()
+        }
+    }
+
+    fun changeSubscriptionPlan(targetPlan: PremiumPlan) {
+        viewModelScope.launch {
+            repository.changeSubscriptionPlan(targetPlan)
             refresh()
         }
     }

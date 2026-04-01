@@ -280,6 +280,30 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
         "Profilo e panoramica utilizzo app.",
         "Профиль и обзор использования приложения."
     ),
+    "plan_free_badge" to (
+        v("Basis", "Basique", "Básico", "Base", "Базовый") +
+            mapOf(AppLanguage.EN to "Basic", AppLanguage.CS to "Základní")
+    ),
+    "plan_free_title" to (
+        v("Free", "Free", "Free", "Free", "Free") +
+            mapOf(AppLanguage.EN to "Free", AppLanguage.CS to "Free")
+    ),
+    "plan_habits_usage" to (
+        v("Aktive Gewohnheiten", "Habitudes actives", "Hábitos activos", "Abitudini attive", "Активные привычки") +
+            mapOf(AppLanguage.EN to "Active habits", AppLanguage.CS to "Aktivní návyky")
+    ),
+    "plan_limit_reached" to (
+        v("Limit erreicht", "Limite atteint", "Límite alcanzado", "Limite raggiunto", "Лимит достигнут") +
+            mapOf(AppLanguage.EN to "Limit reached", AppLanguage.CS to "Limit dosažen")
+    ),
+    "plan_slots_free" to (
+        v("{n} Plätze frei", "{n} places libres", "{n} espacios libres", "{n} slot liberi", "{n} слота свободно") +
+            mapOf(AppLanguage.EN to "{n} slots free", AppLanguage.CS to "{n} místa volná")
+    ),
+    "manage_subscription" to (
+        v("Abo verwalten →", "Gérer l'abonnement →", "Gestionar suscripción →", "Gestisci abbonamento →", "Управление подпиской →") +
+            mapOf(AppLanguage.EN to "Manage subscription →", AppLanguage.CS to "Spravovat předplatné →")
+    ),
     "Current plan" to v("Aktueller Plan", "Forfait actuel", "Plan actual", "Piano corrente", "Текущий тариф"),
     "One active habit" to v("Eine aktive Gewohnheit", "Une habitude active", "Un habito activo", "Una abitudine attiva", "Одна активная привычка"),
     "Non-archived habits" to v("Nicht archivierte Gewohnheiten", "Habitudes non archivees", "Habitos no archivados", "Abitudini non archiviate", "Неархивные привычки"),
@@ -1714,3 +1738,4 @@ fun tf(source: String, vararg args: Any): String {
 @Composable
 @ReadOnlyComposable
 fun appLocale(): Locale = localeForLanguage(LocalAppLanguage.current)
+

@@ -90,6 +90,12 @@ internal val ukTranslations: Map<String, String> = mapOf(
     "Unlimited habits" to "Безлімітні звички",
     "Choose Premium" to "Обрати Premium",
     "Profile and app usage overview." to "Профіль і огляд використання застосунку.",
+    "plan_free_badge" to "Базовий",
+    "plan_free_title" to "Free",
+    "plan_habits_usage" to "Активні звички",
+    "plan_limit_reached" to "Ліміт досягнуто",
+    "plan_slots_free" to "{n} слоти вільні",
+    "manage_subscription" to "Керування підпискою →",
     "Current plan" to "Поточний тариф",
     "One active habit" to "Одна активна звичка",
     "Non-archived habits" to "Неархівні звички",
@@ -598,3 +604,4 @@ internal val ukTranslations: Map<String, String> = mapOf(
     "dd MMM yyyy" to "dd MMM yyyy",
     "LLLL yyyy" to "LLLL yyyy"
 )
+

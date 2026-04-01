@@ -2907,226 +2907,434 @@ private fun AccountPage(
     onDeleteAccount: () -> Unit
 ) {
     val spacing = AppTheme.spacing
-    val semantic = AppTheme.colors
     val context = LocalContext.current
     val language = LocalAppLanguage.current
     val locale = appLocale()
     val dateFormatter = remember(locale) {
         DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)
     }
+    val freeHabitLimit = 3
+    val activeHabitsCount = state.tasks.size
+    val usageProgress = (activeHabitsCount.toFloat() / freeHabitLimit.toFloat()).coerceIn(0f, 1f)
+    val freeSlots = (freeHabitLimit - activeHabitsCount).coerceAtLeast(0)
+    @Suppress("DEPRECATION")
+    val appVersionName = remember(context) {
+        runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
+        }.getOrDefault("")
+    }
+    val isDark = AppTheme.colors.backgroundCanvas.red < 0.2f
+    val colorScheme = MaterialTheme.colorScheme
+    val planCardSurface = if (isDark) Color(0xFF0A1F13) else colorScheme.surface
+    val innerWidgetSurface = if (isDark) Color(0xFF0F2318) else colorScheme.background
+    val innerSunkenSurface = if (isDark) Color(0xFF152E1F) else colorScheme.surfaceVariant
+    val primaryOnDarkText = if (isDark) Color(0xFFE8F5EF) else colorScheme.onBackground
+    val secondaryOnDarkText = if (isDark) Color(0xFF9ECFB4) else colorScheme.onSurfaceVariant
+    val mutedOnDarkText = if (isDark) Color(0xFF6AAA85) else colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
+    val disabledOnDarkText = if (isDark) Color(0xFF4A7A5E) else colorScheme.outline
+    val accentPrimary = if (isDark) Color(0xFF2DCF96) else colorScheme.primary
+    val accentSecondary = if (isDark) Color(0xFF1D9E75) else colorScheme.primary
+    val sectionDividerColor = if (isDark) Color(0xFF1A3528) else colorScheme.outline.copy(alpha = 0.45f)
+    val freeBadgeBackground = if (isDark) Color(0xFF1A2A1A) else colorScheme.surfaceVariant
+    val activeBadgeBackground = if (isDark) Color(0xFF1A3A20) else accentPrimary.copy(alpha = 0.14f)
+    val cancelledBadgeBackground = if (isDark) Color(0xFF2A1F0A) else colorScheme.error.copy(alpha = 0.12f)
     var showResetConfirm by rememberSaveable { mutableStateOf(false) }
     var showDeleteConfirm by rememberSaveable { mutableStateOf(false) }
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(spacing.x2),
-        verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
+        contentPadding = PaddingValues(horizontal = spacing.x2, vertical = spacing.x2),
+        verticalArrangement = Arrangement.Top
     ) {
         item {
-            GlassCard(tone = SurfaceTone.PRIMARY) {
-                when (val subscriptionState = state.subscriptionState) {
-                    SubscriptionState.Free -> {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                t("Current plan"),
-                                style = MaterialTheme.typography.labelLarge,
-                                color = semantic.textSecondary
-                            )
-                            Surface(
-                                color = semantic.backgroundSurfaceMuted,
-                                shape = RoundedCornerShape(999.dp)
-                            ) {
-                                Text(
-                                    text = t("3 habits"),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = semantic.textSecondary,
-                                    modifier = Modifier.padding(horizontal = spacing.x1, vertical = 2.dp)
-                                )
-                            }
-                        }
-                        Spacer(Modifier.height(spacing.x0_5))
-                        Text(
-                            text = t("Free"),
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(Modifier.height(spacing.x1))
-                        Text("○ ${t("Home screen widgets")}", color = semantic.textSecondary)
-                        Spacer(Modifier.height(spacing.x0_5))
-                        Text("○ ${t("Advanced analytics")}", color = semantic.textSecondary)
-                        Spacer(Modifier.height(spacing.x0_5))
-                        Text("○ ${t("Unlimited habits")}", color = semantic.textSecondary)
-                        Spacer(Modifier.height(spacing.x1_5))
-                        Button(
-                            onClick = { onOpenPaywall(PaywallTrigger.DEFAULT) },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF2DCF96),
-                                contentColor = Color(0xFF04342C)
-                            )
-                        ) {
-                            Text(
-                                text = "${t("Get Premium")} ✦",
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                    }
+            val featureItems = listOf(
+                t("Unlimited habits"),
+                t("Home screen widgets"),
+                t("Advanced analytics")
+            )
 
-                    is SubscriptionState.PremiumActive -> {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                t("Current plan"),
-                                style = MaterialTheme.typography.labelLarge,
-                                color = semantic.textSecondary
-                            )
-                            Surface(
-                                color = Color(0xFF1A3A20),
-                                shape = RoundedCornerShape(999.dp)
-                            ) {
-                                Text(
-                                    text = t("Active"),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color(0xFF2DCF96),
-                                    modifier = Modifier.padding(horizontal = spacing.x1, vertical = 2.dp)
-                                )
-                            }
-                        }
-                        Spacer(Modifier.height(spacing.x0_5))
-                        Text(
-                            text = "${t("Premium")} ✦",
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                        if (subscriptionState.nextBillingDate != null) {
-                            Spacer(Modifier.height(spacing.x1))
-                            HorizontalDivider(color = semantic.borderSubtle.copy(alpha = 0.4f))
-                            Spacer(Modifier.height(spacing.x1))
+            val cardBorderColor = when (state.subscriptionState) {
+                is SubscriptionState.PremiumActive -> accentPrimary
+                is SubscriptionState.PremiumCancelled -> if (isDark) Color(0xFF3A1A1A) else colorScheme.error.copy(alpha = 0.45f)
+                SubscriptionState.Free -> Color.Transparent
+            }
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = planCardSurface,
+                shape = RoundedCornerShape(16.dp),
+                border = if (state.subscriptionState == SubscriptionState.Free) null else BorderStroke(1.5.dp, cardBorderColor)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    when (val subscriptionState = state.subscriptionState) {
+                        SubscriptionState.Free -> {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.Top
                             ) {
-                                Text(
-                                    text = t("Next billing"),
-                                    color = semantic.textSecondary,
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                                Column(horizontalAlignment = Alignment.End) {
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     Text(
-                                        text = subscriptionState.nextBillingAmount.orEmpty(),
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold
+                                        text = t("Current plan").uppercase(locale),
+                                        fontSize = 11.sp,
+                                        color = mutedOnDarkText,
+                                        fontWeight = FontWeight.Medium
                                     )
                                     Text(
-                                        text = subscriptionState.nextBillingDate.format(dateFormatter),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = semantic.textSecondary
+                                        text = t("plan_free_title"),
+                                        fontSize = 24.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = primaryOnDarkText
+                                    )
+                                    Text(
+                                        text = "$activeHabitsCount / $freeHabitLimit ${t("plan_habits_usage").lowercase(locale)}",
+                                        fontSize = 12.sp,
+                                        color = mutedOnDarkText
+                                    )
+                                }
+                                Surface(
+                                    color = freeBadgeBackground,
+                                    shape = RoundedCornerShape(999.dp)
+                                ) {
+                                    Text(
+                                        text = t("plan_free_badge"),
+                                        color = mutedOnDarkText,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                                     )
                                 }
                             }
-                        }
-                        Spacer(Modifier.height(spacing.x1_5))
-                        OutlinedButton(
-                            onClick = onOpenManageSubscription,
-                            modifier = Modifier.fillMaxWidth(),
-                            border = BorderStroke(1.dp, semantic.primary)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(t("Manage subscription"))
-                                Text("→", fontSize = 18.sp, color = AppTheme.colors.textSecondary)
 
-                            }
-                        }
-                    }
-
-                    is SubscriptionState.PremiumCancelled -> {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                t("Subscription cancelled"),
-                                style = MaterialTheme.typography.labelLarge,
-                                color = semantic.textSecondary
-                            )
+                            Spacer(Modifier.height(10.dp))
+                            HorizontalDivider(color = innerSunkenSurface, thickness = 1.dp)
+                            Spacer(Modifier.height(10.dp))
                             Surface(
-                                color = Color(0xFF2A1F0A),
-                                shape = RoundedCornerShape(999.dp)
+                                modifier = Modifier.fillMaxWidth(),
+                                color = innerWidgetSurface,
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = t("plan_habits_usage"),
+                                            fontSize = 12.sp,
+                                            color = secondaryOnDarkText
+                                        )
+                                        Text(
+                                            text = "$activeHabitsCount / $freeHabitLimit",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = primaryOnDarkText
+                                        )
+                                    }
+                                    LinearProgressIndicator(
+                                        progress = { usageProgress },
+                                        color = if (activeHabitsCount >= freeHabitLimit) Color(0xFFF59E42) else accentSecondary,
+                                        trackColor = innerSunkenSurface,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(4.dp)
+                                            .clip(RoundedCornerShape(2.dp))
+                                    )
+                                    Text(
+                                        text = if (activeHabitsCount >= freeHabitLimit) {
+                                            t("plan_limit_reached")
+                                        } else {
+                                            t("plan_slots_free").replace("{n}", freeSlots.toString())
+                                        },
+                                        fontSize = 10.sp,
+                                        color = if (activeHabitsCount >= freeHabitLimit) Color(0xFFF59E42) else mutedOnDarkText
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.height(10.dp))
+                            HorizontalDivider(color = innerSunkenSurface, thickness = 1.dp)
+                            Spacer(Modifier.height(8.dp))
+                            featureItems.forEach { feature ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 3.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(15.dp)
+                                            .border(1.5.dp, if (isDark) Color(0xFF2A4A38) else colorScheme.outline, RoundedCornerShape(999.dp))
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = feature,
+                                        fontSize = 13.sp,
+                                        color = disabledOnDarkText
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.height(12.dp))
+                            Button(
+                                onClick = { onOpenPaywall(PaywallTrigger.DEFAULT) },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(14.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = accentPrimary,
+                                    contentColor = Color(0xFF04342C)
+                                ),
+                                contentPadding = PaddingValues(vertical = 14.dp)
                             ) {
                                 Text(
-                                    text = t("Until expiry"),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color(0xFFF59E42),
-                                    modifier = Modifier.padding(horizontal = spacing.x1, vertical = 2.dp)
+                                    text = "${t("Get Premium")} ✦",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold
                                 )
                             }
                         }
-                        Spacer(Modifier.height(spacing.x0_5))
-                        Text(
-                            text = "${subscriptionState.plan.displayName()} · ${planPriceLabel(subscriptionState.plan)}",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = semantic.textPrimary
-                        )
-                        Spacer(Modifier.height(spacing.x1))
-                        HorizontalDivider(color = semantic.borderSubtle.copy(alpha = 0.4f))
-                        Spacer(Modifier.height(spacing.x1))
-                        Text(
-                            text = "${t("Premium active until")} ${subscriptionState.expiresOn.format(dateFormatter)}",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color(0xFFF59E42)
-                        )
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            text = t("No charge will happen."),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = semantic.textSecondary
-                        )
-                        Spacer(Modifier.height(spacing.x1_5))
-                        OutlinedButton(
-                            onClick = onOpenManageSubscription,
-                            modifier = Modifier.fillMaxWidth(),
-                            border = BorderStroke(1.dp, semantic.primary)
-                        ) {
+
+                        is SubscriptionState.PremiumActive -> {
+                            val isLifetime = subscriptionState.plan == PremiumPlan.LIFETIME
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.Center,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(
+                                        text = t("Current plan").uppercase(locale),
+                                        fontSize = 11.sp,
+                                        color = mutedOnDarkText,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Text(
+                                        text = "${t("Premium")} ✦",
+                                        fontSize = 24.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = primaryOnDarkText
+                                    )
+                                }
+                                Surface(
+                                    color = activeBadgeBackground,
+                                    shape = RoundedCornerShape(999.dp)
+                                ) {
+                                    Text(
+                                        text = t("Active"),
+                                        color = accentPrimary,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
+                            }
+
+                            if (!isLifetime && subscriptionState.nextBillingDate != null) {
+                                Spacer(Modifier.height(10.dp))
+                                HorizontalDivider(color = innerSunkenSurface, thickness = 1.dp)
+                                Spacer(Modifier.height(10.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.Top
+                                ) {
+                                    Text(
+                                        text = t("Next billing"),
+                                        fontSize = 13.sp,
+                                        color = secondaryOnDarkText
+                                    )
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text(
+                                            text = subscriptionState.nextBillingAmount.orEmpty(),
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = primaryOnDarkText
+                                        )
+                                        Text(
+                                            text = subscriptionState.nextBillingDate.format(dateFormatter),
+                                            fontSize = 11.sp,
+                                            color = mutedOnDarkText
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(Modifier.height(10.dp))
+                            HorizontalDivider(color = innerSunkenSurface, thickness = 1.dp)
+                            Spacer(Modifier.height(8.dp))
+                            featureItems.forEach { feature ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 3.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Surface(
+                                        color = accentSecondary,
+                                        shape = RoundedCornerShape(999.dp),
+                                        modifier = Modifier.size(15.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Check,
+                                                contentDescription = null,
+                                                tint = Color.White,
+                                                modifier = Modifier.size(10.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = feature,
+                                        fontSize = 13.sp,
+                                        color = secondaryOnDarkText
+                                    )
+                                }
+                            }                            Spacer(Modifier.height(12.dp))
+                            Button(
+                                onClick = onOpenManageSubscription,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(14.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = accentPrimary,
+                                    contentColor = Color(0xFF04342C)
+                                ),
+                                contentPadding = PaddingValues(vertical = 13.dp)
+                            ) {
+                                Text(
+                                    text = t("manage_subscription"),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        is SubscriptionState.PremiumCancelled -> {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(
+                                        text = t("Current plan").uppercase(locale),
+                                        fontSize = 11.sp,
+                                        color = mutedOnDarkText,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Text(
+                                        text = "${t("Premium")} ✦",
+                                        fontSize = 24.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = primaryOnDarkText
+                                    )
+                                }
+                                Surface(
+                                    color = cancelledBadgeBackground,
+                                    shape = RoundedCornerShape(999.dp)
+                                ) {
+                                    Text(
+                                        text = t("Until expiry"),
+                                        color = Color(0xFFF59E42),
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(Modifier.height(10.dp))
+                            HorizontalDivider(color = innerSunkenSurface, thickness = 1.dp)
+                            Spacer(Modifier.height(10.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(t("Manage subscription"))
-                                Text("→", fontSize = 18.sp, color = AppTheme.colors.textSecondary)
+                                Text(
+                                    text = t("Premium active until"),
+                                    fontSize = 13.sp,
+                                    color = secondaryOnDarkText
+                                )
+                                Text(
+                                    text = subscriptionState.expiresOn.format(dateFormatter),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFF59E42)
+                                )
+                            }
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = t("No charge ✓"),
+                                fontSize = 12.sp,
+                                color = accentPrimary
+                            )
 
+                            Spacer(Modifier.height(10.dp))
+                            HorizontalDivider(color = innerSunkenSurface, thickness = 1.dp)
+                            Spacer(Modifier.height(8.dp))
+                            featureItems.forEach { feature ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 3.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Surface(
+                                        color = accentSecondary,
+                                        shape = RoundedCornerShape(999.dp),
+                                        modifier = Modifier.size(15.dp)
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.Check,
+                                                contentDescription = null,
+                                                tint = Color.White,
+                                                modifier = Modifier.size(10.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = feature,
+                                        fontSize = 13.sp,
+                                        color = secondaryOnDarkText
+                                    )
+                                }
+                            }                            Spacer(Modifier.height(12.dp))
+                            OutlinedButton(
+                                onClick = onOpenManageSubscription,
+                                modifier = Modifier.fillMaxWidth(),
+                                border = BorderStroke(1.5.dp, accentPrimary),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = accentPrimary),
+                                shape = RoundedCornerShape(14.dp),
+                                contentPadding = PaddingValues(vertical = 13.dp)
+                            ) {
+                                Text(
+                                    text = t("manage_subscription"),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
                             }
                         }
                     }
                 }
             }
         }
+
         item {
-            SettingsGroup(
-                title = t("Settings")
-            ) {
-                SettingsRow(
-                    title = t("App settings"),
-                    leadingIcon = Icons.Rounded.Settings,
-                    onClick = onOpenSettings
-                )
-            }
-        }
-        item {
-            SettingsGroup(title = t("Support")) {
-                SettingsRow(
+            AccountSectionLabel(title = t("Support"))
+            AccountActionCard {
+                AccountActionRow(
                     title = t("Help center"),
                     onClick = {
                         Toast.makeText(
@@ -3136,8 +3344,8 @@ private fun AccountPage(
                         ).show()
                     }
                 )
-                SettingsDivider()
-                SettingsRow(
+                HorizontalDivider(color = sectionDividerColor, thickness = 1.dp)
+                AccountActionRow(
                     title = t("Contact support"),
                     onClick = {
                         Toast.makeText(
@@ -3149,9 +3357,11 @@ private fun AccountPage(
                 )
             }
         }
+
         item {
-            SettingsGroup(title = t("Data")) {
-                SettingsRow(
+            AccountSectionLabel(title = t("Data"))
+            AccountActionCard {
+                AccountActionRow(
                     title = t("Export data"),
                     onClick = {
                         val result = onExportData()
@@ -3168,18 +3378,32 @@ private fun AccountPage(
                         Toast.makeText(context, message, Toast.LENGTH_LONG).show()
                     }
                 )
-                SettingsDivider()
-                SettingsRow(
+                HorizontalDivider(color = sectionDividerColor, thickness = 1.dp)
+                AccountActionRow(
                     title = t("Reset progress"),
                     onClick = { showResetConfirm = true }
                 )
-                SettingsDivider()
-                SettingsRow(
+            }
+            Spacer(Modifier.height(4.dp))
+            AccountActionCard {
+                AccountActionRow(
                     title = t("Delete account"),
                     destructive = true,
                     onClick = { showDeleteConfirm = true }
                 )
             }
+        }
+
+        item {
+            Text(
+                text = "Micro Habit · $appVersionName",
+                fontSize = 11.sp,
+                color = mutedOnDarkText,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 20.dp)
+            )
         }
     }
 
@@ -3237,6 +3461,59 @@ private fun AccountPage(
                     Text(t("Cancel"))
                 }
             }
+        )
+    }
+}
+
+@Composable
+private fun AccountSectionLabel(title: String) {
+    Text(
+        text = title,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.Medium,
+        color = AppTheme.colors.textTertiary,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 4.dp, end = 4.dp, top = 16.dp, bottom = 6.dp)
+    )
+}
+
+@Composable
+private fun AccountActionCard(content: @Composable () -> Unit) {
+    val colors = AppTheme.colors
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = colors.backgroundSurfaceMuted,
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, colors.borderSubtle.copy(alpha = 0.55f))
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) { content() }
+    }
+}
+
+@Composable
+private fun AccountActionRow(
+    title: String,
+    destructive: Boolean = false,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = title,
+            fontSize = 14.sp,
+            color = if (destructive) AppTheme.colors.danger else AppTheme.colors.textPrimary,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = "›",
+            fontSize = 16.sp,
+            color = if (destructive) AppTheme.colors.danger else MaterialTheme.colorScheme.outline
         )
     }
 }
@@ -3526,6 +3803,11 @@ private fun PaywallPage(
     onClose: () -> Unit
 ) {
     val colors = AppTheme.colors
+    val isDark = isSystemInDarkTheme()
+    val colorScheme = MaterialTheme.colorScheme
+    val accentPrimary = if (isDark) Color(0xFF2DCF96) else colorScheme.primary
+    val legalColor = if (isDark) Color(0xFF6AAA85) else colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
+    val footerDividerColor = if (isDark) Color(0xFF1A3528) else colorScheme.outline.copy(alpha = 0.45f)
     val subtitle = when (trigger) {
         PaywallTrigger.HABIT_LIMIT -> t("You reached the limit of 3 habits.")
         PaywallTrigger.ANALYTICS -> t("Unlock advanced analytics.")
@@ -3537,7 +3819,6 @@ private fun PaywallPage(
         BillingCycle.MONTHLY -> "${t("Get Premium")} — \$3.99 / ${t("month")}".replace('$', '$')
         BillingCycle.LIFETIME -> "${t("Get Premium")} — \$59.99".replace('$', '$')
     }
-    val legalColor = Color(0xFF6AAA85)
     val _ignore = onClose
 
     Column(Modifier.fillMaxSize().background(colors.backgroundCanvas)) {
@@ -3598,7 +3879,7 @@ private fun PaywallPage(
             }
         }
 
-        HorizontalDivider(color = Color(0xFF1A3528), thickness = 1.dp)
+        HorizontalDivider(color = footerDividerColor, thickness = 1.dp)
         Column(
             modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 18.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -3607,14 +3888,19 @@ private fun PaywallPage(
                 onClick = onSubscribe,
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !currentPlan.hasPremiumAccess(),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2DCF96), contentColor = Color(0xFF04342C)),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = accentPrimary,
+                    contentColor = if (isDark) Color(0xFF04342C) else colorScheme.onPrimary
+                ),
                 shape = RoundedCornerShape(14.dp)
-            ) { Text(ctaLabel, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(vertical = 2.dp)) }
+            ) {
+                Text(ctaLabel, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(vertical = 2.dp))
+            }
 
             Text(
                 text = t("Restore purchase"),
                 fontSize = 12.sp,
-                color = Color(0xFF2DCF96),
+                color = accentPrimary,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 6.dp).clickable(onClick = onRestorePurchase)
             )
@@ -3628,7 +3914,6 @@ private fun PaywallPage(
         }
     }
 }
-
 @Composable
 private fun PaywallPlanCard(
     title: String,
@@ -3641,21 +3926,21 @@ private fun PaywallPlanCard(
 ) {
     val colors = AppTheme.colors
     val isDark = isSystemInDarkTheme()
-    val selectedBorder = if (isDark) Color(0xFF2DCF96) else Color(0xFF1D9E75)
-    val selectedTitle = if (isDark) Color(0xFFE8F5EF) else Color(0xFF0F2318)
-    val selectedPrice = if (isDark) Color(0xFF2DCF96) else Color(0xFF0F6E56)
-    val selectedMeta = if (isDark) Color(0xFF6AAA85) else Color(0xFF3A7A5E)
-    val selectedBadgeBg = if (isDark) Color(0xFF1A3A20) else Color(0xFFC8EFE0)
-    val selectedBadgeText = if (isDark) Color(0xFF2DCF96) else Color(0xFF0F6E56)
-    val lifetimeSelectedBadgeBg = if (isDark) Color(0xFF1A2A1A) else Color(0xFFFEF3E0)
-    val lifetimeSelectedBadgeText = if (isDark) Color(0xFFF59E42) else Color(0xFFB07010)
-    val unselectedTitle = if (isDark) Color(0xFF9ECFB4) else Color(0xFF9A9A9A)
-    val unselectedPrice = if (isDark) Color(0xFF9ECFB4) else Color(0xFF9A9A9A)
-    val unselectedMeta = if (isDark) Color(0xFF4A7A5E) else Color(0xFFBBBBBB)
-    val unselectedBadgeBg = if (isDark) Color(0xFF152E1F) else Color(0xFFE8E8E8)
-    val unselectedBadgeText = if (isDark) Color(0xFF4A7A5E) else Color(0xFFAAAAAA)
-    val lifetimeUnselectedBadgeBg = if (isDark) Color(0xFF151E15) else Color(0xFFF5F5F5)
-    val lifetimeUnselectedBadgeText = if (isDark) Color(0xFF7A6030) else Color(0xFFBBBBBB)
+    val selectedBorder = if (isDark) Color(0xFF2DCF96) else colors.primary
+    val selectedTitle = if (isDark) Color(0xFFE8F5EF) else colors.textPrimary
+    val selectedPrice = if (isDark) Color(0xFF2DCF96) else colors.primary
+    val selectedMeta = if (isDark) Color(0xFF6AAA85) else colors.textSecondary
+    val selectedBadgeBg = if (isDark) Color(0xFF1A3A20) else colors.primaryMuted
+    val selectedBadgeText = if (isDark) Color(0xFF2DCF96) else colors.primary
+    val lifetimeSelectedBadgeBg = if (isDark) Color(0xFF1A2A1A) else colors.warning.copy(alpha = 0.16f)
+    val lifetimeSelectedBadgeText = if (isDark) Color(0xFFF59E42) else colors.warning
+    val unselectedTitle = if (isDark) Color(0xFF9ECFB4) else colors.textTertiary
+    val unselectedPrice = if (isDark) Color(0xFF9ECFB4) else colors.textTertiary
+    val unselectedMeta = if (isDark) Color(0xFF4A7A5E) else colors.textTertiary.copy(alpha = 0.88f)
+    val unselectedBadgeBg = if (isDark) Color(0xFF152E1F) else colors.backgroundSurfaceMuted
+    val unselectedBadgeText = if (isDark) Color(0xFF4A7A5E) else colors.textTertiary
+    val lifetimeUnselectedBadgeBg = if (isDark) Color(0xFF151E15) else colors.backgroundSurfaceMuted
+    val lifetimeUnselectedBadgeText = if (isDark) Color(0xFF7A6030) else colors.textTertiary
 
     val titleColor = if (selected) selectedTitle else unselectedTitle
     val priceColor = if (selected) selectedPrice else unselectedPrice
@@ -3725,6 +4010,15 @@ private fun ManageSubscriptionScreen(
     val activeState = subscriptionState as? SubscriptionState.PremiumActive
     var selectedPlan by rememberSaveable(subscriptionState) { mutableStateOf(activeState?.plan ?: PremiumPlan.YEARLY) }
     val isDebugBuild = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
+    val isDark = AppTheme.colors.backgroundCanvas.red < 0.2f
+    val colorScheme = MaterialTheme.colorScheme
+    val accentPrimary = if (isDark) Color(0xFF2DCF96) else colorScheme.primary
+    val darkInnerSurface = if (isDark) Color(0xFF152E1F) else colorScheme.surfaceVariant
+    val activeBadgeBg = if (isDark) Color(0xFF1A3A20) else accentPrimary.copy(alpha = 0.14f)
+    val warningBadgeBg = if (isDark) Color(0xFF2A1F0A) else colorScheme.error.copy(alpha = 0.12f)
+    val lifetimeBadgeBg = if (isDark) Color(0xFF1A2A1A) else colorScheme.surfaceVariant
+    val activeCardBorder = accentPrimary
+    val cancelledCardBorder = if (isDark) Color(0xFF3A1A1A) else colorScheme.error.copy(alpha = 0.45f)
 
     LaunchedEffect(activeState?.plan) { if (activeState != null) selectedPlan = activeState.plan }
 
@@ -3740,7 +4034,7 @@ private fun ManageSubscriptionScreen(
                         Button(
                             onClick = { onOpenPaywall(PaywallTrigger.DEFAULT) },
                             modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2DCF96), contentColor = Color(0xFF04342C)),
+                            colors = ButtonDefaults.buttonColors(containerColor = accentPrimary, contentColor = Color(0xFF04342C)),
                             shape = RoundedCornerShape(14.dp)
                         ) { Text(t("Get Premium"), fontWeight = FontWeight.SemiBold) }
                     }
@@ -3748,11 +4042,11 @@ private fun ManageSubscriptionScreen(
 
                 is SubscriptionState.PremiumActive -> {
                     val isLifetime = subscriptionState.plan == PremiumPlan.LIFETIME
-                    ManageSubscriptionCard(Color(0xFF2DCF96), 1.5.dp) {
+                    ManageSubscriptionCard(activeCardBorder, 1.5.dp) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Text(t("Active plan"), style = MaterialTheme.typography.labelLarge, color = colors.textSecondary)
-                            Surface(color = Color(0xFF1A3A20), shape = RoundedCornerShape(999.dp)) {
-                                Text(t("Active"), color = Color(0xFF2DCF96), style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
+                            Surface(color = activeBadgeBg, shape = RoundedCornerShape(999.dp)) {
+                                Text(t("Active"), color = accentPrimary, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
                             }
                         }
                         Spacer(Modifier.height(6.dp))
@@ -3767,7 +4061,7 @@ private fun ManageSubscriptionScreen(
                         if (isLifetime) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                 Text(t("billing_no_recurring"), color = colors.textSecondary, style = MaterialTheme.typography.bodyMedium)
-                                Text(t("billing_never"), color = Color(0xFF2DCF96), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+                                Text(t("billing_never"), color = accentPrimary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
                             }
                         } else {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
@@ -3782,10 +4076,10 @@ private fun ManageSubscriptionScreen(
                 }
 
                 is SubscriptionState.PremiumCancelled -> {
-                    ManageSubscriptionCard(Color(0xFF3A1A1A), 1.5.dp) {
+                    ManageSubscriptionCard(cancelledCardBorder, 1.5.dp) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                             Text(t("Subscription cancelled"), style = MaterialTheme.typography.labelLarge, color = colors.textSecondary)
-                            Surface(color = Color(0xFF2A1F0A), shape = RoundedCornerShape(999.dp)) {
+                            Surface(color = warningBadgeBg, shape = RoundedCornerShape(999.dp)) {
                                 Text(t("Until expiry"), style = MaterialTheme.typography.labelSmall, color = Color(0xFFF59E42), modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
                             }
                         }
@@ -3820,12 +4114,12 @@ private fun ManageSubscriptionScreen(
                             enabled = false,
                             opacity = 1f,
                             badge = t("plan_lifetime_yours"),
-                            badgeBackground = Color(0xFF1A2A1A),
+                            badgeBackground = lifetimeBadgeBg,
                             badgeColor = Color(0xFFF59E42),
                             onClick = {}
                         )
                         Spacer(Modifier.height(10.dp))
-                        Surface(color = Color(0xFF0A1A10), shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
+                        Surface(color = darkInnerSurface, shape = RoundedCornerShape(10.dp), modifier = Modifier.fillMaxWidth()) {
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -3855,7 +4149,7 @@ private fun ManageSubscriptionScreen(
                             selected = selectedPlan == PremiumPlan.LIFETIME,
                             enabled = true,
                             badge = t("plan_lifetime_forever_badge"),
-                            badgeBackground = Color(0xFF1A2A1A),
+                            badgeBackground = lifetimeBadgeBg,
                             badgeColor = Color(0xFFF59E42),
                             onClick = { selectedPlan = PremiumPlan.LIFETIME }
                         )
@@ -3866,7 +4160,7 @@ private fun ManageSubscriptionScreen(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(14.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFF2DCF96),
+                                containerColor = accentPrimary,
                                 contentColor = Color(0xFF04342C),
                                 disabledContainerColor = colors.backgroundSurfaceMuted,
                                 disabledContentColor = colors.textSecondary
@@ -3895,7 +4189,7 @@ private fun ManageSubscriptionScreen(
                     Button(
                         onClick = onRenewSubscription,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2DCF96), contentColor = Color(0xFF04342C)),
+                        colors = ButtonDefaults.buttonColors(containerColor = accentPrimary, contentColor = Color(0xFF04342C)),
                         shape = RoundedCornerShape(14.dp)
                     ) { Text(t("Renew subscription"), fontWeight = FontWeight.SemiBold) }
                 }
@@ -3921,7 +4215,7 @@ private fun ManageSubscriptionScreen(
                 Text(
                     text = t("Cancel subscription"),
                     fontSize = 13.sp,
-                    color = Color(0xFFE05C5C),
+                    color = colors.danger,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp).clickable { showCancelSheet = true }
                 )
@@ -3933,7 +4227,7 @@ private fun ManageSubscriptionScreen(
                 Text(
                     text = t("Restore purchase"),
                     fontSize = 12.sp,
-                    color = Color(0xFF6AAA85),
+                    color = AppTheme.colors.textTertiary,
                     textDecoration = TextDecoration.Underline,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp).clickable(onClick = onRestorePurchase)
@@ -4016,15 +4310,31 @@ private fun ManagePlanSwitchRow(
     enabled: Boolean,
     onClick: () -> Unit,
     badge: String? = null,
-    badgeBackground: Color = Color(0xFF1A3A20),
-    badgeColor: Color = Color(0xFF2DCF96),
+    badgeBackground: Color = Color.Unspecified,
+    badgeColor: Color = Color.Unspecified,
     opacity: Float = 1f
 ) {
+    val isDark = AppTheme.colors.backgroundCanvas.red < 0.2f
+    val colorScheme = MaterialTheme.colorScheme
+    val cardBackground = if (isDark) Color(0xFF0A1F13) else colorScheme.surface
+
+    val selectedBorder = if (isDark) Color(0xFF2DCF96) else colorScheme.primary
+    val checkFill = if (isDark) Color(0xFF2DCF96) else colorScheme.primary
+    val unselectedRing = if (isDark) Color(0xFF2A5A3A) else colorScheme.outline
+    val baseBadgeBackground = if (badgeBackground == Color.Unspecified) Color(0xFF1A3A20) else badgeBackground
+    val baseBadgeColor = if (badgeColor == Color.Unspecified) { if (isDark) Color(0xFF2DCF96) else colorScheme.primaryContainer } else badgeColor
+    val badgeBg = if (isDark) baseBadgeBackground else colorScheme.surfaceVariant
+    val badgeFg = if (isDark) baseBadgeColor else colorScheme.primaryContainer
+    val selectedTitleColor = if (isDark) Color(0xFFE8F5EF) else AppTheme.colors.textPrimary
+    val unselectedTitleColor = if (isDark) Color(0xFF9ECFB4) else AppTheme.colors.textSecondary
+    val selectedPriceColor = if (isDark) Color(0xFF2DCF96) else AppTheme.colors.primary
+    val unselectedPriceColor = if (isDark) Color(0xFF4A7A5E) else AppTheme.colors.textTertiary
+
     Surface(
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier).graphicsLayer { alpha = opacity },
         shape = RoundedCornerShape(14.dp),
-        color = if (selected) Color(0xFF0A1F13) else Color(0xFF152E1F),
-        border = if (selected) BorderStroke(1.5.dp, Color(0xFF2DCF96)) else null
+        color = cardBackground,
+        border = if (selected) BorderStroke(1.5.dp, selectedBorder) else null
     ) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
@@ -4032,25 +4342,24 @@ private fun ManagePlanSwitchRow(
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (selected) {
-                Surface(Modifier.size(20.dp), shape = RoundedCornerShape(999.dp), color = Color(0xFF2DCF96)) {
+                Surface(Modifier.size(20.dp), shape = RoundedCornerShape(999.dp), color = checkFill) {
                     Box(contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Check, null, tint = Color.White, modifier = Modifier.size(11.dp)) }
                 }
             } else {
-                Box(Modifier.size(20.dp).border(2.dp, Color(0xFF2A5A3A), RoundedCornerShape(999.dp)))
+                Box(Modifier.size(20.dp).border(2.dp, unselectedRing, RoundedCornerShape(999.dp)))
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text(title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = AppTheme.colors.textPrimary)
+                    Text(title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = if (selected) selectedTitleColor else unselectedTitleColor)
                     if (!badge.isNullOrBlank()) {
-                        Text(badge, color = badgeColor, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.background(badgeBackground, RoundedCornerShape(5.dp)).padding(horizontal = 7.dp, vertical = 2.dp))
+                        Text(badge, color = badgeFg, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.background(badgeBg, RoundedCornerShape(5.dp)).padding(horizontal = 7.dp, vertical = 2.dp))
                     }
                 }
-                Text(price, fontSize = 13.sp, color = AppTheme.colors.textSecondary)
+                Text(price, fontSize = 13.sp, color = if (selected) selectedPriceColor else unselectedPriceColor)
             }
         }
     }
 }
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MilestonePreviewSheet(
@@ -4058,6 +4367,11 @@ private fun MilestonePreviewSheet(
     onSelect: (Int) -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val isDark = isSystemInDarkTheme()
+    val colorScheme = MaterialTheme.colorScheme
+    val darkPrimaryText = if (isDark) Color(0xFFE8F5EF) else colorScheme.onBackground
+    val darkMutedText = if (isDark) Color(0xFF6AAA85) else colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
+    val dividerColor = if (isDark) Color(0xFF1A3528) else colorScheme.outline.copy(alpha = 0.45f)
     val rows = remember {
         streakMilestoneTierDefinitions.map { definition ->
             definition.days to definition.accentColor
@@ -4080,7 +4394,7 @@ private fun MilestonePreviewSheet(
                     modifier = Modifier
                         .size(width = 36.dp, height = 4.dp)
                         .clip(RoundedCornerShape(2.dp))
-                        .background(Color(0xFF2A4A38))
+                        .background(if (isDark) Color(0xFF2A4A38) else colorScheme.outline.copy(alpha = 0.45f))
                 )
             }
             Spacer(Modifier.height(16.dp))
@@ -4088,7 +4402,7 @@ private fun MilestonePreviewSheet(
                 text = "Preview milestone screens",
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color(0xFFE8F5EF),
+                color = darkPrimaryText,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp)
@@ -4126,12 +4440,12 @@ private fun MilestonePreviewSheet(
                                 text = "$days ${streakDaysUnit(days)}",
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFFE8F5EF)
+                                color = darkPrimaryText
                             )
                             Text(
                                 text = t("milestone_badge_${days}"),
                                 fontSize = 11.sp,
-                                color = Color(0xFF6AAA85),
+                                color = AppTheme.colors.textTertiary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -4139,11 +4453,11 @@ private fun MilestonePreviewSheet(
                         Text(
                             text = "›",
                             fontSize = 16.sp,
-                            color = Color(0xFF6AAA85)
+                            color = darkMutedText
                         )
                     }
                     if (index != rows.lastIndex) {
-                        HorizontalDivider(color = Color(0xFF1A3528), thickness = 1.dp)
+                        HorizontalDivider(color = dividerColor, thickness = 1.dp)
                     }
                 }
             }
@@ -4159,6 +4473,12 @@ private fun CancelSubscriptionSheet(
 ) {
     val spacing = AppTheme.spacing
     val colors = AppTheme.colors
+    val isDark = AppTheme.colors.backgroundCanvas.red < 0.2f
+    val colorScheme = MaterialTheme.colorScheme
+    val accentPrimary = if (isDark) Color(0xFF2DCF96) else colorScheme.primary
+    val statusCardSurface = if (isDark) Color(0xFF0A1F13) else colorScheme.surface
+    val keepButtonBorder = if (isDark) Color(0xFF1A3A27) else colorScheme.outline
+    val keepButtonText = if (isDark) Color(0xFF9ECFB4) else colorScheme.onSurfaceVariant
     val locale = appLocale()
     val dateFormatter = remember(locale) { DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale) }
     val activeUntil = state.nextBillingDate?.format(dateFormatter).orEmpty()
@@ -4172,7 +4492,7 @@ private fun CancelSubscriptionSheet(
             Text(t("cancel_sheet_title"), fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
             Text("${managePlanName(state.plan)} · ${managePlanPriceSummary(state.plan)}", fontSize = 13.sp, color = colors.textSecondary, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
 
-            Surface(Modifier.fillMaxWidth(), color = Color(0xFF0A1F13), shape = RoundedCornerShape(16.dp)) {
+            Surface(Modifier.fillMaxWidth(), color = statusCardSurface, shape = RoundedCornerShape(16.dp)) {
                 Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Text(t("Premium active until"), color = colors.textSecondary, fontSize = 12.sp)
@@ -4183,14 +4503,14 @@ private fun CancelSubscriptionSheet(
                     Spacer(Modifier.height(10.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Text(t("Charge"), color = colors.textSecondary, fontSize = 12.sp)
-                        Text(t("No charge ✓"), color = Color(0xFF2DCF96), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text(t("No charge ✓"), color = accentPrimary, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
                 }
             }
 
             Surface(Modifier.fillMaxWidth(), color = colors.backgroundSurface, shape = RoundedCornerShape(16.dp)) {
                 Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(t("cancel_loses_title").replace("{date}", activeUntil), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFE05C5C))
+                    Text(t("cancel_loses_title").replace("{date}", activeUntil), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = colors.danger)
                     CancelSheetLossRow(t("Home screen widgets"))
                     CancelSheetLossRow(t("Advanced analytics"))
                     CancelSheetLossRow(t("More than 3 active habits"))
@@ -4201,21 +4521,20 @@ private fun CancelSubscriptionSheet(
             OutlinedButton(
                 onClick = onDismiss,
                 modifier = Modifier.fillMaxWidth(),
-                border = BorderStroke(1.dp, Color(0xFF1A3A27)),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF9ECFB4)),
+                border = BorderStroke(1.dp, keepButtonBorder),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = keepButtonText),
                 shape = RoundedCornerShape(14.dp)
             ) { Text(t("Keep Premium"), fontWeight = FontWeight.SemiBold) }
 
-            Text(t("cancel_confirm_btn"), fontSize = 13.sp, color = Color(0xFFE05C5C), textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp).clickable(onClick = onConfirmCancel))
+            Text(t("cancel_confirm_btn"), fontSize = 13.sp, color = colors.danger, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp).clickable(onClick = onConfirmCancel))
             Spacer(Modifier.height(spacing.x1))
         }
     }
 }
-
 @Composable
 private fun CancelSheetLossRow(label: String) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("✕", color = Color(0xFFE05C5C), fontWeight = FontWeight.Bold)
+        Text("✕", color = AppTheme.colors.danger, fontWeight = FontWeight.Bold)
         Text(label, color = AppTheme.colors.textPrimary)
     }
 }
@@ -4266,13 +4585,16 @@ private fun managePlanHintText(currentPlan: PremiumPlan, targetPlan: PremiumPlan
 @Composable
 private fun PremiumFeatureRow(title: String, subtitle: String, showSubtitle: Boolean = true) {
     val colors = AppTheme.colors
+    val isDark = isSystemInDarkTheme()
+    val colorScheme = MaterialTheme.colorScheme
+    val accentPrimary = if (isDark) Color(0xFF2DCF96) else colorScheme.primary
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
         verticalAlignment = if (showSubtitle) Alignment.Top else Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Surface(Modifier.size(18.dp), shape = RoundedCornerShape(999.dp), color = Color(0xFF2DCF96).copy(alpha = 0.2f)) {
-            Box(contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Check, contentDescription = null, tint = Color(0xFF2DCF96), modifier = Modifier.size(12.dp)) }
+        Surface(Modifier.size(18.dp), shape = RoundedCornerShape(999.dp), color = accentPrimary.copy(alpha = if (isDark) 0.2f else 0.14f)) {
+            Box(contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Check, contentDescription = null, tint = accentPrimary, modifier = Modifier.size(12.dp)) }
         }
         if (showSubtitle) {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -4284,7 +4606,6 @@ private fun PremiumFeatureRow(title: String, subtitle: String, showSubtitle: Boo
         }
     }
 }
-
 private fun themeLabel(mode: AppThemeMode, language: AppLanguage): String {
     return when (mode) {
         AppThemeMode.SYSTEM -> translate(language, "System")
@@ -6652,6 +6973,9 @@ private fun HeroMiniWeekRow(
 ) {
     val semantic = AppTheme.colors
     val locale = appLocale()
+    val isDark = isSystemInDarkTheme()
+    val lightMissedFill = Color(0xFFC0392B).copy(alpha = 0.08f)
+    val lightMissedBorder = Color(0xFFC0392B).copy(alpha = 0.35f)
     val normalizedPoints = points.takeLast(7).let { if (it.size == 7) it else List(7 - it.size) { 0 } + it }
     val normalizedScheduled = scheduled.takeLast(7).let { if (it.size == 7) it else List(7 - it.size) { false } + it }
     val normalizedManualOverride = manualOverride.takeLast(7).let {
@@ -6675,6 +6999,7 @@ private fun HeroMiniWeekRow(
                 TrackingType.COUNT, TrackingType.DURATION -> value >= 100
             }
             val isPartial = !isCompleted && value > 0 && isScheduled && !isFuture
+            val isMissed = isScheduled && !isFuture && !isToday && !isCompleted && !isPartial
             val dayColor = when {
                 isFuture -> MaterialTheme.colorScheme.surfaceVariant
                 !isScheduled && isManualOverride -> semantic.success.copy(alpha = 0.55f)
@@ -6682,8 +7007,10 @@ private fun HeroMiniWeekRow(
                 isCompleted -> semantic.success
                 isPartial -> semantic.success.copy(alpha = 0.45f)
                 isToday -> Color.Transparent
+                isMissed && !isDark -> lightMissedFill
                 else -> semantic.chartMissed
             }
+            val missedBorderColor = if (isMissed && !isDark) lightMissedBorder else null
             val showTodayBorder = isToday && isScheduled && !isFuture && !isCompleted && !isPartial
             val dayLabel = if (isToday) {
                 todayShortLabel
@@ -6696,7 +7023,8 @@ private fun HeroMiniWeekRow(
                 fillColor = dayColor,
                 isToday = isToday,
                 showTodayBorder = showTodayBorder,
-                todayBorderColor = semantic.primary
+                todayBorderColor = semantic.primary,
+                customBorderColor = missedBorderColor
             )
         }
     }
@@ -6709,9 +7037,15 @@ private fun DayDot(
     fillColor: Color,
     isToday: Boolean,
     showTodayBorder: Boolean,
-    todayBorderColor: Color
+    todayBorderColor: Color,
+    customBorderColor: Color? = null
 ) {
     val semantic = AppTheme.colors
+    val borderModifier = when {
+        showTodayBorder -> Modifier.border(1.dp, todayBorderColor, RoundedCornerShape(6.dp))
+        customBorderColor != null -> Modifier.border(1.5.dp, customBorderColor, RoundedCornerShape(6.dp))
+        else -> Modifier
+    }
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally
@@ -6723,13 +7057,7 @@ private fun DayDot(
                 .aspectRatio(1f)
                 .clip(RoundedCornerShape(6.dp))
                 .background(fillColor)
-                .then(
-                    if (showTodayBorder) {
-                        Modifier.border(1.dp, todayBorderColor, RoundedCornerShape(6.dp))
-                    } else {
-                        Modifier
-                    }
-                )
+                .then(borderModifier)
         )
         Spacer(Modifier.height(3.dp))
         Text(
@@ -6743,7 +7071,6 @@ private fun DayDot(
         )
     }
 }
-
 @Composable
 private fun HeroDetailsButton(onClick: () -> Unit) {
     val semantic = AppTheme.colors
@@ -9154,15 +9481,3 @@ private fun monthGrid(month: YearMonth): List<List<LocalDate?>> {
     while (days.size % 7 != 0) days += null
     return days.chunked(7)
 }
-
-
-
-
-
-
-
-
-
-
-
-

@@ -10,20 +10,20 @@ import androidx.compose.ui.graphics.Color
 import com.example.microhabit.data.AppThemeMode
 
 private val LightColorScheme = lightColorScheme(
-    primary = Color(0xFF1F6F64),
+    primary = Color(0xFF1D9E75),
     onPrimary = Color(0xFFFFFFFF),
-    primaryContainer = Color(0xFFDDEFEA),
-    onPrimaryContainer = Color(0xFF123A33),
-    secondary = Color(0xFF55645F),
+    primaryContainer = Color(0xFFD1F0E4),
+    onPrimaryContainer = Color(0xFF0F6E56),
+    secondary = Color(0xFF3A5C3E),
     onSecondary = Color(0xFFFFFFFF),
-    background = Color(0xFFF5F7F6),
-    onBackground = Color(0xFF111A17),
+    background = Color(0xFFEEF3EE),
+    onBackground = Color(0xFF0D1F12),
     surface = Color(0xFFFFFFFF),
-    onSurface = Color(0xFF111A17),
-    surfaceVariant = Color(0xFFEDF1EF),
-    onSurfaceVariant = Color(0xFF5B6862),
-    outline = Color(0xFFE3E9E6),
-    error = Color(0xFFB54747),
+    onSurface = Color(0xFF0D1F12),
+    surfaceVariant = Color(0xFFE4EDE5),
+    onSurfaceVariant = Color(0xFF5A7A5E),
+    outline = Color(0xFFC8D9CA),
+    error = Color(0xFFC0392B),
     onError = Color(0xFFFFFFFF)
 )
 
@@ -46,27 +46,27 @@ private val DarkColorScheme = darkColorScheme(
 )
 
 private val LightSemanticColors = AppSemanticColors(
-    primary = Color(0xFF1F6F64),
-    primaryMuted = Color(0xFFEAF5F1),
-    success = Color(0xFF2E8C63),
-    successMuted = Color(0xFFE6F4ED),
+    primary = Color(0xFF1D9E75),
+    primaryMuted = Color(0xFFECFDF5),
+    success = Color(0xFF1D9E75),
+    successMuted = Color(0xFFECFDF5),
     lottieCheckmarkTint = Color(0xFFFFFFFF),
-    neutral = Color(0xFF5B6862),
-    neutralMuted = Color(0xFFF2F5F3),
-    backgroundCanvas = Color(0xFFF5F7F6),
+    neutral = Color(0xFF3A5C3E),
+    neutralMuted = Color(0xFFE8EFE8),
+    backgroundCanvas = Color(0xFFEEF3EE),
     backgroundSurface = Color(0xFFFFFFFF),
-    backgroundSurfaceMuted = Color(0xFFF2F5F3),
-    textPrimary = Color(0xFF111A17),
-    textSecondary = Color(0xFF4F5C56),
-    textTertiary = Color(0xFF7A8781),
-    borderSubtle = Color(0xFFE7EDE9),
-    borderStrong = Color(0xFFD2DBD7),
-    warning = Color(0xFFA3722C),
-    danger = Color(0xFFB54747),
-    chartDone = Color(0xFF1F6F64),
-    chartMissed = Color(0xFFC8D2CD),
-    calendarTodayRing = Color(0xFF1F6F64),
-    calendarDoneDot = Color(0xFF2E8C63)
+    backgroundSurfaceMuted = Color(0xFFE4EDE5),
+    textPrimary = Color(0xFF0D1F12),
+    textSecondary = Color(0xFF3A5C3E),
+    textTertiary = Color(0xFF5A7A5E),
+    borderSubtle = Color(0xFFD8E6D9),
+    borderStrong = Color(0xFFA8BEA9),
+    warning = Color(0xFFF59E0B),
+    danger = Color(0xFFC0392B),
+    chartDone = Color(0xFF1D9E75),
+    chartMissed = Color(0xFFC0392B),
+    calendarTodayRing = Color(0xFF1D9E75),
+    calendarDoneDot = Color(0xFF0F6E56)
 )
 
 private val DarkSemanticColors = AppSemanticColors(
@@ -121,3 +121,4 @@ fun MicroHabitTheme(
         )
     }
 }
+

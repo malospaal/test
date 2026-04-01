@@ -415,13 +415,17 @@ Unit label UX для `COUNT`:
 
 ### 12.8 Account Screen
 - `Account` — primary destination для профиля и подписки (profile/plan screen), а не основной экран конфигурации приложения.
-- В Account используются отдельные секции:
-  - текущий план (`Plan`) + действие `Manage subscription`;
-  - entry `App settings` (переход в `Settings`);
+- Верхний plan-card имеет 2 визуальных режима:
+  - `Free`: бейдж `Basic`, usage-блок `Active habits` с прогресс-баром лимита `3` активных привычек, locked feature-list (3 пункта), CTA `Get Premium ✦`;
+  - `Premium` (`PremiumActive`/`PremiumCancelled`): plan-card с border-state (`green` для active, `amber/red` для cancelled), feature-list из 3 premium-пунктов и outline CTA `Manage subscription →`.
+- Для `PremiumActive` monthly/yearly в plan-card показывается `Next billing`; для `Lifetime` billing-row скрыт.
+- Для `PremiumCancelled` billing-row заменяется на info-блок `Premium active until {date}` и `No charge ✓`.
+- В Account-секциях остаются только:
   - `Support` (`Help center`, `Contact support`);
-  - `Data` (`Export data`, `Reset progress`, `Delete account`).
-- `Delete account` в Account визуально оформляется как destructive action.
-- Theme / Language / Notifications не настраиваются напрямую на Account-экране и вынесены в `Settings`.
+  - `Data` (`Export data`, `Reset progress`).
+- `Delete account` вынесен из Data-группы в отдельную isolated destructive card.
+- Внизу Account отображается app version footer: `Micro Habit · {versionName}`.
+- Theme / Language / Notifications не настраиваются напрямую на Account-экране и вынесены в `Settings`; переход в `Settings` выполняется через глобальный gear action top bar.
 
 ### 12.9 Settings Screen
 - `Settings` — отдельный экран системных настроек приложения (application configuration).
@@ -652,6 +656,4 @@ Unit label UX для `COUNT`:
 - прочитать `PRODUCT_LOGIC.md`,
 - сверить задачу с инвариантами,
 - реализовать изменения согласованно во всех затронутых частях приложения.
-
-
 

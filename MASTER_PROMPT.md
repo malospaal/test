@@ -35,6 +35,22 @@ If the requested change modifies product behavior, you MUST also update PRODUCT_
 PRODUCT_LOGIC.md must always reflect the real behavior of the application.
 
 --------------------------------------------------
+CODEBASE MAP RULE
+--------------------------------------------------
+
+The file CODEBASE_MAP.md (\"CODEBASE.MAP\") is the canonical project structure map.
+
+Before implementing changes you MUST:
+
+1. Read CODEBASE_MAP.md (project file map, function map, shared registry).
+2. Use it to locate target files and dependencies safely.
+
+After each task/prompt you MUST:
+
+1. Update CODEBASE_MAP.md if file structure, function location, or cross-screen usage changed.
+2. Keep CODEBASE_MAP.md synchronized with the real codebase state.
+
+--------------------------------------------------
 ENGINEERING PRINCIPLES
 --------------------------------------------------
 
@@ -46,6 +62,7 @@ Avoid:
 - speculative architecture changes
 - breaking invariants defined in PRODUCT_LOGIC.md
 - changing unrelated behavior
+- growing a single file with unrelated responsibilities when safe decomposition is possible
 
 If product intent and existing code conflict:
 
@@ -58,6 +75,12 @@ ViewModel
 UI
 
 UI must not duplicate business logic that belongs in the Repository.
+
+Prefer logical modularization:
+
+- if a feature can be split safely into focused files, do so
+- only split when justified by clear responsibility boundaries and maintenance value
+- avoid file splitting that increases complexity without practical benefit
 
 --------------------------------------------------
 IMPLEMENTATION WORKFLOW

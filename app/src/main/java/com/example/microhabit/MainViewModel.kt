@@ -620,6 +620,10 @@ class MainViewModel(
         _state.update { it.copy(editorTimesPerWeek = value.coerceIn(1, 7)) }
     }
 
+    fun setEditorCustomDays(days: Set<Int>) {
+        _state.update { it.copy(editorCustomDays = days.filter { day -> day in 1..7 }.toSet()) }
+    }
+
     fun toggleEditorCustomDay(day: Int) {
         if (day !in 1..7) return
         _state.update {
@@ -1580,3 +1584,4 @@ class MainViewModel(
         private const val DEFAULT_REMINDER_MINUTE = 0
     }
 }
+

@@ -508,6 +508,18 @@ internal val ukTranslations: Map<String, String> = mapOf(
     "label_reminder" to "Нагадування",
     "label_skip" to "Пропустити",
     "label_reminder_off" to "Вимкнено",
+    "editor_advanced_show" to "Більше опцій",
+    "editor_advanced_hide" to "Менше опцій",
+    "editor_unit_hint_small" to "напр. склянки, підходи, повтори",
+    "editor_unit_hint_medium" to "напр. сторінки, кроки",
+    "editor_unit_hint_large" to "напр. кроки, слова",
+    "editor_freq_daily_title" to "Щодня",
+    "editor_freq_daily_subtitle" to "Кожного дня",
+    "editor_freq_set_days_title" to "Вибрані дні",
+    "editor_freq_set_days_subtitle" to "Обрати дні тижня",
+    "editor_freq_n_times_title" to "N× / тиждень",
+    "editor_freq_n_times_subtitle" to "Гнучкі дні",
+    "editor_remind_me_at" to "Нагадати о",
     "show_advanced" to "Дата завершення і нагадування ▾",
     "hide_advanced" to "Сховати ▴",
     "tracking_type_yesno" to "Зробити",
@@ -655,3 +667,4 @@ internal val ukTranslations: Map<String, String> = mapOf(
     "dd MMM yyyy" to "dd MMM yyyy",
     "LLLL yyyy" to "LLLL yyyy"
 )
+

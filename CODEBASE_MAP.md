@@ -238,7 +238,8 @@ Responsibility: App-wide enums/constants/contracts extracted from MainActivity.
 | GlassCard | ui/shared/SelectorsAndCards.kt | Tracker, HabitDetail, Calendar, Analytics, Habits, Onboarding |
 | HabitSelectorRow | ui/shared/SelectorsAndCards.kt | Tracker, Calendar, Analytics |
 | TaskSelector | ui/shared/SelectorsAndCards.kt | Analytics (and shared selector flows) |
-| SelectChip | ui/shared/SelectorsAndCards.kt | TaskEditorDialog, OnboardingWizard |
+| SelectChip | ui/shared/SelectorsAndCards.kt | OnboardingWizard |
+| TimesPerWeekStepper | ui/onboarding/TemplateConfirm.kt | TemplateConfirm, TaskEditorDialog |
 | CalendarHeaderRow | ui/shared/DateTimeHelpers.kt | Tracker CalendarCard, Calendar screen |
 | showThemedTimePicker | ui/shared/DateTimeHelpers.kt | AppRoot, TaskEditorDialog, OnboardingWizard |
 | showThemedDatePicker | ui/shared/DateTimeHelpers.kt | AppRoot, TaskEditorDialog |
@@ -272,3 +273,4 @@ Responsibility: App-wide enums/constants/contracts extracted from MainActivity.
 - Free limit: 3 active habits (FREE_ACTIVE_HABIT_LIMIT)
 - Widget entitlement derived from SubscriptionState, not legacy pro_access_source
 - Milestone shown once per (habitId, days) pair — tracked in SharedPreferences
+

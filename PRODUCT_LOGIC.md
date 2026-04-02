@@ -28,7 +28,7 @@
 - `id: String`
 - `title: String`
 - `emoji: String`
-- `colorHex: String`
+- `colorHex: String` (legacy/internal storage field; user color selection is not supported)
 - `trackingType: TrackingType` (`YES_NO`, `COUNT`, `DURATION`)
 - `dailyTarget: Int`
 - `unitLabel: String`
@@ -354,18 +354,27 @@ Template flow:
 
 `TaskEditorDialog` (редизайн формы):
 - tracking type карточки используют продуктовые лейблы `Сделать / Посчитать / Засечь время`;
-- frequency chips используют `Каждый день / Выбрать дни / N раз в неделю` + contextual description;
+- frequency selector использует 3-card grid (`Daily` / `Set days` / `N× / week`) с week-dot превью и selected-border state;
 - поле emoji встроено inline в строку названия привычки (tap opens emoji picker sheet);
-- выбор цвета — компактная inline-строка color dots под названием (без отдельной `Color` секции);
-- Start date остаётся обязательной и editable строкой.
+- пользовательский выбор цвета привычки отсутствует (color picker / color dots удалены из create/edit UI);
+- Start date остаётся обязательной и editable строкой и использует `DateChip` паттерн (pill + edit-calendar icon).
 
 Advanced block:
 - End date + Reminders свёрнуты по умолчанию под expandable row;
 - если форма открыта с prefill, `showAdvanced` по умолчанию остаётся `false` (пользователь открывает секцию вручную);
-- при включении End date default выставляется в `max(today + 30 days, startDate)` и сразу открывается DatePicker.
+- при включении End date default выставляется в `max(today + 30 days, startDate)` и сразу открывается DatePicker;
+- End date и reminder time редактируются через единый `DateChip` паттерн (без full-width outlined date/time buttons).
 
 Unit label UX для `COUNT`:
-- placeholder зависит от величины `dailyTarget` (small/large hint).
+- placeholder зависит от величины `dailyTarget` (small / medium / large hint).
+
+Editor behavior updates:
+- validation message `Fill required fields to continue.` показывается только после первой неуспешной попытки Save;
+- tracking-type subtitle показывается только у выбранной карточки (animated expand/fade);
+- target section (`COUNT`/`DURATION`) появляется/скрывается через animated visibility;
+- для `COUNT` target используется inline stepper (`- value +`) с быстрым диапазоном `1..99`; tap по value открывает numpad для ввода больших значений;
+- для `TIMES_PER_WEEK` editor UI ограничивает выбор до `1..6` (чтобы не дублировать семантику `DAILY`), при этом доменная модель по-прежнему поддерживает `1..7`;
+- при переключении на `SELECTED_DAYS` пользователь начинает с пустого выбора дней (без автопредзаполнения).
 
 ### 12.5 Onboarding
 - Onboarding реализован отдельным wizard-flow и активируется для нового пользователя (когда onboarding не завершён и привычек ещё нет).
@@ -656,4 +665,7 @@ Unit label UX для `COUNT`:
 - прочитать `PRODUCT_LOGIC.md`,
 - сверить задачу с инвариантами,
 - реализовать изменения согласованно во всех затронутых частях приложения.
+
+
+
 

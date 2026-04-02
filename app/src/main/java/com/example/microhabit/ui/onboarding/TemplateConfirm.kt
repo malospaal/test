@@ -299,7 +299,7 @@ internal fun HabitTemplateConfirmScreen(
                                     onClick = { frequency = TaskFrequency.TIMES_PER_WEEK }
                                 )
                                 AnimatedVisibility(visible = frequency == TaskFrequency.TIMES_PER_WEEK) {
-                                    TimesPerWeekInputField(
+                                    TimesPerWeekStepper(
                                         value = timesPerWeek,
                                         onValueChange = { timesPerWeek = it.coerceIn(1, 7) }
                                     )
@@ -364,35 +364,65 @@ private enum class ExpandedConfirmParam {
 }
 
 @Composable
-private fun TimesPerWeekInputField(
+internal fun TimesPerWeekStepper(
     value: Int,
-    onValueChange: (Int) -> Unit
+    onValueChange: (Int) -> Unit,
+    min: Int = 1,
+    max: Int = 7
 ) {
-    var input by remember(value) { mutableStateOf(value.coerceIn(1, 7).toString()) }
+    val spacing = AppTheme.spacing
+    val colorScheme = MaterialTheme.colorScheme
 
-    OutlinedTextField(
-        value = input,
-        onValueChange = { raw ->
-            val digits = raw.filter { it.isDigit() }.take(1)
-            input = digits
-            val parsed = digits.toIntOrNull() ?: return@OutlinedTextField
-            onValueChange(parsed.coerceIn(1, 7))
-        },
-        label = { Text(t("Times per week")) },
+    Row(
         modifier = Modifier.fillMaxWidth(),
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.Number,
-            imeAction = ImeAction.Done
-        ),
-        keyboardActions = KeyboardActions(
-            onDone = {
-                val normalized = input.toIntOrNull()?.coerceIn(1, 7) ?: value.coerceIn(1, 7)
-                input = normalized.toString()
-                onValueChange(normalized)
-            }
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = t("Times per week"),
+            style = MaterialTheme.typography.bodyMedium,
+            color = colorScheme.onSurface
         )
-    )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(spacing.x1),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Button(
+                onClick = { onValueChange((value - 1).coerceAtLeast(min)) },
+                enabled = value > min,
+                shape = RoundedCornerShape(AppTheme.radius.md),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = colorScheme.surfaceVariant,
+                    contentColor = colorScheme.onSurface,
+                    disabledContainerColor = colorScheme.surfaceVariant,
+                    disabledContentColor = colorScheme.onSurfaceVariant
+                ),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+            ) {
+                Text("-")
+            }
+            Text(
+                text = value.coerceIn(min, max).toString(),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = colorScheme.onSurface
+            )
+            Button(
+                onClick = { onValueChange((value + 1).coerceAtMost(max)) },
+                enabled = value < max,
+                shape = RoundedCornerShape(AppTheme.radius.md),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = colorScheme.surfaceVariant,
+                    contentColor = colorScheme.onSurface,
+                    disabledContainerColor = colorScheme.surfaceVariant,
+                    disabledContentColor = colorScheme.onSurfaceVariant
+                ),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+            ) {
+                Text("+")
+            }
+        }
+    }
 }
 
 @Composable

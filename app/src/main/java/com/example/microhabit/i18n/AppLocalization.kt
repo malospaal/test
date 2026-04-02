@@ -1364,6 +1364,18 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "label_reminder" to (v("Erinnerung", "Rappel", "Recordatorio", "Promemoria", "Напоминание") + mapOf(AppLanguage.EN to "Reminder", AppLanguage.CS to "Připomínka")),
     "label_skip" to (v("Überspringen", "Passer", "Saltar", "Salta", "Пропустить") + mapOf(AppLanguage.EN to "Skip", AppLanguage.CS to "Přeskočit")),
     "label_reminder_off" to (v("Aus", "Desactive", "Desactivado", "Disattivato", "Выключено") + mapOf(AppLanguage.EN to "Off", AppLanguage.CS to "Vypnuto")),
+    "editor_advanced_show" to (v("Mehr Optionen", "Plus d'options", "Más opciones", "Più opzioni", "Больше опций") + mapOf(AppLanguage.EN to "More options", AppLanguage.CS to "Více možností")),
+    "editor_advanced_hide" to (v("Weniger Optionen", "Moins d'options", "Menos opciones", "Meno opzioni", "Меньше опций") + mapOf(AppLanguage.EN to "Fewer options", AppLanguage.CS to "Méně možností")),
+    "editor_unit_hint_small" to (v("z.B. Gläser, Sätze, Wiederholungen", "ex. verres, séries, répétitions", "p. ej. vasos, series, repeticiones", "es. bicchieri, serie, ripetizioni", "например, стаканы, подходы, повторы") + mapOf(AppLanguage.EN to "e.g. glasses, sets, reps", AppLanguage.CS to "např. sklenice, série, opakování")),
+    "editor_unit_hint_medium" to (v("z.B. Seiten, Schritte", "ex. pages, pas", "p. ej. páginas, pasos", "es. pagine, passi", "например, страницы, шаги") + mapOf(AppLanguage.EN to "e.g. pages, steps", AppLanguage.CS to "např. stránky, kroky")),
+    "editor_unit_hint_large" to (v("z.B. Schritte, Wörter", "ex. pas, mots", "p. ej. pasos, palabras", "es. passi, parole", "например, шаги, слова") + mapOf(AppLanguage.EN to "e.g. steps, words", AppLanguage.CS to "např. kroky, slova")),
+    "editor_freq_daily_title" to (v("Täglich", "Quotidien", "Diario", "Quotidiano", "Каждый день") + mapOf(AppLanguage.EN to "Daily", AppLanguage.CS to "Denně")),
+    "editor_freq_daily_subtitle" to (v("Jeden Tag", "Chaque jour", "Cada día", "Ogni giorno", "Каждый день") + mapOf(AppLanguage.EN to "Every day", AppLanguage.CS to "Každý den")),
+    "editor_freq_set_days_title" to (v("Feste Tage", "Jours fixes", "Días fijos", "Giorni fissi", "Выбранные дни") + mapOf(AppLanguage.EN to "Set days", AppLanguage.CS to "Vybrané dny")),
+    "editor_freq_set_days_subtitle" to (v("Wochentage wählen", "Choisir des jours", "Elegir días", "Scegli i giorni", "Выбрать дни недели") + mapOf(AppLanguage.EN to "Pick weekdays", AppLanguage.CS to "Vyber dny v týdnu")),
+    "editor_freq_n_times_title" to (v("N× / Woche", "N× / semaine", "N× / semana", "N× / settimana", "N× / неделя") + mapOf(AppLanguage.EN to "N× / week", AppLanguage.CS to "N× / týden")),
+    "editor_freq_n_times_subtitle" to (v("Flexible Tage", "Jours flexibles", "Días flexibles", "Giorni flessibili", "Гибкие дни") + mapOf(AppLanguage.EN to "Flexible days", AppLanguage.CS to "Flexibilní dny")),
+    "editor_remind_me_at" to (v("Erinnere mich um", "Rappelle-moi à", "Recuérdame a las", "Ricordamelo alle", "Напомнить в") + mapOf(AppLanguage.EN to "Remind me at", AppLanguage.CS to "Připomeň mi v")),
     "show_advanced" to v("Enddatum und Erinnerungen ▾", "Date de fin et rappels ▾", "Fecha final y recordatorios ▾", "Data di fine e promemoria ▾", "Дата окончания и напоминания ▾"),
     "hide_advanced" to v("Ausblenden ▴", "Masquer ▴", "Ocultar ▴", "Nascondi ▴", "Скрыть ▴"),
     "tracking_type_yesno" to (v("Erledigen", "Faire", "Hacer", "Fallo", "Сделать") + mapOf(AppLanguage.EN to "Do it", AppLanguage.CS to "Splnit")),
@@ -1789,3 +1801,4 @@ fun tf(source: String, vararg args: Any): String {
 @Composable
 @ReadOnlyComposable
 fun appLocale(): Locale = localeForLanguage(LocalAppLanguage.current)
+

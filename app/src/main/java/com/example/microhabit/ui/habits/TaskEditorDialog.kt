@@ -24,9 +24,12 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.EditCalendar
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -41,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -434,7 +438,8 @@ internal fun TaskEditorDialog(
                                     if (isTitleInvalid) colorScheme.error else colorScheme.outlineVariant,
                                     RoundedCornerShape(radius.md)
                                 )
-                                .padding(horizontal = spacing.x1, vertical = spacing.x0_5),
+                                .heightIn(min = 52.dp)
+                                .padding(horizontal = spacing.x1, vertical = spacing.x1),
                             horizontalArrangement = Arrangement.spacedBy(spacing.x1),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -443,7 +448,7 @@ internal fun TaskEditorDialog(
                                 shape = RoundedCornerShape(8.dp),
                                 color = colorScheme.surfaceVariant,
                                 border = BorderStroke(stroke.thin, colorScheme.outlineVariant),
-                                modifier = Modifier.size(36.dp)
+                                modifier = Modifier.size(38.dp)
                             ) {
                                 Box(
                                     modifier = Modifier.fillMaxSize(),
@@ -500,13 +505,13 @@ internal fun TaskEditorDialog(
                         trackingCards.forEach { (type, title, description) ->
                             val selected = state.editorTrackingType == type
                             val icon = when (type) {
-                                TrackingType.YES_NO -> "✅"
-                                TrackingType.COUNT -> "🔢"
-                                TrackingType.DURATION -> "⏱️"
+                                TrackingType.YES_NO -> Icons.Default.CheckCircle
+                                TrackingType.COUNT -> Icons.Default.Tag
+                                TrackingType.DURATION -> Icons.Default.AccessTime
                             }
 
                             TrackingTypeCard(
-                                iconText = icon,
+                                icon = icon,
                                 title = title,
                                 subtitle = description,
                                 selected = selected,
@@ -971,7 +976,7 @@ internal fun TaskEditorDialog(
 
 @Composable
 private fun TrackingTypeCard(
-    iconText: String,
+    icon: ImageVector,
     title: String,
     subtitle: String,
     selected: Boolean,
@@ -1024,11 +1029,11 @@ private fun TrackingTypeCard(
                     .background(iconBgColor),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = iconText,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = iconTint
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = iconTint,
+                    modifier = Modifier.size(18.dp)
                 )
             }
 
@@ -1235,6 +1240,10 @@ private fun DateChip(
         }
     }
 }
+
+
+
+
 
 
 

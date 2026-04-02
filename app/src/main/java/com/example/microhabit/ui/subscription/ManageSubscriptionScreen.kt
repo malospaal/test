@@ -384,8 +384,8 @@ internal fun ManagePlanSwitchRow(
     opacity: Float = 1f
 ) {
     val isDark = AppTheme.colors.backgroundCanvas.red < 0.2f
-    val cardBackground = if (isDark) Color(0xFF0A1F13) else Color(0xFFFFFFFF)
-
+    val colors = AppTheme.colors
+    val cardBackground = if (isDark) colors.backgroundSurface else Color(0xFFFFFFFF)
     val selectedBorder = if (isDark) Color(0xFF2DCF96) else Color(0xFF1D9E75)
     val unselectedBorder = if (isDark) null else BorderStroke(1.dp, Color(0xFFC8D9CA))
     val checkFill = if (isDark) Color(0xFF2DCF96) else Color(0xFF1D9E75)
@@ -705,6 +705,7 @@ internal fun managePlanHintText(currentPlan: PremiumPlan, targetPlan: PremiumPla
         else -> t("plan_switcher_select_hint")
     }
 }
+
 
 
 

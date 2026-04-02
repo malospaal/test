@@ -3,32 +3,61 @@ package com.example.microhabit.ui.onboarding
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.microhabit.data.AppLanguage
-import com.example.microhabit.i18n.LocalAppLanguage
-import com.example.microhabit.i18n.formatTranslate
+import com.example.microhabit.data.TrackingType
 import com.example.microhabit.i18n.t
 import com.example.microhabit.ui.create.CreateHabitTemplate
 import com.example.microhabit.ui.create.CreateHabitTemplateCatalog
 import com.example.microhabit.ui.create.TemplateCategory
 import com.example.microhabit.ui.theme.AppTheme
+
 @Composable
 internal fun OnboardingCategoryCard(
     modifier: Modifier = Modifier,
@@ -36,7 +65,6 @@ internal fun OnboardingCategoryCard(
     selected: Boolean,
     onClick: () -> Unit
 ) {
-    val colors = AppTheme.colors
     val scale by animateFloatAsState(
         targetValue = if (selected) 1f else 0.97f,
         animationSpec = tween(durationMillis = 150),
@@ -50,14 +78,18 @@ internal fun OnboardingCategoryCard(
             }
             .clip(RoundedCornerShape(AppTheme.radius.md))
             .clickable(onClick = onClick),
-        color = if (selected) colors.primaryMuted else colors.backgroundSurfaceMuted
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+        border = BorderStroke(
+            width = if (selected) 1.5.dp else 1.dp,
+            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+        )
     ) {
         Text(
             text = title,
             modifier = Modifier.padding(horizontal = AppTheme.spacing.x1_5, vertical = AppTheme.spacing.x1_5),
             style = MaterialTheme.typography.titleSmall,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-            color = colors.textPrimary
+            color = MaterialTheme.colorScheme.onSurface
         )
     }
 }
@@ -70,7 +102,6 @@ internal fun OnboardingTemplateCard(
     onClick: () -> Unit
 ) {
     val spacing = AppTheme.spacing
-    val colors = AppTheme.colors
     val scale by animateFloatAsState(
         targetValue = if (selected) 1f else 0.985f,
         animationSpec = tween(durationMillis = 140),
@@ -85,7 +116,11 @@ internal fun OnboardingTemplateCard(
             }
             .clip(RoundedCornerShape(AppTheme.radius.md))
             .clickable(onClick = onClick),
-        color = if (selected) colors.primaryMuted else colors.backgroundSurfaceMuted
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+        border = BorderStroke(
+            width = if (selected) 1.5.dp else 1.dp,
+            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+        )
     ) {
         Row(
             modifier = Modifier
@@ -99,19 +134,20 @@ internal fun OnboardingTemplateCard(
                 text = title,
                 modifier = Modifier.weight(1f),
                 style = MaterialTheme.typography.bodyLarge,
-                color = colors.textPrimary
+                color = MaterialTheme.colorScheme.onSurface
             )
             if (selected) {
                 Icon(
                     imageVector = Icons.Rounded.Check,
                     contentDescription = t("Selected"),
-                    tint = colors.primary
+                    tint = MaterialTheme.colorScheme.primary
                 )
             }
         }
     }
 }
 
+@Suppress("UNUSED_PARAMETER")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun HabitCategoryScreen(
@@ -121,20 +157,23 @@ internal fun HabitCategoryScreen(
     onDismiss: () -> Unit
 ) {
     val spacing = AppTheme.spacing
-    val colors = AppTheme.colors
-    val language = LocalAppLanguage.current
     val categories = remember {
         listOf(
             Triple(TemplateCategory.HEALTH, "💊", "cat_health"),
+            Triple(TemplateCategory.NUTRITION, "🥦", "category_nutrition"),
             Triple(TemplateCategory.SPORT, "🏃", "cat_sport"),
             Triple(TemplateCategory.MENTAL, "🧘", "cat_mental"),
-            Triple(TemplateCategory.PRODUCTIVITY, "📚", "cat_productivity")
+            Triple(TemplateCategory.RELATIONSHIPS, "🤝", "category_relationships"),
+            Triple(TemplateCategory.PRODUCTIVITY, "📚", "cat_productivity"),
+            Triple(TemplateCategory.FINANCE, "💰", "category_finance"),
+            Triple(TemplateCategory.CREATIVITY, "🎨", "category_creativity")
         )
     }
+    var selectedCategory by rememberSaveable { mutableStateOf<TemplateCategory?>(null) }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = colors.backgroundCanvas
+        color = MaterialTheme.colorScheme.background
     ) {
         Scaffold(
             topBar = {
@@ -151,34 +190,48 @@ internal fun HabitCategoryScreen(
                             Icon(Icons.Rounded.Close, contentDescription = t("Close"))
                         }
                     },
-                    actions = {
-                        TextButton(onClick = onSkip) {
-                            Text(t("label_skip"))
-                        }
-                    },
                     colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                        containerColor = colors.backgroundSurface
+                        containerColor = MaterialTheme.colorScheme.surface
                     )
                 )
+            },
+            bottomBar = {
+                OutlinedButton(
+                    onClick = onCreateCustom,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary),
+                    shape = RoundedCornerShape(13.dp)
+                ) {
+                    Text(
+                        text = t("custom_habit_btn"),
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp
+                    )
+                }
             }
         ) { innerPadding ->
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
-                    .padding(horizontal = spacing.x2, vertical = spacing.x1_5),
+                    .padding(horizontal = spacing.x2, vertical = spacing.x1_5)
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
             ) {
                 Text(
                     text = t("label_what_to_improve"),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Medium,
-                    color = colors.textPrimary
+                    color = MaterialTheme.colorScheme.onBackground
                 )
                 Text(
                     text = t("label_choose_category"),
                     style = MaterialTheme.typography.bodySmall,
-                    color = colors.textSecondary
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 categories.chunked(2).forEach { row ->
                     Row(
@@ -186,13 +239,15 @@ internal fun HabitCategoryScreen(
                         horizontalArrangement = Arrangement.spacedBy(spacing.x1)
                     ) {
                         row.forEach { (category, emoji, nameKey) ->
-                            val templateCount = CreateHabitTemplateCatalog.templatesFor(category).size
                             CategoryTile(
                                 emoji = emoji,
                                 title = t(nameKey),
-                                countLabel = templateCountLabel(templateCount, language),
+                                selected = selectedCategory == category,
                                 modifier = Modifier.weight(1f),
-                                onClick = { onCategorySelected(category) }
+                                onClick = {
+                                    selectedCategory = category
+                                    onCategorySelected(category)
+                                }
                             )
                         }
                         repeat((2 - row.size).coerceAtLeast(0)) {
@@ -200,88 +255,45 @@ internal fun HabitCategoryScreen(
                         }
                     }
                 }
-                Spacer(modifier = Modifier.weight(1f))
-                TextButton(
-                    onClick = onCreateCustom,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = t("btn_create_custom"),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium,
-                        color = colors.primary
-                    )
-                }
             }
         }
     }
-
 }
 
 @Composable
 internal fun CategoryTile(
     emoji: String,
     title: String,
-    countLabel: String,
+    selected: Boolean,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    val colors = AppTheme.colors
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
-        color = colors.backgroundSurface,
-        border = BorderStroke(1.dp, colors.borderSubtle),
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+        border = BorderStroke(
+            width = if (selected) 1.5.dp else 1.dp,
+            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+        ),
         modifier = modifier.aspectRatio(1.1f)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(16.dp),
-            verticalArrangement = Arrangement.SpaceBetween
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            Text(text = emoji, fontSize = 28.sp)
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = countLabel,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
-
-private fun templateCountLabel(count: Int, language: AppLanguage): String {
-    if (count <= 0) return formatTranslate(language, "template_count_many", 0)
-    return when (language) {
-        AppLanguage.RU, AppLanguage.UK -> {
-            val mod10 = count % 10
-            val mod100 = count % 100
-            val key = when {
-                mod10 == 1 && mod100 != 11 -> "template_count_one"
-                mod10 in 2..4 && mod100 !in 12..14 -> "template_count_few"
-                else -> "template_count_many"
-            }
-            formatTranslate(language, key, count)
-        }
-        AppLanguage.CS -> {
-            val key = when (count) {
-                1 -> "template_count_one"
-                2, 3, 4 -> "template_count_few"
-                else -> "template_count_many"
-            }
-            formatTranslate(language, key, count)
-        }
-        else -> {
-            val key = if (count == 1) "template_count_one" else "template_count_many"
-            formatTranslate(language, key, count)
+            Text(text = emoji, fontSize = 42.sp)
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }
@@ -295,12 +307,12 @@ internal fun HabitTemplateScreen(
     onBack: () -> Unit
 ) {
     val spacing = AppTheme.spacing
-    val colors = AppTheme.colors
     val templates = remember(category) { CreateHabitTemplateCatalog.templatesFor(category) }
+    var selectedTemplateId by rememberSaveable(category.name) { mutableStateOf<String?>(null) }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = colors.backgroundCanvas
+        color = MaterialTheme.colorScheme.background
     ) {
         Scaffold(
             topBar = {
@@ -321,9 +333,27 @@ internal fun HabitTemplateScreen(
                         }
                     },
                     colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                        containerColor = colors.backgroundSurface
+                        containerColor = MaterialTheme.colorScheme.surface
                     )
                 )
+            },
+            bottomBar = {
+                OutlinedButton(
+                    onClick = onCreateCustomHabit,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary),
+                    shape = RoundedCornerShape(13.dp)
+                ) {
+                    Text(
+                        text = t("custom_habit_btn"),
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp
+                    )
+                }
             }
         ) { innerPadding ->
             LazyColumn(
@@ -334,11 +364,19 @@ internal fun HabitTemplateScreen(
                 verticalArrangement = Arrangement.spacedBy(spacing.x1)
             ) {
                 items(templates, key = { it.id }) { template ->
+                    val selected = selectedTemplateId == template.id
+                    val trackingTypeLabel = trackingTypeBadgeLabel(template.trackingType)
                     Surface(
-                        onClick = { onTemplateSelected(template) },
+                        onClick = {
+                            selectedTemplateId = template.id
+                            onTemplateSelected(template)
+                        },
                         shape = RoundedCornerShape(AppTheme.radius.md),
-                        color = colors.backgroundSurface,
-                        border = BorderStroke(AppTheme.stroke.thin, colors.borderSubtle.copy(alpha = 0.6f))
+                        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+                        border = BorderStroke(
+                            width = if (selected) 1.5.dp else 1.dp,
+                            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+                        )
                     ) {
                         Row(
                             modifier = Modifier
@@ -364,39 +402,39 @@ internal fun HabitTemplateScreen(
                                     text = t(template.nameKey),
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Medium,
-                                    color = colors.textPrimary
-                                )
-                                Text(
-                                    text = templateMetaLabel(template),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = colors.textSecondary
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                             }
-                            Text(
-                                text = "›",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = colors.textSecondary.copy(alpha = 0.4f)
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .background(
+                                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                        shape = RoundedCornerShape(5.dp)
+                                    )
+                                    .padding(horizontal = 7.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = trackingTypeLabel,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
-                    }
-                }
-                item {
-                    OutlinedButton(
-                        onClick = onCreateCustomHabit,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(AppTheme.radius.md),
-                        border = BorderStroke(AppTheme.stroke.thin, colors.borderSubtle.copy(alpha = 0.6f)),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = colors.primary
-                        )
-                    ) {
-                        Text(t("btn_create_custom"))
                     }
                 }
             }
         }
     }
 }
+
+@Composable
+private fun trackingTypeBadgeLabel(type: TrackingType): String = when (type) {
+    TrackingType.YES_NO -> t("tracking_type_do")
+    TrackingType.DURATION -> t("tracking_type_time")
+    TrackingType.COUNT -> t("tracking_type_count")
+}
+
 
 
 

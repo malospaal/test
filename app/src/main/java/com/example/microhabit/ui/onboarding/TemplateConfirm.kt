@@ -11,6 +11,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -42,6 +43,7 @@ import com.example.microhabit.ui.theme.AppTheme
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun HabitTemplateConfirmScreen(
@@ -54,7 +56,7 @@ internal fun HabitTemplateConfirmScreen(
     onRequestReminderTime: (Int, Int, (Int, Int) -> Unit) -> Unit
 ) {
     val spacing = AppTheme.spacing
-    val colors = AppTheme.colors
+    val colorScheme = MaterialTheme.colorScheme
     val locale = appLocale()
     val language = LocalAppLanguage.current
     val template = initial.template
@@ -106,12 +108,18 @@ internal fun HabitTemplateConfirmScreen(
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = colors.backgroundCanvas
+        color = colorScheme.background
     ) {
         Scaffold(
             topBar = {
                 CenterAlignedTopAppBar(
-                    title = { Text("") },
+                    title = {
+                        Text(
+                            text = t("screen_create_habit"),
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
                             Icon(
@@ -121,215 +129,238 @@ internal fun HabitTemplateConfirmScreen(
                         }
                     },
                     colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                        containerColor = colors.backgroundSurface
+                        containerColor = colorScheme.surface
                     )
                 )
+            },
+            bottomBar = {
+                Surface(
+                    color = colorScheme.surface,
+                    tonalElevation = 2.dp
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onConfigureMore(currentDraft) }
+                                .padding(vertical = 6.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = t("customize_more"),
+                                fontSize = 14.sp,
+                                color = colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        Spacer(Modifier.height(10.dp))
+
+                        Button(
+                            onClick = { onCreateHabit(currentDraft) },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = colorScheme.primary,
+                                contentColor = colorScheme.onPrimary
+                            ),
+                            contentPadding = PaddingValues(vertical = 15.dp)
+                        ) {
+                            Text(
+                                text = t("btn_create_habit"),
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
             }
         ) { innerPadding ->
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
-                    .padding(horizontal = spacing.x2, vertical = spacing.x1_5)
+                    .padding(horizontal = spacing.x2, vertical = spacing.x2)
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
+                verticalArrangement = Arrangement.spacedBy(spacing.x2)
             ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp, bottom = 4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(96.dp)
+                            .clip(CircleShape)
+                            .background(colorScheme.primaryContainer.copy(alpha = 0.45f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(text = template.emoji, fontSize = 52.sp)
+                    }
+                    Spacer(Modifier.height(14.dp))
+                    Text(
+                        text = habitName,
+                        fontSize = 29.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colorScheme.onBackground
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = buildTemplateSubtitle(template),
+                        fontSize = 14.sp,
+                        color = colorScheme.onSurfaceVariant
+                    )
+                }
+
                 Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = colors.backgroundSurface,
-                    border = BorderStroke(AppTheme.stroke.thin, colors.borderSubtle.copy(alpha = 0.7f))
+                    shape = RoundedCornerShape(18.dp),
+                    color = colorScheme.surface,
+                    border = BorderStroke(AppTheme.stroke.thin, colorScheme.outlineVariant)
                 ) {
                     Column(
                         modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
+                        val isFrequencyExpanded = expandedParam == ExpandedConfirmParam.FREQUENCY
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 2.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(46.dp)
-                                    .clip(RoundedCornerShape(13.dp))
-                                    .background(colors.primary.copy(alpha = 0.12f)),
-                                contentAlignment = Alignment.Center
+                            Text(
+                                text = t("label_frequency"),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = colorScheme.onSurfaceVariant
+                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Text(text = template.emoji, fontSize = 22.sp)
-                            }
-                            Column(
-                                modifier = Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(2.dp)
-                            ) {
-                                Text(
-                                    text = habitName,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = colors.textPrimary
-                                )
-                                Text(
-                                    text = "${t(CreateHabitTemplateCatalog.categoryLabelKey(template.category))} · ${templateTrackingTypeLabel(template.trackingType)}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = colors.textSecondary
-                                )
-                            }
-                        }
-
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = colors.backgroundSurfaceMuted.copy(alpha = 0.6f),
-                            border = BorderStroke(AppTheme.stroke.thin, colors.borderSubtle.copy(alpha = 0.6f))
-                        ) {
-                            Column {
-                                val isFrequencyExpanded = expandedParam == ExpandedConfirmParam.FREQUENCY
-                                Row(
+                                if (!isFrequencyExpanded) {
+                                    Text(
+                                        text = templateFrequencyLabel(frequency),
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = colorScheme.onSurface
+                                    )
+                                }
+                                Box(
                                     modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(
+                                            color = colorScheme.primaryContainer,
+                                            shape = RoundedCornerShape(6.dp)
+                                        )
+                                        .clickable {
+                                            expandedParam = if (isFrequencyExpanded) null else ExpandedConfirmParam.FREQUENCY
+                                        }
+                                        .padding(horizontal = 9.dp, vertical = 3.dp)
                                 ) {
                                     Text(
-                                        text = t("label_frequency"),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = colors.textSecondary
+                                        text = if (isFrequencyExpanded) t("action_done") else t("edit_label"),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = colorScheme.primary
                                     )
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                    ) {
-                                        if (!isFrequencyExpanded) {
-                                            Text(
-                                                text = templateFrequencyLabel(frequency),
-                                                style = MaterialTheme.typography.labelMedium,
-                                                fontWeight = FontWeight.Medium,
-                                                color = colors.primary
-                                            )
-                                        }
-                                        Text(
-                                            text = if (isFrequencyExpanded) t("action_done") else t("action_edit"),
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = colors.primary.copy(alpha = if (isFrequencyExpanded) 1f else 0.75f),
-                                            fontWeight = if (isFrequencyExpanded) FontWeight.Medium else FontWeight.Normal,
-                                            modifier = Modifier.clickable {
-                                                expandedParam = if (isFrequencyExpanded) null else ExpandedConfirmParam.FREQUENCY
-                                            }
-                                        )
-                                    }
                                 }
-
-                                AnimatedVisibility(
-                                    visible = isFrequencyExpanded,
-                                    enter = expandVertically(animationSpec = tween(200)) + fadeIn(),
-                                    exit = shrinkVertically(animationSpec = tween(200)) + fadeOut()
-                                ) {
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(start = 14.dp, end = 14.dp, bottom = 10.dp),
-                                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        TemplateFrequencyOption(
-                                            label = t("freq_every_day"),
-                                            selected = frequency == TaskFrequency.DAILY,
-                                            onClick = { frequency = TaskFrequency.DAILY }
-                                        )
-                                        TemplateFrequencyOption(
-                                            label = t("freq_selected_days"),
-                                            selected = frequency == TaskFrequency.SELECTED_DAYS,
-                                            description = t("freq_selected_days_desc"),
-                                            onClick = {
-                                                frequency = TaskFrequency.SELECTED_DAYS
-                                                if (customDays.isEmpty()) {
-                                                    customDays = template.defaultDays.ifEmpty { setOf(1, 2, 3, 4, 5) }
-                                                }
-                                            }
-                                        )
-                                        AnimatedVisibility(visible = frequency == TaskFrequency.SELECTED_DAYS) {
-                                            WeekdaySelector(
-                                                selectedDays = customDays,
-                                                onToggle = { day ->
-                                                    val next = customDays.toMutableSet()
-                                                    if (!next.add(day)) next.remove(day)
-                                                    customDays = next
-                                                }
-                                            )
-                                        }
-                                        TemplateFrequencyOption(
-                                            label = t("freq_times_per_week"),
-                                            selected = frequency == TaskFrequency.TIMES_PER_WEEK,
-                                            description = t("freq_times_per_week_desc"),
-                                            onClick = { frequency = TaskFrequency.TIMES_PER_WEEK }
-                                        )
-                                        AnimatedVisibility(visible = frequency == TaskFrequency.TIMES_PER_WEEK) {
-                                            TimesPerWeekStepper(
-                                                value = timesPerWeek,
-                                                onValueChange = { timesPerWeek = it.coerceIn(1, 7) }
-                                            )
-                                        }
-                                    }
-                                }
-
-                                HorizontalDivider(
-                                    thickness = 0.5.dp,
-                                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
-                                )
-                                TemplateParamRow(
-                                    label = t("label_start_date"),
-                                    value = startDate.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)),
-                                    action = t("action_edit"),
-                                    onAction = {
-                                        onPickStartDate(startDate) { picked ->
-                                            startDate = picked
-                                        }
-                                    }
-                                )
-                                HorizontalDivider(
-                                    thickness = 0.5.dp,
-                                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
-                                )
-                                TemplateParamRow(
-                                    label = t("label_reminder"),
-                                    value = if (reminderEnabled) {
-                                        formatTimeForDevice(LocalContext.current, reminderHour, reminderMinute)
-                                    } else {
-                                        t("label_reminder_off")
-                                    },
-                                    action = if (reminderEnabled) t("action_edit") else t("action_enable"),
-                                    onAction = {
-                                        onRequestReminderTime(reminderHour, reminderMinute) { hour, minute ->
-                                            reminderEnabled = true
-                                            reminderHour = hour
-                                            reminderMinute = minute
-                                        }
-                                    }
-                                )
                             }
                         }
-                    }
-                }
 
-                OutlinedButton(
-                    onClick = { onConfigureMore(currentDraft) },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(AppTheme.radius.md),
-                    border = BorderStroke(AppTheme.stroke.thin, colors.borderSubtle.copy(alpha = 0.6f)),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.primary)
-                ) {
-                    Text(t("btn_configure_more"))
-                }
-                Button(
-                    onClick = { onCreateHabit(currentDraft) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
-                    shape = RoundedCornerShape(AppTheme.radius.md)
-                ) {
-                    Text(
-                        text = t("btn_create_habit"),
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                        AnimatedVisibility(
+                            visible = isFrequencyExpanded,
+                            enter = expandVertically(animationSpec = tween(200)) + fadeIn(),
+                            exit = shrinkVertically(animationSpec = tween(200)) + fadeOut()
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 2.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                TemplateFrequencyOption(
+                                    label = t("freq_every_day"),
+                                    selected = frequency == TaskFrequency.DAILY,
+                                    onClick = { frequency = TaskFrequency.DAILY }
+                                )
+                                TemplateFrequencyOption(
+                                    label = t("freq_selected_days"),
+                                    selected = frequency == TaskFrequency.SELECTED_DAYS,
+                                    description = t("freq_selected_days_desc"),
+                                    onClick = {
+                                        frequency = TaskFrequency.SELECTED_DAYS
+                                        if (customDays.isEmpty()) {
+                                            customDays = template.defaultDays.ifEmpty { setOf(1, 2, 3, 4, 5) }
+                                        }
+                                    }
+                                )
+                                AnimatedVisibility(visible = frequency == TaskFrequency.SELECTED_DAYS) {
+                                    WeekdaySelector(
+                                        selectedDays = customDays,
+                                        onToggle = { day ->
+                                            val next = customDays.toMutableSet()
+                                            if (!next.add(day)) next.remove(day)
+                                            customDays = next
+                                        }
+                                    )
+                                }
+                                TemplateFrequencyOption(
+                                    label = t("freq_times_per_week"),
+                                    selected = frequency == TaskFrequency.TIMES_PER_WEEK,
+                                    description = t("freq_times_per_week_desc"),
+                                    onClick = { frequency = TaskFrequency.TIMES_PER_WEEK }
+                                )
+                                AnimatedVisibility(visible = frequency == TaskFrequency.TIMES_PER_WEEK) {
+                                    TimesPerWeekStepper(
+                                        value = timesPerWeek,
+                                        onValueChange = { timesPerWeek = it.coerceIn(1, 7) }
+                                    )
+                                }
+                            }
+                        }
+
+                        HorizontalDivider(
+                            thickness = 0.5.dp,
+                            color = colorScheme.outlineVariant
+                        )
+                        TemplateParamRow(
+                            label = t("label_start_date"),
+                            value = startDate.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)),
+                            action = t("edit_label"),
+                            onAction = {
+                                onPickStartDate(startDate) { picked ->
+                                    startDate = picked
+                                }
+                            }
+                        )
+                        HorizontalDivider(
+                            thickness = 0.5.dp,
+                            color = colorScheme.outlineVariant
+                        )
+                        TemplateParamRow(
+                            label = t("label_reminder"),
+                            value = if (reminderEnabled) {
+                                formatTimeForDevice(LocalContext.current, reminderHour, reminderMinute)
+                            } else {
+                                t("label_reminder_off")
+                            },
+                            action = if (reminderEnabled) t("edit_label") else t("enable_label"),
+                            onAction = {
+                                onRequestReminderTime(reminderHour, reminderMinute) { hour, minute ->
+                                    reminderEnabled = true
+                                    reminderHour = hour
+                                    reminderMinute = minute
+                                }
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -362,17 +393,17 @@ private fun TemplateFrequencyOption(
     onClick: () -> Unit
 ) {
     val spacing = AppTheme.spacing
-    val colors = AppTheme.colors
+    val colorScheme = MaterialTheme.colorScheme
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(AppTheme.radius.md))
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(AppTheme.radius.md),
-        color = if (selected) colors.primary.copy(alpha = 0.12f) else colors.backgroundSurfaceMuted,
+        color = if (selected) colorScheme.primaryContainer else colorScheme.surfaceVariant,
         border = BorderStroke(
-            AppTheme.stroke.thin,
-            if (selected) colors.primary.copy(alpha = 0.5f) else colors.borderSubtle.copy(alpha = 0.6f)
+            if (selected) 1.5.dp else AppTheme.stroke.thin,
+            if (selected) colorScheme.primary else colorScheme.outlineVariant
         )
     ) {
         Column(
@@ -383,13 +414,13 @@ private fun TemplateFrequencyOption(
                 text = label,
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                color = colors.textPrimary
+                color = colorScheme.onSurface
             )
             if (!description.isNullOrBlank()) {
                 Text(
                     text = description,
                     style = MaterialTheme.typography.bodySmall,
-                    color = colors.textSecondary
+                    color = colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -403,45 +434,57 @@ private fun TemplateParamRow(
     action: String,
     onAction: () -> Unit
 ) {
-    val spacing = AppTheme.spacing
-    val colors = AppTheme.colors
+    val colorScheme = MaterialTheme.colorScheme
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp),
+            .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = label,
             modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.bodyMedium,
-            color = colors.textSecondary
+            color = colorScheme.onSurfaceVariant
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium,
-            color = colors.textPrimary
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = colorScheme.onSurface
         )
-        Spacer(modifier = Modifier.width(spacing.x0_5))
-        TextButton(
-            onClick = onAction,
-            contentPadding = PaddingValues(horizontal = spacing.x0_5, vertical = 0.dp)
+        Spacer(modifier = Modifier.width(8.dp))
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .background(
+                    color = colorScheme.primaryContainer,
+                    shape = RoundedCornerShape(6.dp)
+                )
+                .clickable(onClick = onAction)
+                .padding(horizontal = 9.dp, vertical = 3.dp)
         ) {
             Text(
                 text = action,
-                style = MaterialTheme.typography.labelMedium,
-                color = colors.primary
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = colorScheme.primary
             )
         }
     }
 }
 
 @Composable
+private fun buildTemplateSubtitle(template: CreateHabitTemplate): String {
+    val category = t(CreateHabitTemplateCatalog.categoryLabelKey(template.category))
+    return "$category · ${templateMetaLabel(template)}"
+}
+
+@Composable
 private fun templateTrackingTypeLabel(type: TrackingType): String = when (type) {
-    TrackingType.YES_NO -> t("tracking_type_yesno")
+    TrackingType.YES_NO -> t("tracking_type_do")
     TrackingType.COUNT -> t("tracking_type_count")
-    TrackingType.DURATION -> t("tracking_type_duration")
+    TrackingType.DURATION -> t("tracking_type_time")
 }
 
 @Composable
@@ -486,6 +529,3 @@ private fun selectedDaysShortLabel(days: Set<Int>): String {
     }
     return normalized.joinToString(" ") { day -> labels[day - 1] }
 }
-
-
-

@@ -1,11 +1,16 @@
 package com.example.microhabit.ui.habits
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -31,15 +36,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
-import androidx.compose.animation.animateContentSize
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.microhabit.HabitUiState
@@ -61,6 +69,46 @@ import com.example.microhabit.ui.tracker.ValueNumpad
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
+import kotlinx.coroutines.delay
+
+private object HabitEditorMotion {
+    val Quick = tween<Float>(durationMillis = 150, easing = FastOutSlowInEasing)
+    val QuickDp = tween<Dp>(durationMillis = 150, easing = FastOutSlowInEasing)
+    val QuickInt = tween<Int>(durationMillis = 150, easing = FastOutSlowInEasing)
+    val Medium = tween<Float>(durationMillis = 220, easing = FastOutSlowInEasing)
+    val Standard = tween<Float>(durationMillis = 280, easing = FastOutSlowInEasing)
+    val StandardDp = tween<Dp>(durationMillis = 280, easing = FastOutSlowInEasing)
+    val StandardInt = tween<Int>(durationMillis = 280, easing = FastOutSlowInEasing)
+    val QuickColor = tween<Color>(durationMillis = 150, easing = FastOutSlowInEasing)
+    val SaveColor = tween<Color>(durationMillis = 200, easing = FastOutSlowInEasing)
+    val ErrorEnterFloat = tween<Float>(durationMillis = 150, easing = FastOutSlowInEasing)
+    val ErrorExitFloat = tween<Float>(durationMillis = 120, easing = FastOutSlowInEasing)
+    val ErrorEnterInt = tween<Int>(durationMillis = 150, easing = FastOutSlowInEasing)
+    val ErrorExitInt = tween<Int>(durationMillis = 120, easing = FastOutSlowInEasing)
+    val ErrorEnterSize = tween<IntSize>(durationMillis = 150, easing = FastOutSlowInEasing)
+    val ErrorExitSize = tween<IntSize>(durationMillis = 120, easing = FastOutSlowInEasing)
+
+    val enterMedium =
+        expandVertically(tween(220, easing = FastOutSlowInEasing)) +
+            fadeIn(tween(220, easing = FastOutSlowInEasing))
+    val exitMedium =
+        shrinkVertically(tween(220, easing = FastOutSlowInEasing)) +
+            fadeOut(tween(180, easing = FastOutSlowInEasing))
+
+    val enterStandard =
+        expandVertically(tween(280, easing = FastOutSlowInEasing)) +
+            fadeIn(tween(280, easing = FastOutSlowInEasing))
+    val exitStandard =
+        shrinkVertically(tween(280, easing = FastOutSlowInEasing)) +
+            fadeOut(tween(200, easing = FastOutSlowInEasing))
+
+    val enterDelayed =
+        expandVertically(tween(280, easing = FastOutSlowInEasing)) +
+            fadeIn(tween(250, delayMillis = 80, easing = FastOutSlowInEasing))
+    val exitFast =
+        shrinkVertically(tween(180, easing = FastOutSlowInEasing)) +
+            fadeOut(tween(130, easing = FastOutSlowInEasing))
+}
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
@@ -90,6 +138,33 @@ internal fun TaskEditorDialog(
     val canSave = vm.canSaveEditor()
     val isTitleInvalid = wasSaveAttempted && state.editorTitle.isBlank()
     val shortWeekdays = remember(language) { weekdayLabels(language).map { it.take(2) } }
+    val editorScrollState = rememberScrollState()
+
+    val saveBtnBg by animateColorAsState(
+        targetValue = if (canSave) colorScheme.primary else colorScheme.surfaceVariant,
+        animationSpec = HabitEditorMotion.SaveColor,
+        label = "saveBtnBg"
+    )
+    val saveBtnText by animateColorAsState(
+        targetValue = if (canSave) colorScheme.onPrimary else colorScheme.onSurfaceVariant,
+        animationSpec = HabitEditorMotion.SaveColor,
+        label = "saveBtnText"
+    )
+
+    var frequencyDescriptionTarget by remember { mutableStateOf(state.editorFrequency) }
+    var showFrequencyDescription by remember { mutableStateOf(true) }
+    var lastTargetTrackingType by remember {
+        mutableStateOf(
+            when (state.editorTrackingType) {
+                TrackingType.DURATION -> TrackingType.DURATION
+                else -> TrackingType.COUNT
+            }
+        )
+    }
+
+    var previousAdvancedVisible by remember { mutableStateOf(state.editorShowAdvanced) }
+    var previousReminderEnabled by remember { mutableStateOf(state.editorReminderEnabled) }
+    var previousEndDateEnabled by remember { mutableStateOf(state.editorEndDate != null) }
 
     val trackingCards = listOf(
         Triple(TrackingType.YES_NO, t("tracking_type_do_it"), t("tracking_type_do_it_sub")),
@@ -111,10 +186,75 @@ internal fun TaskEditorDialog(
         if (canSave) wasSaveAttempted = false
     }
 
+    LaunchedEffect(state.editorFrequency) {
+        if (frequencyDescriptionTarget == state.editorFrequency) return@LaunchedEffect
+        showFrequencyDescription = false
+        delay(130)
+        frequencyDescriptionTarget = state.editorFrequency
+        showFrequencyDescription = true
+    }
+
     LaunchedEffect(state.editorFrequency, state.editorTimesPerWeek) {
         if (state.editorFrequency == TaskFrequency.TIMES_PER_WEEK && state.editorTimesPerWeek > 6) {
             vm.setEditorTimesPerWeek(6)
         }
+    }
+    LaunchedEffect(state.editorTrackingType) {
+        if (state.editorTrackingType != TrackingType.YES_NO) {
+            lastTargetTrackingType = state.editorTrackingType
+        }
+    }
+
+    LaunchedEffect(state.editorShowAdvanced) {
+        if (state.editorShowAdvanced && !previousAdvancedVisible) {
+            delay(220)
+            val target = editorScrollState.maxValue
+            if (target > editorScrollState.value) {
+                editorScrollState.animateScrollTo(target, animationSpec = HabitEditorMotion.Standard)
+            }
+        } else if (!state.editorShowAdvanced && previousAdvancedVisible) {
+            delay(80)
+            val clamped = editorScrollState.value.coerceAtMost(editorScrollState.maxValue)
+            if (clamped != editorScrollState.value) {
+                editorScrollState.animateScrollTo(clamped, animationSpec = HabitEditorMotion.Medium)
+            }
+        }
+        previousAdvancedVisible = state.editorShowAdvanced
+    }
+
+    LaunchedEffect(state.editorReminderEnabled) {
+        if (state.editorReminderEnabled && !previousReminderEnabled) {
+            delay(120)
+            val target = editorScrollState.maxValue
+            if (target > editorScrollState.value) {
+                editorScrollState.animateScrollTo(target, animationSpec = HabitEditorMotion.Medium)
+            }
+        } else if (!state.editorReminderEnabled && previousReminderEnabled) {
+            delay(70)
+            val clamped = editorScrollState.value.coerceAtMost(editorScrollState.maxValue)
+            if (clamped != editorScrollState.value) {
+                editorScrollState.animateScrollTo(clamped, animationSpec = HabitEditorMotion.Medium)
+            }
+        }
+        previousReminderEnabled = state.editorReminderEnabled
+    }
+
+    LaunchedEffect(state.editorEndDate != null) {
+        val endDateEnabled = state.editorEndDate != null
+        if (endDateEnabled && !previousEndDateEnabled) {
+            delay(120)
+            val target = editorScrollState.maxValue
+            if (target > editorScrollState.value) {
+                editorScrollState.animateScrollTo(target, animationSpec = HabitEditorMotion.Medium)
+            }
+        } else if (!endDateEnabled && previousEndDateEnabled) {
+            delay(70)
+            val clamped = editorScrollState.value.coerceAtMost(editorScrollState.maxValue)
+            if (clamped != editorScrollState.value) {
+                editorScrollState.animateScrollTo(clamped, animationSpec = HabitEditorMotion.Medium)
+            }
+        }
+        previousEndDateEnabled = endDateEnabled
     }
 
     if (showEmojiPicker) {
@@ -237,7 +377,11 @@ internal fun TaskEditorDialog(
                             .padding(horizontal = spacing.x2, vertical = spacing.x1_5),
                         verticalArrangement = Arrangement.spacedBy(spacing.x0_5)
                     ) {
-                        if (wasSaveAttempted && state.editorTitle.isBlank()) {
+                        AnimatedVisibility(
+                            visible = wasSaveAttempted && state.editorTitle.isBlank(),
+                            enter = fadeIn(HabitEditorMotion.ErrorEnterFloat) + expandVertically(HabitEditorMotion.ErrorEnterSize),
+                            exit = fadeOut(HabitEditorMotion.ErrorExitFloat) + shrinkVertically(HabitEditorMotion.ErrorExitSize)
+                        ) {
                             Text(
                                 text = t("Fill required fields to continue."),
                                 style = MaterialTheme.typography.bodySmall,
@@ -256,8 +400,8 @@ internal fun TaskEditorDialog(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(radius.md),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (canSave) colorScheme.primary else colorScheme.surfaceVariant,
-                                contentColor = if (canSave) colorScheme.onPrimary else colorScheme.onSurfaceVariant
+                                containerColor = saveBtnBg,
+                                contentColor = saveBtnText
                             )
                         ) {
                             Text(if (state.editingTaskId == null) t("Save habit") else t("Save changes"))
@@ -271,10 +415,10 @@ internal fun TaskEditorDialog(
                     .fillMaxSize()
                     .padding(innerPadding)
                     .padding(horizontal = spacing.x2, vertical = spacing.x1_5)
-                    .verticalScroll(rememberScrollState()),
+                    .verticalScroll(editorScrollState),
                 verticalArrangement = Arrangement.spacedBy(spacing.x1_5)
             ) {
-                FormSection(title = t("Basic setup")) {
+                FormSection(title = t("Habit name")) {
                     Column(verticalArrangement = Arrangement.spacedBy(spacing.x0_5)) {
                         Row(
                             modifier = Modifier
@@ -326,7 +470,11 @@ internal fun TaskEditorDialog(
                             Spacer(modifier = Modifier.size(20.dp))
                         }
 
-                        AnimatedVisibility(visible = isTitleInvalid) {
+                        AnimatedVisibility(
+                            visible = isTitleInvalid,
+                            enter = fadeIn(HabitEditorMotion.ErrorEnterFloat) + expandVertically(HabitEditorMotion.ErrorEnterSize),
+                            exit = fadeOut(HabitEditorMotion.ErrorExitFloat) + shrinkVertically(HabitEditorMotion.ErrorExitSize)
+                        ) {
                             Text(
                                 text = t("Fill required fields to continue."),
                                 color = colorScheme.error,
@@ -362,13 +510,26 @@ internal fun TaskEditorDialog(
                     }
                 }
 
+                Column {
+                val showTargetSection =
+                    state.editorTrackingType == TrackingType.COUNT || state.editorTrackingType == TrackingType.DURATION
+                val targetTrackingType =
+                    if (showTargetSection) state.editorTrackingType else lastTargetTrackingType
                 AnimatedVisibility(
-                    visible = state.editorTrackingType == TrackingType.COUNT || state.editorTrackingType == TrackingType.DURATION,
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut()
+                    visible = showTargetSection,
+                    enter = HabitEditorMotion.enterStandard,
+                    exit = HabitEditorMotion.exitStandard
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(spacing.x1_5)) {
-                        if (state.editorTrackingType == TrackingType.COUNT) {
+                    AnimatedContent(
+                        targetState = targetTrackingType,
+                        transitionSpec = {
+                            fadeIn(animationSpec = HabitEditorMotion.Medium) togetherWith
+                                fadeOut(animationSpec = HabitEditorMotion.Quick)
+                        },
+                        contentAlignment = Alignment.TopStart,
+                        label = "trackingTypeTargetSwap"
+                    ) { activeTrackingType ->
+                        if (activeTrackingType == TrackingType.COUNT) {
                             FormSection(title = t("Count target")) {
                                 Surface(
                                     modifier = Modifier.fillMaxWidth(),
@@ -440,7 +601,7 @@ internal fun TaskEditorDialog(
                             }
                         }
 
-                        if (state.editorTrackingType == TrackingType.DURATION) {
+                        if (activeTrackingType == TrackingType.DURATION) {
                             FormSection(title = t("Duration target")) {
                                 OutlinedTextField(
                                     value = state.editorDailyTarget.toString(),
@@ -465,9 +626,15 @@ internal fun TaskEditorDialog(
                         }
                     }
                 }
+                    val targetSectionGap by animateDpAsState(
+                        targetValue = if (showTargetSection) spacing.x1_5 else 0.dp,
+                        animationSpec = HabitEditorMotion.StandardDp,
+                        label = "targetSectionGap"
+                    )
+                    Spacer(modifier = Modifier.height(targetSectionGap))
                 FormSection(title = t("label_frequency")) {
                     Column(
-                        modifier = Modifier.animateContentSize(animationSpec = tween(220)),
+                        modifier = Modifier,
                         verticalArrangement = Arrangement.spacedBy(0.dp)
                     ) {
                         Row(
@@ -504,34 +671,27 @@ internal fun TaskEditorDialog(
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
 
                         AnimatedVisibility(
-                            visible = state.editorFrequency == TaskFrequency.DAILY,
-                            enter = expandVertically() + fadeIn(),
-                            exit = shrinkVertically() + fadeOut()
+                            visible = showFrequencyDescription,
+                            enter = HabitEditorMotion.enterDelayed,
+                            exit = HabitEditorMotion.exitFast
                         ) {
-                            FrequencyDescriptionCard(text = t("freq_daily_desc"))
-                        }
-                        AnimatedVisibility(
-                            visible = state.editorFrequency == TaskFrequency.SELECTED_DAYS,
-                            enter = expandVertically() + fadeIn(),
-                            exit = shrinkVertically() + fadeOut()
-                        ) {
-                            FrequencyDescriptionCard(text = t("freq_selected_days_desc"))
-                        }
-                        AnimatedVisibility(
-                            visible = state.editorFrequency == TaskFrequency.TIMES_PER_WEEK,
-                            enter = expandVertically() + fadeIn(),
-                            exit = shrinkVertically() + fadeOut()
-                        ) {
-                            FrequencyDescriptionCard(text = t("freq_times_per_week_desc"))
+                            key(frequencyDescriptionTarget) {
+                                val descriptionText = when (frequencyDescriptionTarget) {
+                                    TaskFrequency.DAILY -> t("freq_daily_desc")
+                                    TaskFrequency.SELECTED_DAYS -> t("freq_selected_days_desc")
+                                    TaskFrequency.TIMES_PER_WEEK -> t("freq_times_per_week_desc")
+                                }
+                                FrequencyDescriptionCard(text = descriptionText)
+                            }
                         }
 
                         AnimatedVisibility(
                             visible = state.editorFrequency == TaskFrequency.SELECTED_DAYS,
-                            enter = expandVertically() + fadeIn(),
-                            exit = shrinkVertically() + fadeOut()
+                            enter = HabitEditorMotion.enterStandard,
+                            exit = HabitEditorMotion.exitStandard
                         ) {
                             Column(
                                 modifier = Modifier.padding(top = 8.dp),
@@ -581,8 +741,8 @@ internal fun TaskEditorDialog(
 
                         AnimatedVisibility(
                             visible = state.editorFrequency == TaskFrequency.TIMES_PER_WEEK,
-                            enter = expandVertically() + fadeIn(),
-                            exit = shrinkVertically() + fadeOut()
+                            enter = HabitEditorMotion.enterStandard,
+                            exit = HabitEditorMotion.exitStandard
                         ) {
                             Row(
                                 modifier = Modifier
@@ -612,6 +772,7 @@ internal fun TaskEditorDialog(
                     }
                 }
 
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -662,8 +823,8 @@ internal fun TaskEditorDialog(
 
                 AnimatedVisibility(
                     visible = state.editorShowAdvanced,
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut()
+                    enter = HabitEditorMotion.enterStandard,
+                    exit = HabitEditorMotion.exitStandard
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(spacing.x1_5)) {
                         SettingsSwitchRow(
@@ -689,7 +850,11 @@ internal fun TaskEditorDialog(
                             }
                         )
 
-                        AnimatedVisibility(visible = state.editorEndDate != null) {
+                        AnimatedVisibility(
+                            visible = state.editorEndDate != null,
+                            enter = HabitEditorMotion.enterMedium,
+                            exit = HabitEditorMotion.exitMedium
+                        ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically
@@ -727,7 +892,11 @@ internal fun TaskEditorDialog(
                             onCheckedChange = vm::setEditorReminderEnabled
                         )
 
-                        AnimatedVisibility(visible = state.editorReminderEnabled) {
+                        AnimatedVisibility(
+                            visible = state.editorReminderEnabled,
+                            enter = HabitEditorMotion.enterMedium,
+                            exit = HabitEditorMotion.exitMedium
+                        ) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically
@@ -776,16 +945,36 @@ private fun TrackingTypeCard(
     onClick: () -> Unit
 ) {
     val colorScheme = MaterialTheme.colorScheme
+    val cardBorderColor by animateColorAsState(
+        targetValue = if (selected) colorScheme.primary else colorScheme.outlineVariant,
+        animationSpec = HabitEditorMotion.QuickColor,
+        label = "trackingCardBorder_$title"
+    )
+    val cardBgColor by animateColorAsState(
+        targetValue = if (selected) colorScheme.primary.copy(alpha = 0.12f) else colorScheme.surface,
+        animationSpec = HabitEditorMotion.QuickColor,
+        label = "trackingCardBg_$title"
+    )
+    val iconBgColor by animateColorAsState(
+        targetValue = if (selected) colorScheme.primary.copy(alpha = 0.2f) else colorScheme.surfaceVariant,
+        animationSpec = HabitEditorMotion.QuickColor,
+        label = "trackingIconBg_$title"
+    )
+    val iconTint by animateColorAsState(
+        targetValue = if (selected) colorScheme.primary else colorScheme.onSurfaceVariant,
+        animationSpec = HabitEditorMotion.QuickColor,
+        label = "trackingIconTint_$title"
+    )
 
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(10.dp),
-        color = if (selected) colorScheme.primary.copy(alpha = 0.12f) else colorScheme.surface,
+        color = cardBgColor,
         border = BorderStroke(
             width = if (selected) 1.5.dp else 1.dp,
-            color = if (selected) colorScheme.primary else colorScheme.outline
+            color = cardBorderColor
         )
     ) {
         Column(
@@ -803,7 +992,7 @@ private fun TrackingTypeCard(
                         .size(24.dp)
                         .clip(RoundedCornerShape(6.dp))
                         .background(
-                            if (selected) colorScheme.primary.copy(alpha = 0.2f) else colorScheme.surfaceVariant
+                            iconBgColor
                         ),
                     contentAlignment = Alignment.Center
                 ) {
@@ -811,7 +1000,7 @@ private fun TrackingTypeCard(
                         text = iconText,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
-                        color = if (selected) colorScheme.primary else colorScheme.onSurfaceVariant
+                        color = iconTint
                     )
                 }
 
@@ -823,18 +1012,12 @@ private fun TrackingTypeCard(
                 )
             }
 
-            AnimatedVisibility(
-                visible = selected,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut()
-            ) {
-                Text(
-                    text = subtitle,
-                    modifier = Modifier.padding(start = 36.dp),
-                    fontSize = 12.sp,
-                    color = colorScheme.onSurfaceVariant
-                )
-            }
+            Text(
+                text = subtitle,
+                modifier = Modifier.padding(start = 36.dp),
+                fontSize = 12.sp,
+                color = colorScheme.onSurfaceVariant
+            )
         }
     }
 }
@@ -847,16 +1030,31 @@ private fun FrequencyOptionCard(
     onClick: () -> Unit
 ) {
     val colorScheme = MaterialTheme.colorScheme
+    val freqCardBorder by animateColorAsState(
+        targetValue = if (selected) colorScheme.primary else colorScheme.outlineVariant,
+        animationSpec = HabitEditorMotion.QuickColor,
+        label = "freqCardBorder_$title"
+    )
+    val freqCardBg by animateColorAsState(
+        targetValue = if (selected) colorScheme.primary.copy(alpha = 0.12f) else colorScheme.surface,
+        animationSpec = HabitEditorMotion.QuickColor,
+        label = "freqCardBg_$title"
+    )
+    val freqTitleColor by animateColorAsState(
+        targetValue = if (selected) colorScheme.primary else colorScheme.onSurfaceVariant,
+        animationSpec = HabitEditorMotion.QuickColor,
+        label = "freqTitleColor_$title"
+    )
 
     Surface(
         modifier = modifier
             .requiredHeight(60.dp)
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
-        color = if (selected) colorScheme.primary.copy(alpha = 0.12f) else colorScheme.surface,
+        color = freqCardBg,
         border = BorderStroke(
             width = if (selected) 1.5.dp else 1.dp,
-            color = if (selected) colorScheme.primary else colorScheme.outline
+            color = freqCardBorder
         )
     ) {
         Box(
@@ -872,7 +1070,7 @@ private fun FrequencyOptionCard(
                 textAlign = TextAlign.Center,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
-                color = if (selected) colorScheme.primary else colorScheme.onSurfaceVariant
+                color = freqTitleColor
             )
         }
     }
@@ -1007,6 +1205,8 @@ private fun DateChip(
         }
     }
 }
+
+
 
 
 

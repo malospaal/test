@@ -375,7 +375,7 @@ internal val ukTranslations: Map<String, String> = mapOf(
     "W" to "Т",
     "Tracking type" to "Тип відстеження",
     "Frequency" to "Частота",
-    "Basic setup" to "Базові налаштування",
+    "Basic setup" to "Назва звички",
     "Habit name" to "Назва звички",
     "Morning meditation" to "Ранкова медитація",
     "Icon / emoji" to "Іконка / емодзі",
@@ -677,4 +677,5 @@ internal val ukTranslations: Map<String, String> = mapOf(
     "dd MMM yyyy" to "dd MMM yyyy",
     "LLLL yyyy" to "LLLL yyyy"
 )
+
 

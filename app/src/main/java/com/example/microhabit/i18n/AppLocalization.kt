@@ -1028,7 +1028,7 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "W" to v("KW ", "S", "S", "S", "Н"),
     "Tracking type" to v("Tracking-Typ", "Type de suivi", "Tipo de seguimiento", "Tipo di monitoraggio", "Тип отслеживания"),
     "Frequency" to v("Frequenz", "Frequence", "Frecuencia", "Frequenza", "Частота"),
-    "Basic setup" to v("Basiseinstellungen", "Configuration de base", "Configuracion basica", "Impostazioni base", "Базовые настройки"),
+    "Basic setup" to v("Name der Gewohnheit", "Nom de l'habitude", "Nombre del habito", "Nome abitudine", "Название привычки"),
     "Habit name" to v("Name der Gewohnheit", "Nom de l'habitude", "Nombre del habito", "Nome abitudine", "Название привычки"),
     "Morning meditation" to v("Morgenmeditation", "Meditation du matin", "Meditacion matutina", "Meditazione mattutina", "Утренняя медитация"),
     "Icon / emoji" to v("Symbol / Emoji", "Icone / emoji", "Icono / emoji", "Icona / emoji", "Иконка / эмодзи"),
@@ -1811,6 +1811,7 @@ fun tf(source: String, vararg args: Any): String {
 @Composable
 @ReadOnlyComposable
 fun appLocale(): Locale = localeForLanguage(LocalAppLanguage.current)
+
 
 
 

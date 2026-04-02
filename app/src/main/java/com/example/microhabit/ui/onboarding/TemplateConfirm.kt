@@ -5,6 +5,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -257,8 +258,10 @@ internal fun HabitTemplateConfirmScreen(
 
                         AnimatedVisibility(
                             visible = isFrequencyExpanded,
-                            enter = expandVertically(animationSpec = tween(200)) + fadeIn(),
-                            exit = shrinkVertically(animationSpec = tween(200)) + fadeOut()
+                            enter = expandVertically(tween(280, easing = FastOutSlowInEasing)) +
+                                fadeIn(tween(280, easing = FastOutSlowInEasing)),
+                            exit = shrinkVertically(tween(280, easing = FastOutSlowInEasing)) +
+                                fadeOut(tween(200, easing = FastOutSlowInEasing))
                         ) {
                             Column(
                                 modifier = Modifier
@@ -282,7 +285,13 @@ internal fun HabitTemplateConfirmScreen(
                                         }
                                     }
                                 )
-                                AnimatedVisibility(visible = frequency == TaskFrequency.SELECTED_DAYS) {
+                                AnimatedVisibility(
+                                    visible = frequency == TaskFrequency.SELECTED_DAYS,
+                                    enter = expandVertically(tween(280, easing = FastOutSlowInEasing)) +
+                                        fadeIn(tween(280, easing = FastOutSlowInEasing)),
+                                    exit = shrinkVertically(tween(280, easing = FastOutSlowInEasing)) +
+                                        fadeOut(tween(200, easing = FastOutSlowInEasing))
+                                ) {
                                     WeekdaySelector(
                                         selectedDays = customDays,
                                         onToggle = { day ->
@@ -298,7 +307,13 @@ internal fun HabitTemplateConfirmScreen(
                                     description = t("freq_times_per_week_desc"),
                                     onClick = { frequency = TaskFrequency.TIMES_PER_WEEK }
                                 )
-                                AnimatedVisibility(visible = frequency == TaskFrequency.TIMES_PER_WEEK) {
+                                AnimatedVisibility(
+                                    visible = frequency == TaskFrequency.TIMES_PER_WEEK,
+                                    enter = expandVertically(tween(280, easing = FastOutSlowInEasing)) +
+                                        fadeIn(tween(280, easing = FastOutSlowInEasing)),
+                                    exit = shrinkVertically(tween(280, easing = FastOutSlowInEasing)) +
+                                        fadeOut(tween(200, easing = FastOutSlowInEasing))
+                                ) {
                                     TimesPerWeekStepper(
                                         value = timesPerWeek,
                                         onValueChange = { timesPerWeek = it.coerceIn(1, 7) }

@@ -1,5 +1,6 @@
 package com.example.microhabit.ui.onboarding
 
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -66,8 +67,8 @@ internal fun OnboardingCategoryCard(
     onClick: () -> Unit
 ) {
     val scale by animateFloatAsState(
-        targetValue = if (selected) 1f else 0.97f,
-        animationSpec = tween(durationMillis = 150),
+        targetValue = if (selected) 1f else 0.96f,
+        animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
         label = "onboardingCategoryScale"
     )
     Surface(
@@ -103,8 +104,8 @@ internal fun OnboardingTemplateCard(
 ) {
     val spacing = AppTheme.spacing
     val scale by animateFloatAsState(
-        targetValue = if (selected) 1f else 0.985f,
-        animationSpec = tween(durationMillis = 140),
+        targetValue = if (selected) 1f else 0.96f,
+        animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing),
         label = "onboardingTemplateScale"
     )
     Surface(

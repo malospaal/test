@@ -353,8 +353,8 @@ Template flow:
 - primary action в confirm создаёт привычку сразу (через prefill в editor/save pipeline), secondary — открывает расширенный editor.
 
 `TaskEditorDialog` (редизайн формы):
-- tracking type карточки используют продуктовые лейблы `Сделать / Посчитать / Засечь время`;
-- frequency selector использует 3-card grid (`Daily` / `Set days` / `N× / week`) с week-dot превью и selected-border state;
+- tracking type карточки используют продуктовые лейблы `Do it / Count / Time it`;
+- frequency selector использует 3-card grid (`Every day` / `Specific days` / `Times per week`) без dot-превью внутри карточек; отдельный description card отображается ниже по выбранному режиму;
 - поле emoji встроено inline в строку названия привычки (tap opens emoji picker sheet);
 - пользовательский выбор цвета привычки отсутствует (color picker / color dots удалены из create/edit UI);
 - Start date остаётся обязательной и editable строкой и использует `DateChip` паттерн (pill + edit-calendar icon).
@@ -374,7 +374,7 @@ Editor behavior updates:
 - target section (`COUNT`/`DURATION`) появляется/скрывается через animated visibility;
 - для `COUNT` target используется inline stepper (`- value +`) с быстрым диапазоном `1..99`; tap по value открывает numpad для ввода больших значений;
 - для `TIMES_PER_WEEK` editor UI ограничивает выбор до `1..6` (чтобы не дублировать семантику `DAILY`), при этом доменная модель по-прежнему поддерживает `1..7`;
-- при переключении на `SELECTED_DAYS` пользователь начинает с пустого выбора дней (без автопредзаполнения).
+- при переключении на `SELECTED_DAYS` по умолчанию предвыбираются будние дни `Mon..Fri` (1..5), после чего пользователь может изменить выбор вручную.
 
 ### 12.5 Onboarding
 - Onboarding реализован отдельным wizard-flow и активируется для нового пользователя (когда onboarding не завершён и привычек ещё нет).
@@ -665,6 +665,8 @@ Editor behavior updates:
 - прочитать `PRODUCT_LOGIC.md`,
 - сверить задачу с инвариантами,
 - реализовать изменения согласованно во всех затронутых частях приложения.
+
+
 
 
 

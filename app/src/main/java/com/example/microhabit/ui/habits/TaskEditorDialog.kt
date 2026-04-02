@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.microhabit.HabitUiState
@@ -52,7 +53,6 @@ import com.example.microhabit.i18n.t
 import com.example.microhabit.i18n.weekdayLabels
 import com.example.microhabit.ui.components.FormSection
 import com.example.microhabit.ui.components.SettingsSwitchRow
-import com.example.microhabit.ui.onboarding.TimesPerWeekStepper
 import com.example.microhabit.ui.shared.formatTimeForDevice
 import com.example.microhabit.ui.shared.showThemedDatePicker
 import com.example.microhabit.ui.shared.showThemedTimePicker
@@ -92,9 +92,9 @@ internal fun TaskEditorDialog(
     val shortWeekdays = remember(language) { weekdayLabels(language).map { it.take(2) } }
 
     val trackingCards = listOf(
-        Triple(TrackingType.YES_NO, t("tracking_type_yesno"), t("tracking_type_yesno_desc")),
-        Triple(TrackingType.COUNT, t("tracking_type_count"), t("tracking_type_count_desc")),
-        Triple(TrackingType.DURATION, t("tracking_type_duration"), t("tracking_type_duration_desc"))
+        Triple(TrackingType.YES_NO, t("tracking_type_do_it"), t("tracking_type_do_it_sub")),
+        Triple(TrackingType.COUNT, t("tracking_type_count"), t("tracking_type_count_sub")),
+        Triple(TrackingType.DURATION, t("tracking_type_time_it"), t("tracking_type_time_it_sub"))
     )
 
     val emojiSuggestions = listOf(
@@ -237,7 +237,7 @@ internal fun TaskEditorDialog(
                             .padding(horizontal = spacing.x2, vertical = spacing.x1_5),
                         verticalArrangement = Arrangement.spacedBy(spacing.x0_5)
                     ) {
-                        if (wasSaveAttempted && !canSave) {
+                        if (wasSaveAttempted && state.editorTitle.isBlank()) {
                             Text(
                                 text = t("Fill required fields to continue."),
                                 style = MaterialTheme.typography.bodySmall,
@@ -337,59 +337,27 @@ internal fun TaskEditorDialog(
                 }
 
                 FormSection(title = t("Tracking type")) {
-                    Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 1.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         trackingCards.forEach { (type, title, description) ->
                             val selected = state.editorTrackingType == type
                             val icon = when (type) {
                                 TrackingType.YES_NO -> "✓"
                                 TrackingType.COUNT -> "#"
-                                TrackingType.DURATION -> "⏱"
+                                TrackingType.DURATION -> "◷"
                             }
 
-                            Surface(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(radius.md))
-                                    .clickable { vm.setEditorTrackingType(type) },
-                                shape = RoundedCornerShape(radius.md),
-                                color = if (selected) colorScheme.primaryContainer else colorScheme.surfaceVariant,
-                                border = BorderStroke(
-                                    width = if (selected) stroke.medium else stroke.thin,
-                                    color = if (selected) colorScheme.primary else colorScheme.outlineVariant
-                                )
-                            ) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = spacing.x1_5, vertical = spacing.x1),
-                                    verticalArrangement = Arrangement.spacedBy(spacing.x0_5)
-                                ) {
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(spacing.x0_5),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(text = icon, style = MaterialTheme.typography.titleSmall)
-                                        Text(
-                                            text = title,
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = colorScheme.onSurface
-                                        )
-                                    }
-
-                                    AnimatedVisibility(
-                                        visible = selected,
-                                        enter = expandVertically() + fadeIn(),
-                                        exit = shrinkVertically() + fadeOut()
-                                    ) {
-                                        Text(
-                                            text = description,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = colorScheme.onSurfaceVariant
-                                        )
-                                    }
-                                }
-                            }
+                            TrackingTypeCard(
+                                iconText = icon,
+                                title = title,
+                                subtitle = description,
+                                selected = selected,
+                                onClick = { vm.setEditorTrackingType(type) }
+                            )
                         }
                     }
                 }
@@ -402,96 +370,72 @@ internal fun TaskEditorDialog(
                     Column(verticalArrangement = Arrangement.spacedBy(spacing.x1_5)) {
                         if (state.editorTrackingType == TrackingType.COUNT) {
                             FormSection(title = t("Count target")) {
-                                Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = colorScheme.surface,
+                                    border = BorderStroke(1.dp, colorScheme.outline)
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 13.dp, vertical = 13.dp),
+                                        verticalArrangement = Arrangement.spacedBy(12.dp)
                                     ) {
                                         Text(
-                                            text = t("Daily target"),
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = colorScheme.onSurface
+                                            text = t("Daily target").uppercase(locale),
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = colorScheme.onSurfaceVariant
                                         )
 
                                         Row(
-                                            horizontalArrangement = Arrangement.spacedBy(spacing.x1),
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Button(
-                                                onClick = {
-                                                    val current = state.editorDailyTarget
+                                            Text(
+                                                text = t("editor_how_many_per_day"),
+                                                fontSize = 13.sp,
+                                                color = colorScheme.onSurfaceVariant
+                                            )
+                                            EditorInlineStepper(
+                                                value = state.editorDailyTarget.coerceAtLeast(1),
+                                                min = 1,
+                                                canIncrease = true,
+                                                onDecrease = {
+                                                    val current = state.editorDailyTarget.coerceAtLeast(1)
                                                     val next = if (current > 99) 99 else (current - 1).coerceAtLeast(1)
                                                     vm.setEditorDailyTarget(next)
                                                 },
-                                                enabled = state.editorDailyTarget > 1,
-                                                shape = RoundedCornerShape(radius.md),
-                                                colors = ButtonDefaults.buttonColors(
-                                                    containerColor = colorScheme.surfaceVariant,
-                                                    contentColor = colorScheme.onSurface,
-                                                    disabledContainerColor = colorScheme.surfaceVariant,
-                                                    disabledContentColor = colorScheme.onSurfaceVariant
-                                                ),
-                                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
-                                            ) {
-                                                Text("-")
-                                            }
-
-                                            Surface(
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(radius.md))
-                                                    .clickable {
-                                                        countNumpadInput = state.editorDailyTarget.coerceAtLeast(1).toString()
+                                                onIncrease = {
+                                                    val current = state.editorDailyTarget.coerceAtLeast(1)
+                                                    if (current >= 99) {
+                                                        countNumpadInput = current.toString()
                                                         showCountNumpad = true
-                                                    },
-                                                shape = RoundedCornerShape(radius.md),
-                                                color = colorScheme.surfaceVariant,
-                                                border = BorderStroke(stroke.thin, colorScheme.outlineVariant)
-                                            ) {
-                                                Text(
-                                                    text = state.editorDailyTarget.coerceAtLeast(1).toString(),
-                                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                                                    style = MaterialTheme.typography.titleMedium,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = colorScheme.onSurface
-                                                )
-                                            }
-
-                                            Button(
-                                                onClick = {
-                                                    val next = (state.editorDailyTarget.coerceAtLeast(1) + 1).coerceAtMost(99)
-                                                    vm.setEditorDailyTarget(next)
-                                                },
-                                                enabled = state.editorDailyTarget < 99,
-                                                shape = RoundedCornerShape(radius.md),
-                                                colors = ButtonDefaults.buttonColors(
-                                                    containerColor = colorScheme.surfaceVariant,
-                                                    contentColor = colorScheme.onSurface,
-                                                    disabledContainerColor = colorScheme.surfaceVariant,
-                                                    disabledContentColor = colorScheme.onSurfaceVariant
-                                                ),
-                                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
-                                            ) {
-                                                Text("+")
-                                            }
+                                                    } else {
+                                                        vm.setEditorDailyTarget(current + 1)
+                                                    }
+                                                }
+                                            )
                                         }
-                                    }
 
-                                    OutlinedTextField(
-                                        value = state.editorUnitLabel,
-                                        onValueChange = vm::setEditorUnitLabel,
-                                        label = { Text(t("Unit label")) },
-                                        placeholder = {
-                                            val unitHint = when {
-                                                state.editorDailyTarget <= 10 -> t("editor_unit_hint_small")
-                                                state.editorDailyTarget <= 100 -> t("editor_unit_hint_medium")
-                                                else -> t("editor_unit_hint_large")
-                                            }
-                                            Text(unitHint)
-                                        },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        singleLine = true
-                                    )
+                                        OutlinedTextField(
+                                            value = state.editorUnitLabel,
+                                            onValueChange = vm::setEditorUnitLabel,
+                                            label = { Text(t("Unit label")) },
+                                            placeholder = {
+                                                val unitHint = when {
+                                                    state.editorDailyTarget <= 10 -> t("editor_unit_hint_small")
+                                                    state.editorDailyTarget <= 100 -> t("editor_unit_hint_medium")
+                                                    else -> t("editor_unit_hint_large")
+                                                }
+                                                Text(unitHint)
+                                            },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            singleLine = true
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -524,39 +468,35 @@ internal fun TaskEditorDialog(
                 FormSection(title = t("label_frequency")) {
                     Column(
                         modifier = Modifier.animateContentSize(animationSpec = tween(220)),
-                        verticalArrangement = Arrangement.spacedBy(spacing.x1)
+                        verticalArrangement = Arrangement.spacedBy(0.dp)
                     ) {
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(spacing.x1)
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 1.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            FrequencyCard(
+                            FrequencyOptionCard(
                                 modifier = Modifier.weight(1f),
-                                title = t("editor_freq_daily_title"),
-                                subtitle = t("editor_freq_daily_subtitle"),
+                                title = t("freq_daily"),
                                 selected = state.editorFrequency == TaskFrequency.DAILY,
-                                filledDots = setOf(0, 1, 2, 3, 4, 5, 6),
                                 onClick = { vm.setEditorFrequency(TaskFrequency.DAILY) }
                             )
-                            FrequencyCard(
+                            FrequencyOptionCard(
                                 modifier = Modifier.weight(1f),
-                                title = t("editor_freq_set_days_title"),
-                                subtitle = t("editor_freq_set_days_subtitle"),
+                                title = t("freq_selected_days"),
                                 selected = state.editorFrequency == TaskFrequency.SELECTED_DAYS,
-                                filledDots = setOf(0, 2, 4),
                                 onClick = {
-                                    if (state.editorFrequency != TaskFrequency.SELECTED_DAYS && state.editorCustomDays.isNotEmpty()) {
-                                        vm.setEditorCustomDays(emptySet())
+                                    if (state.editorFrequency != TaskFrequency.SELECTED_DAYS) {
+                                        vm.setEditorCustomDays(setOf(1, 2, 3, 4, 5))
                                     }
                                     vm.setEditorFrequency(TaskFrequency.SELECTED_DAYS)
                                 }
                             )
-                            FrequencyCard(
+                            FrequencyOptionCard(
                                 modifier = Modifier.weight(1f),
-                                title = t("editor_freq_n_times_title"),
-                                subtitle = t("editor_freq_n_times_subtitle"),
+                                title = t("freq_times_per_week"),
                                 selected = state.editorFrequency == TaskFrequency.TIMES_PER_WEEK,
-                                filledDots = setOf(1, 3, 5),
                                 onClick = {
                                     vm.setEditorFrequency(TaskFrequency.TIMES_PER_WEEK)
                                     if (state.editorTimesPerWeek > 6) vm.setEditorTimesPerWeek(6)
@@ -564,39 +504,67 @@ internal fun TaskEditorDialog(
                             )
                         }
 
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        AnimatedVisibility(
+                            visible = state.editorFrequency == TaskFrequency.DAILY,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
+                        ) {
+                            FrequencyDescriptionCard(text = t("freq_daily_desc"))
+                        }
                         AnimatedVisibility(
                             visible = state.editorFrequency == TaskFrequency.SELECTED_DAYS,
                             enter = expandVertically() + fadeIn(),
                             exit = shrinkVertically() + fadeOut()
                         ) {
-                            Column(verticalArrangement = Arrangement.spacedBy(spacing.x0_5)) {
-                                Text(
-                                    text = t("freq_selected_days_desc"),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = colorScheme.onSurfaceVariant
-                                )
+                            FrequencyDescriptionCard(text = t("freq_selected_days_desc"))
+                        }
+                        AnimatedVisibility(
+                            visible = state.editorFrequency == TaskFrequency.TIMES_PER_WEEK,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
+                        ) {
+                            FrequencyDescriptionCard(text = t("freq_times_per_week_desc"))
+                        }
+
+                        AnimatedVisibility(
+                            visible = state.editorFrequency == TaskFrequency.SELECTED_DAYS,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(top = 8.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(spacing.x0_5)
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     shortWeekdays.forEachIndexed { index, label ->
                                         val day = index + 1
                                         val selected = day in state.editorCustomDays
-                                        Button(
-                                            onClick = { vm.toggleEditorCustomDay(day) },
-                                            modifier = Modifier.weight(1f),
-                                            shape = RoundedCornerShape(radius.md),
-                                            colors = ButtonDefaults.buttonColors(
-                                                containerColor = if (selected) colorScheme.primaryContainer else colorScheme.surfaceVariant,
-                                                contentColor = if (selected) colorScheme.primary else colorScheme.onSurfaceVariant
-                                            ),
-                                            contentPadding = PaddingValues(vertical = 8.dp)
-                                        ) {
-                                            Text(
-                                                text = label,
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Medium
+                                        Surface(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .requiredHeight(34.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .clickable { vm.toggleEditorCustomDay(day) },
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = if (selected) colorScheme.primary.copy(alpha = 0.12f) else colorScheme.surface,
+                                            border = BorderStroke(
+                                                width = if (selected) 1.5.dp else 1.dp,
+                                                color = if (selected) colorScheme.primary else colorScheme.outline
                                             )
+                                        ) {
+                                            Box(contentAlignment = Alignment.Center) {
+                                                Text(
+                                                    text = label,
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Medium,
+                                                    color = if (selected) colorScheme.primary else colorScheme.onSurfaceVariant
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -616,17 +584,28 @@ internal fun TaskEditorDialog(
                             enter = expandVertically() + fadeIn(),
                             exit = shrinkVertically() + fadeOut()
                         ) {
-                            Column(verticalArrangement = Arrangement.spacedBy(spacing.x0_5)) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Text(
-                                    text = t("freq_times_per_week_desc"),
-                                    style = MaterialTheme.typography.bodySmall,
+                                    text = t("editor_times_per_week"),
+                                    fontSize = 13.sp,
                                     color = colorScheme.onSurfaceVariant
                                 )
-                                TimesPerWeekStepper(
+                                EditorInlineStepper(
                                     value = state.editorTimesPerWeek.coerceIn(1, 6),
-                                    onValueChange = { vm.setEditorTimesPerWeek(it.coerceIn(1, 6)) },
                                     min = 1,
-                                    max = 6
+                                    canIncrease = state.editorTimesPerWeek < 6,
+                                    onDecrease = {
+                                        vm.setEditorTimesPerWeek((state.editorTimesPerWeek - 1).coerceIn(1, 6))
+                                    },
+                                    onIncrease = {
+                                        vm.setEditorTimesPerWeek((state.editorTimesPerWeek + 1).coerceIn(1, 6))
+                                    }
                                 )
                             }
                         }
@@ -668,7 +647,7 @@ internal fun TaskEditorDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        imageVector = if (state.editorShowAdvanced) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                        imageVector = if (state.editorShowAdvanced) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                         contentDescription = null,
                         tint = colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(18.dp)
@@ -716,7 +695,7 @@ internal fun TaskEditorDialog(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = t("End date"),
+                                    text = t("label_finish_on"),
                                     modifier = Modifier.weight(1f),
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = colorScheme.onSurfaceVariant
@@ -789,69 +768,209 @@ internal fun TaskEditorDialog(
 }
 
 @Composable
-private fun FrequencyCard(
-    modifier: Modifier = Modifier,
+private fun TrackingTypeCard(
+    iconText: String,
     title: String,
     subtitle: String,
     selected: Boolean,
-    filledDots: Set<Int>,
     onClick: () -> Unit
 ) {
-    val radius = AppTheme.radius
-    val stroke = AppTheme.stroke
     val colorScheme = MaterialTheme.colorScheme
 
     Surface(
-        modifier = modifier
-            .clip(RoundedCornerShape(radius.md))
+        modifier = Modifier
+            .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(radius.md),
-        color = if (selected) colorScheme.primaryContainer else colorScheme.surface,
+        shape = RoundedCornerShape(10.dp),
+        color = if (selected) colorScheme.primary.copy(alpha = 0.12f) else colorScheme.surface,
         border = BorderStroke(
-            if (selected) stroke.medium else stroke.thin,
-            if (selected) colorScheme.primary else colorScheme.outlineVariant
+            width = if (selected) 1.5.dp else 1.dp,
+            color = if (selected) colorScheme.primary else colorScheme.outline
         )
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 10.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+                .padding(horizontal = 13.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(3.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                repeat(7) { index ->
-                    val filled = index in filledDots
-                    Box(
-                        modifier = Modifier
-                            .size(7.dp)
-                            .clip(CircleShape)
-                            .background(
-                                color = when {
-                                    filled && selected -> colorScheme.primary
-                                    filled -> colorScheme.onSurface.copy(alpha = 0.5f)
-                                    else -> colorScheme.surfaceVariant
-                                }
-                            )
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(
+                            if (selected) colorScheme.primary.copy(alpha = 0.2f) else colorScheme.surfaceVariant
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = iconText,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = if (selected) colorScheme.primary else colorScheme.onSurfaceVariant
                     )
                 }
+
+                Text(
+                    text = title,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = colorScheme.onSurface
+                )
             }
 
+            AnimatedVisibility(
+                visible = selected,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                Text(
+                    text = subtitle,
+                    modifier = Modifier.padding(start = 36.dp),
+                    fontSize = 12.sp,
+                    color = colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FrequencyOptionCard(
+    modifier: Modifier = Modifier,
+    title: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val colorScheme = MaterialTheme.colorScheme
+
+    Surface(
+        modifier = modifier
+            .requiredHeight(60.dp)
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(12.dp),
+        color = if (selected) colorScheme.primary.copy(alpha = 0.12f) else colorScheme.surface,
+        border = BorderStroke(
+            width = if (selected) 1.5.dp else 1.dp,
+            color = if (selected) colorScheme.primary else colorScheme.outline
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 6.dp, vertical = 12.dp),
+            contentAlignment = Alignment.Center
+        ) {
             Text(
                 text = title,
-                fontSize = 12.sp,
+                maxLines = 2,
+                lineHeight = 17.sp,
+                textAlign = TextAlign.Center,
+                fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
-                color = colorScheme.onSurface
+                color = if (selected) colorScheme.primary else colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun FrequencyDescriptionCard(text: String) {
+    val colorScheme = MaterialTheme.colorScheme
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(10.dp),
+        color = colorScheme.primary.copy(alpha = 0.07f),
+        border = BorderStroke(1.dp, colorScheme.primary.copy(alpha = 0.18f))
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 13.dp, vertical = 11.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .padding(top = 6.dp)
+                    .size(6.dp)
+                    .clip(CircleShape)
+                    .background(colorScheme.primary)
             )
             Text(
-                text = subtitle,
-                fontSize = 10.sp,
+                text = text,
+                fontSize = 12.sp,
+                lineHeight = 18.sp,
                 color = colorScheme.onSurfaceVariant
             )
         }
+    }
+}
+
+@Composable
+private fun EditorInlineStepper(
+    value: Int,
+    min: Int,
+    canIncrease: Boolean,
+    onDecrease: () -> Unit,
+    onIncrease: () -> Unit
+) {
+    val colorScheme = MaterialTheme.colorScheme
+
+    Surface(
+        shape = RoundedCornerShape(22.dp),
+        color = colorScheme.surfaceVariant,
+        border = BorderStroke(1.dp, colorScheme.outlineVariant)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            StepperAction(
+                symbol = "-",
+                enabled = value > min,
+                onClick = onDecrease
+            )
+            Text(
+                text = value.toString(),
+                modifier = Modifier.widthIn(min = 32.dp),
+                textAlign = TextAlign.Center,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = colorScheme.onSurface
+            )
+            StepperAction(
+                symbol = "+",
+                enabled = canIncrease,
+                onClick = onIncrease
+            )
+        }
+    }
+}
+
+@Composable
+private fun StepperAction(
+    symbol: String,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    val colorScheme = MaterialTheme.colorScheme
+
+    Box(
+        modifier = Modifier
+            .size(32.dp)
+            .clip(CircleShape)
+            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = symbol,
+            fontSize = 18.sp,
+            color = colorScheme.primary.copy(alpha = if (enabled) 1f else 0.3f)
+        )
     }
 }
 
@@ -866,12 +985,13 @@ private fun DateChip(
             .clip(RoundedCornerShape(20.dp))
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(20.dp),
-        color = colorScheme.surfaceVariant
+        color = colorScheme.surfaceVariant,
+        border = BorderStroke(1.dp, colorScheme.outline)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
         ) {
             Text(
                 text = text,
@@ -879,14 +999,20 @@ private fun DateChip(
                 color = colorScheme.onSurface
             )
             Icon(
-                imageVector = Icons.Filled.EditCalendar,
+                imageVector = Icons.Default.EditCalendar,
                 contentDescription = null,
                 tint = colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(14.dp)
             )
         }
     }
 }
+
+
+
+
+
+
 
 
 

@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -33,6 +34,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -46,9 +48,7 @@ import com.example.microhabit.i18n.tf
 import com.example.microhabit.ui.components.ChoiceOption
 import com.example.microhabit.ui.components.FormSection
 import com.example.microhabit.ui.components.SettingsSwitchRow
-import com.example.microhabit.ui.components.Stepper
 import com.example.microhabit.ui.components.WeekdaySelector
-import com.example.microhabit.ui.components.parseColorHex
 import com.example.microhabit.ui.shared.SelectChip
 import com.example.microhabit.ui.shared.formatTimeForDevice
 import com.example.microhabit.ui.shared.showThemedDatePicker
@@ -71,7 +71,6 @@ internal fun TaskEditorDialog(
     val context = LocalContext.current
     val locale = appLocale()
     val is24HourView = android.text.format.DateFormat.is24HourFormat(context)
-    val selectedColor = parseColorHex(state.editorColorHex)
     val pickerTheme = R.style.ThemeOverlay_MicroHabit_Picker
     val datePickerTheme = R.style.ThemeOverlay_MicroHabit_DatePicker
     val pickerActionColor = colors.primary.toArgb()
@@ -86,7 +85,6 @@ internal fun TaskEditorDialog(
         ChoiceOption(TaskFrequency.SELECTED_DAYS, t("freq_selected_days")),
         ChoiceOption(TaskFrequency.TIMES_PER_WEEK, t("freq_times_per_week"))
     )
-    val palette = listOf("#1F6F64", "#3B7EA1", "#7B6BC9", "#3E8E5F", "#B36A3C", "#C65C74", "#5D6D7E")
     val emojiSuggestions = listOf(
         "✨", "💧", "💊", "🥗", "🌿", "😴", "🏃", "🏋️", "🚴", "🤸",
         "👟", "🧘", "📵", "🙏", "📚", "✍️", "🎓", "💼", "🎯", "🔥",
@@ -263,37 +261,7 @@ internal fun TaskEditorDialog(
                                     inner()
                                 }
                             )
-                            Box(
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .clip(RoundedCornerShape(AppTheme.radius.full))
-                                    .background(selectedColor.copy(alpha = 0.85f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Spacer(modifier = Modifier.size(1.dp))
-                            }
-                        }
-                        Row(
-                            modifier = Modifier.padding(vertical = 2.dp),
-                            horizontalArrangement = Arrangement.spacedBy(spacing.x1),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            palette.forEach { hex ->
-                                val color = parseColorHex(hex)
-                                val selected = hex.equals(state.editorColorHex, ignoreCase = true)
-                                Box(
-                                    modifier = Modifier
-                                        .size(24.dp)
-                                        .clip(RoundedCornerShape(AppTheme.radius.full))
-                                        .background(color)
-                                        .border(
-                                            width = if (selected) 2.dp else stroke.thin,
-                                            color = if (selected) color else colors.borderSubtle.copy(alpha = 0.6f),
-                                            shape = RoundedCornerShape(AppTheme.radius.full)
-                                        )
-                                        .clickable { vm.setEditorColorHex(hex) }
-                                )
-                            }
+                            Spacer(modifier = Modifier.size(20.dp))
                         }
                     }
                 }
@@ -359,7 +327,7 @@ internal fun TaskEditorDialog(
                     TrackingType.COUNT -> {
                         FormSection(title = t("Count target")) {
                             Column(verticalArrangement = Arrangement.spacedBy(spacing.x1)) {
-                                Stepper(
+                                NumericIntField(
                                     label = t("Daily target"),
                                     value = state.editorDailyTarget,
                                     min = 1,
@@ -387,7 +355,7 @@ internal fun TaskEditorDialog(
                     }
                     TrackingType.DURATION -> {
                         FormSection(title = t("Duration target")) {
-                            Stepper(
+                            NumericIntField(
                                 label = t("Daily minute goal"),
                                 value = state.editorDailyTarget,
                                 min = 1,
@@ -445,7 +413,7 @@ internal fun TaskEditorDialog(
                         }
 
                         if (state.editorFrequency == TaskFrequency.TIMES_PER_WEEK) {
-                            Stepper(
+                            NumericIntField(
                                 label = t("Times per week"),
                                 value = state.editorTimesPerWeek,
                                 min = 1,
@@ -621,3 +589,47 @@ internal fun TaskEditorDialog(
         }
     }
 }
+
+
+@Composable
+private fun NumericIntField(
+    label: String,
+    value: Int,
+    min: Int,
+    max: Int,
+    onValueChange: (Int) -> Unit
+) {
+    val colors = AppTheme.colors
+    var input by remember(value) { mutableStateOf(value.coerceIn(min, max).toString()) }
+
+    OutlinedTextField(
+        value = input,
+        onValueChange = { raw ->
+            val digits = raw.filter { it.isDigit() }.take(3)
+            input = digits
+            val parsed = digits.toIntOrNull() ?: return@OutlinedTextField
+            onValueChange(parsed.coerceIn(min, max))
+        },
+        modifier = Modifier.fillMaxWidth(),
+        label = { Text(label) },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Number,
+            imeAction = ImeAction.Done
+        ),
+        keyboardActions = KeyboardActions(
+            onDone = {
+                val normalized = input.toIntOrNull()?.coerceIn(min, max) ?: value.coerceIn(min, max)
+                input = normalized.toString()
+                onValueChange(normalized)
+            }
+        ),
+        supportingText = {
+            Text(
+                text = "$min-$max",
+                color = colors.textSecondary
+            )
+        }
+    )
+}
+

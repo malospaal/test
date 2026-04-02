@@ -1,20 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.MicroHabit" parent="Theme.Material3.DayNight.NoActionBar" />
-
-    <style name="ThemeOverlay.MicroHabit.Picker" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="colorPrimary">@color/microhabit_primary</item>
-        <item name="colorAccent">@color/microhabit_primary</item>
-        <item name="colorControlActivated">@color/microhabit_primary</item>
-        <item name="android:colorAccent">@color/microhabit_primary</item>
-        <item name="android:colorControlActivated">@color/microhabit_primary</item>
+    <style name="Theme.MicroHabit" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="materialTimePickerTheme">@style/ThemeOverlay.MicroHabit.Picker</item>
     </style>
 
-    <style name="ThemeOverlay.MicroHabit.DatePicker" parent="Theme.Material3.DayNight.Dialog.Alert">
+    <style name="ThemeOverlay.MicroHabit.Picker" parent="ThemeOverlay.Material3.MaterialTimePicker">
         <item name="colorPrimary">@color/microhabit_primary</item>
         <item name="colorAccent">@color/microhabit_primary</item>
         <item name="colorControlActivated">@color/microhabit_primary</item>
         <item name="android:colorAccent">@color/microhabit_primary</item>
         <item name="android:colorControlActivated">@color/microhabit_primary</item>
+        <item name="materialButtonOutlinedStyle">@style/Widget.MicroHabit.TimePicker.PeriodButton</item>
+    </style>
+
+    <style name="Widget.MicroHabit.TimePicker.PeriodButton" parent="Widget.Material3.MaterialTimePicker.Button">
+        <item name="android:textColor">@color/microhabit_timepicker_period_text</item>
+        <item name="backgroundTint">@color/microhabit_timepicker_period_background</item>
+        <item name="strokeColor">@color/microhabit_timepicker_period_stroke</item>
+        <item name="strokeWidth">1.5dp</item>
+    </style>
+
+    <style name="ThemeOverlay.MicroHabit.DatePicker" parent="ThemeOverlay.Material3.MaterialCalendar">
+        <item name="colorPrimary">@color/microhabit_primary</item>
+        <item name="colorAccent">@color/microhabit_primary</item>
+        <item name="colorControlActivated">@color/microhabit_primary</item>
+        <item name="android:colorAccent">@color/microhabit_primary</item>
+        <item name="android:colorControlActivated">@color/microhabit_primary</item>
+        <item name="colorOnPrimary">@android:color/white</item>
     </style>
 </resources>
+

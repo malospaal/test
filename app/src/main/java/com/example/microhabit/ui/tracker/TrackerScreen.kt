@@ -153,6 +153,8 @@ internal fun TrackerPage(
                         selectedId = null,
                         onHabitSelected = {},
                         onCreateHabit = onOpenCreateHabit,
+                        addHabitTileSize = 40.dp,
+                        addHabitGapAfter = 8.dp,
                         listState = selectorListState
                     )
                 }
@@ -164,6 +166,8 @@ internal fun TrackerPage(
                         selectedId = state.selectedTaskId,
                         onHabitSelected = { taskId -> switchToTask(taskId, 0) },
                         onCreateHabit = onOpenCreateHabit,
+                        addHabitTileSize = 40.dp,
+                        addHabitGapAfter = 8.dp,
                         listState = selectorListState
                     )
                 }

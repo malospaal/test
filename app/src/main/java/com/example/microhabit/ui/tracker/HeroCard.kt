@@ -58,7 +58,6 @@ import com.example.microhabit.data.TrackingType
 import com.example.microhabit.i18n.appLocale
 import com.example.microhabit.i18n.t
 import com.example.microhabit.i18n.tf
-import com.example.microhabit.ui.components.parseColorHex
 import com.example.microhabit.ui.shared.GlassCard
 import com.example.microhabit.ui.theme.AppTheme
 import java.time.LocalDate
@@ -258,13 +257,12 @@ internal fun HeroCard(
         remaining < 0 -> MaterialTheme.colorScheme.onSurfaceVariant
         else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
     }
-    val habitColor = parseColorHex(task?.colorHex.orEmpty())
     val ringProgress = weeklyRingProgress.coerceIn(0f, 1f)
     val ringPercent = (ringProgress * 100f).roundToInt()
     val ringArcColor = when {
         weeklyRingScheduled > 0 && weeklyRingCompleted >= weeklyRingScheduled -> semantic.success
         trackingType == TrackingType.YES_NO -> semantic.primary
-        else -> habitColor
+        else -> semantic.primary
     }
     val ringTrackColor = MaterialTheme.colorScheme.surfaceVariant
     val ringCenterLabel = "${ringPercent}%"
@@ -675,7 +673,7 @@ internal fun HeroCard(
                                             .weight(1f)
                                             .height(6.dp)
                                             .clip(RoundedCornerShape(3.dp)),
-                                        color = habitColor,
+                                        color = semantic.primary,
                                         trackColor = MaterialTheme.colorScheme.surfaceVariant
                                     )
                                     Spacer(Modifier.width(10.dp))
@@ -1001,6 +999,7 @@ internal fun HeroCard(
         )
     }
 }
+
 
 
 

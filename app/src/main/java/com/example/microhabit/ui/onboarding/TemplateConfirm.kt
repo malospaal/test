@@ -16,7 +16,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material3.*
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -24,6 +27,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.microhabit.data.TaskFrequency
@@ -33,7 +38,6 @@ import com.example.microhabit.i18n.appLocale
 import com.example.microhabit.i18n.t
 import com.example.microhabit.i18n.translate
 import com.example.microhabit.i18n.weekdayLabels
-import com.example.microhabit.ui.components.Stepper
 import com.example.microhabit.ui.components.WeekdaySelector
 import com.example.microhabit.ui.create.CreateHabitTemplate
 import com.example.microhabit.ui.create.CreateHabitTemplateCatalog
@@ -59,6 +63,7 @@ internal fun HabitTemplateConfirmScreen(
     val colorScheme = MaterialTheme.colorScheme
     val locale = appLocale()
     val language = LocalAppLanguage.current
+    val context = LocalContext.current
     val template = initial.template
     val habitName = remember(template.id, initial.habitName, language) {
         initial.habitName.ifBlank { translate(language, template.nameKey) }
@@ -144,17 +149,26 @@ internal fun HabitTemplateConfirmScreen(
                             .navigationBarsPadding()
                             .padding(horizontal = 16.dp, vertical = 12.dp)
                     ) {
-                        Box(
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { onConfigureMore(currentDraft) }
                                 .padding(vertical = 6.dp),
-                            contentAlignment = Alignment.Center
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = t("customize_more"),
+                                text = t("customize_more").replace("→", "").trim(),
                                 fontSize = 14.sp,
-                                color = colorScheme.onSurfaceVariant
+                                fontWeight = FontWeight.SemiBold,
+                                color = colorScheme.onSurface
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+                                contentDescription = null,
+                                tint = colorScheme.onSurface,
+                                modifier = Modifier.size(15.dp)
                             )
                         }
 
@@ -201,7 +215,11 @@ internal fun HabitTemplateConfirmScreen(
                             .background(colorScheme.primaryContainer.copy(alpha = 0.45f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(text = template.emoji, fontSize = 52.sp)
+                        Text(
+                            text = template.emoji,
+                            fontSize = 52.sp,
+                            modifier = Modifier.offset(y = (-1).dp)
+                        )
                     }
                     Spacer(Modifier.height(14.dp))
                     Text(
@@ -228,51 +246,14 @@ internal fun HabitTemplateConfirmScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         val isFrequencyExpanded = expandedParam == ExpandedConfirmParam.FREQUENCY
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 2.dp, vertical = 4.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = t("label_frequency"),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = colorScheme.onSurfaceVariant
-                            )
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                if (!isFrequencyExpanded) {
-                                    Text(
-                                        text = templateFrequencyLabel(frequency),
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = colorScheme.onSurface
-                                    )
-                                }
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(
-                                            color = colorScheme.primaryContainer,
-                                            shape = RoundedCornerShape(6.dp)
-                                        )
-                                        .clickable {
-                                            expandedParam = if (isFrequencyExpanded) null else ExpandedConfirmParam.FREQUENCY
-                                        }
-                                        .padding(horizontal = 9.dp, vertical = 3.dp)
-                                ) {
-                                    Text(
-                                        text = if (isFrequencyExpanded) t("action_done") else t("edit_label"),
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = colorScheme.primary
-                                    )
-                                }
+                        TemplateParamRow(
+                            label = t("label_frequency"),
+                            value = templateFrequencyLabel(frequency),
+                            action = if (isFrequencyExpanded) t("action_done") else t("edit_label"),
+                            onAction = {
+                                expandedParam = if (isFrequencyExpanded) null else ExpandedConfirmParam.FREQUENCY
                             }
-                        }
+                        )
 
                         AnimatedVisibility(
                             visible = isFrequencyExpanded,
@@ -318,7 +299,7 @@ internal fun HabitTemplateConfirmScreen(
                                     onClick = { frequency = TaskFrequency.TIMES_PER_WEEK }
                                 )
                                 AnimatedVisibility(visible = frequency == TaskFrequency.TIMES_PER_WEEK) {
-                                    TimesPerWeekStepper(
+                                    TimesPerWeekInputField(
                                         value = timesPerWeek,
                                         onValueChange = { timesPerWeek = it.coerceIn(1, 7) }
                                     )
@@ -344,15 +325,26 @@ internal fun HabitTemplateConfirmScreen(
                             thickness = 0.5.dp,
                             color = colorScheme.outlineVariant
                         )
-                        TemplateParamRow(
+                        TemplateReminderRow(
                             label = t("label_reminder"),
                             value = if (reminderEnabled) {
-                                formatTimeForDevice(LocalContext.current, reminderHour, reminderMinute)
+                                formatTimeForDevice(context, reminderHour, reminderMinute)
                             } else {
                                 t("label_reminder_off")
                             },
-                            action = if (reminderEnabled) t("edit_label") else t("enable_label"),
-                            onAction = {
+                            enabled = reminderEnabled,
+                            onToggle = { checked ->
+                                if (checked) {
+                                    onRequestReminderTime(reminderHour, reminderMinute) { hour, minute ->
+                                        reminderEnabled = true
+                                        reminderHour = hour
+                                        reminderMinute = minute
+                                    }
+                                } else {
+                                    reminderEnabled = false
+                                }
+                            },
+                            onEdit = {
                                 onRequestReminderTime(reminderHour, reminderMinute) { hour, minute ->
                                     reminderEnabled = true
                                     reminderHour = hour
@@ -372,16 +364,34 @@ private enum class ExpandedConfirmParam {
 }
 
 @Composable
-private fun TimesPerWeekStepper(
+private fun TimesPerWeekInputField(
     value: Int,
     onValueChange: (Int) -> Unit
 ) {
-    Stepper(
-        label = t("Times per week"),
-        value = value.coerceIn(1, 7),
-        min = 1,
-        max = 7,
-        onValueChange = { onValueChange(it.coerceIn(1, 7)) }
+    var input by remember(value) { mutableStateOf(value.coerceIn(1, 7).toString()) }
+
+    OutlinedTextField(
+        value = input,
+        onValueChange = { raw ->
+            val digits = raw.filter { it.isDigit() }.take(1)
+            input = digits
+            val parsed = digits.toIntOrNull() ?: return@OutlinedTextField
+            onValueChange(parsed.coerceIn(1, 7))
+        },
+        label = { Text(t("Times per week")) },
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Number,
+            imeAction = ImeAction.Done
+        ),
+        keyboardActions = KeyboardActions(
+            onDone = {
+                val normalized = input.toIntOrNull()?.coerceIn(1, 7) ?: value.coerceIn(1, 7)
+                input = normalized.toString()
+                onValueChange(normalized)
+            }
+        )
     )
 }
 
@@ -447,30 +457,93 @@ private fun TemplateParamRow(
             style = MaterialTheme.typography.bodyMedium,
             color = colorScheme.onSurfaceVariant
         )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-            color = colorScheme.onSurface
-        )
-        Spacer(modifier = Modifier.width(8.dp))
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(6.dp))
-                .background(
-                    color = colorScheme.primaryContainer,
-                    shape = RoundedCornerShape(6.dp)
-                )
-                .clickable(onClick = onAction)
-                .padding(horizontal = 9.dp, vertical = 3.dp)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
-                text = action,
-                fontSize = 11.sp,
+                text = value,
+                style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
-                color = colorScheme.primary
+                color = colorScheme.onSurface
+            )
+            TemplateInlineActionChip(
+                text = action,
+                onClick = onAction
             )
         }
+    }
+}
+
+@Composable
+private fun TemplateReminderRow(
+    label: String,
+    value: String,
+    enabled: Boolean,
+    onToggle: (Boolean) -> Unit,
+    onEdit: () -> Unit
+) {
+    val colorScheme = MaterialTheme.colorScheme
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+            color = colorScheme.onSurfaceVariant
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = if (enabled) colorScheme.onSurface else colorScheme.onSurfaceVariant
+            )
+            if (enabled) {
+                TemplateInlineActionChip(
+                    text = t("edit_label"),
+                    onClick = onEdit
+                )
+            }
+            Switch(
+                checked = enabled,
+                onCheckedChange = onToggle
+            )
+        }
+    }
+}
+
+@Composable
+private fun TemplateInlineActionChip(
+    text: String,
+    onClick: () -> Unit
+) {
+    val colorScheme = MaterialTheme.colorScheme
+    Box(
+        modifier = Modifier
+            .widthIn(min = 52.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(
+                color = colorScheme.primaryContainer,
+                shape = RoundedCornerShape(6.dp)
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 9.dp, vertical = 3.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = colorScheme.primary
+        )
     }
 }
 
@@ -529,3 +602,4 @@ private fun selectedDaysShortLabel(days: Set<Int>): String {
     }
     return normalized.joinToString(" ") { day -> labels[day - 1] }
 }
+

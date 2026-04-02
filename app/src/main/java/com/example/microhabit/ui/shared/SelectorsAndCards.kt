@@ -50,6 +50,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
@@ -58,7 +59,6 @@ import com.example.microhabit.*
 import com.example.microhabit.ui.tracker.activeHabitsCountLabel
 import com.example.microhabit.data.HabitTask
 import com.example.microhabit.i18n.*
-import com.example.microhabit.ui.components.parseColorHex
 import com.example.microhabit.ui.theme.AppTheme
 @Composable
 internal fun TaskSelector(
@@ -265,6 +265,8 @@ internal fun HabitSelectorRow(
     selectedId: String?,
     onHabitSelected: (String) -> Unit,
     onCreateHabit: (() -> Unit)? = null,
+    addHabitTileSize: Dp = 36.dp,
+    addHabitGapAfter: Dp = 0.dp,
     showAllHabitsOption: Boolean = false,
     onSelectAll: (() -> Unit)? = null,
     showCountLabel: Boolean = true,
@@ -321,12 +323,23 @@ internal fun HabitSelectorRow(
             LazyRow(
                 state = listState,
                 modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(start = spacing.x2, end = 32.dp),
+                contentPadding = PaddingValues(start = 0.dp, end = 32.dp),
                 horizontalArrangement = Arrangement.spacedBy(spacing.x1)
             ) {
                 onCreateHabit?.let { onAdd ->
                     item {
-                        AddHabitTile(onClick = onAdd)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(0.dp)
+                        ) {
+                            AddHabitTile(
+                                onClick = onAdd,
+                                tileSize = addHabitTileSize
+                            )
+                            if (addHabitGapAfter > 0.dp) {
+                                Spacer(modifier = Modifier.width(addHabitGapAfter))
+                            }
+                        }
                     }
                 }
                 if (showAllHabitsOption) {
@@ -364,12 +377,11 @@ internal fun HabitSelectorRow(
                 text = t("← → swipe to switch habits"),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                modifier = Modifier.padding(start = spacing.x2, top = 4.dp, bottom = 2.dp)
+                modifier = Modifier.padding(start = 0.dp, top = 4.dp, bottom = 2.dp)
             )
         }
     }
 }
-
 @Composable
 private fun HabitPill(
     habit: HabitTask,
@@ -377,16 +389,22 @@ private fun HabitPill(
     onClick: () -> Unit
 ) {
     val isDarkTheme = isSystemInDarkTheme()
-    val selectedColor = parseColorHex(habit.colorHex)
+    val selectedColor = AppTheme.colors.primary
     val unselectedBackgroundColor = if (isDarkTheme) {
         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)
     } else {
         MaterialTheme.colorScheme.secondaryContainer
     }
     val backgroundColor = if (isSelected) selectedColor else unselectedBackgroundColor
-    val textColor = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+    val textColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+    val emojiBubbleColor = if (isSelected) {
+        MaterialTheme.colorScheme.surface.copy(alpha = if (isDarkTheme) 0.26f else 0.86f)
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+    val emojiBubbleBorder = MaterialTheme.colorScheme.outline.copy(alpha = if (isDarkTheme) 0.42f else 0.28f)
     val borderColor = if (isSelected) {
-        Color.Transparent
+        AppTheme.colors.primary.copy(alpha = 0.95f)
     } else {
         MaterialTheme.colorScheme.outline.copy(alpha = if (isDarkTheme) 0.36f else 0.55f)
     }
@@ -396,23 +414,35 @@ private fun HabitPill(
         shape = RoundedCornerShape(18.dp),
         color = backgroundColor,
         border = BorderStroke(1.dp, borderColor),
-        modifier = Modifier.height(36.dp)
+        modifier = Modifier.height(40.dp)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp),
+            modifier = Modifier.padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Text(
-                text = habit.emoji.ifBlank { "✨" },
-                style = MaterialTheme.typography.bodyMedium,
-                fontSize = 14.sp
-            )
+            Surface(
+                shape = RoundedCornerShape(999.dp),
+                color = emojiBubbleColor,
+                border = BorderStroke(1.dp, emojiBubbleBorder),
+                modifier = Modifier.size(20.dp)
+            ) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Text(
+                        text = habit.emoji.ifBlank { "✨" },
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontSize = 13.sp
+                    )
+                }
+            }
             Text(
                 text = habit.title,
                 style = MaterialTheme.typography.bodyMedium,
-                fontSize = 14.sp,
-                fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
+                fontSize = 15.sp,
+                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
                 color = textColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -420,9 +450,11 @@ private fun HabitPill(
         }
     }
 }
-
 @Composable
-private fun AddHabitTile(onClick: () -> Unit) {
+private fun AddHabitTile(
+    onClick: () -> Unit,
+    tileSize: Dp = 36.dp
+) {
     val semantic = AppTheme.colors
     val radius = RoundedCornerShape(12.dp)
     val isDarkPalette = semantic.backgroundCanvas.red < 0.2f
@@ -442,7 +474,7 @@ private fun AddHabitTile(onClick: () -> Unit) {
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
-            .size(36.dp)
+            .size(tileSize)
             .clip(radius)
             .background(tintBackground)
             .clickable(onClick = onClick)
@@ -468,7 +500,6 @@ private fun AddHabitTile(onClick: () -> Unit) {
         )
     }
 }
-
 @Composable
 private fun FadeOverlay() {
     val backgroundColor = MaterialTheme.colorScheme.background
@@ -496,22 +527,23 @@ private fun AllHabitsPill(
     Surface(
         onClick = onClick,
         shape = RoundedCornerShape(18.dp),
-        color = if (isSelected) AppTheme.colors.primary else Color.Transparent,
+        color = if (isSelected) AppTheme.colors.primary else MaterialTheme.colorScheme.secondaryContainer,
         border = BorderStroke(
             width = 1.dp,
-            color = if (isSelected) Color.Transparent else MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
+            color = if (isSelected) AppTheme.colors.primary.copy(alpha = 0.95f) else MaterialTheme.colorScheme.outline.copy(alpha = if (isSystemInDarkTheme()) 0.36f else 0.55f)
         ),
-        modifier = Modifier.height(36.dp)
+        modifier = Modifier.height(40.dp)
     ) {
         Box(
             contentAlignment = Alignment.Center,
-            modifier = Modifier.padding(horizontal = 12.dp)
+            modifier = Modifier.padding(horizontal = 14.dp)
         ) {
             Text(
                 text = t("All habits"),
                 style = MaterialTheme.typography.bodyMedium,
-                fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
-                color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                fontSize = 15.sp,
+                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -583,8 +615,3 @@ internal fun GlassCard(
         }
     }
 }
-
-
-
-
-

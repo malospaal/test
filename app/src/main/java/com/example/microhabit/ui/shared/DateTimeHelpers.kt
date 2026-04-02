@@ -21,9 +21,19 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.fragment.app.FragmentActivity
 import com.example.microhabit.i18n.t
 import com.example.microhabit.ui.theme.AppTheme
+import com.google.android.material.datepicker.CalendarConstraints
+import com.google.android.material.datepicker.DateValidatorPointForward
+import com.google.android.material.datepicker.MaterialDatePicker
+import com.google.android.material.timepicker.MaterialTimePicker
+import com.google.android.material.timepicker.TimeFormat
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
+import java.time.ZoneOffset
+
 @Composable
 internal fun CalendarHeaderRow(
     monthLabel: String,
@@ -104,6 +114,25 @@ internal fun showThemedTimePicker(
     actionColorArgb: Int,
     onTimeSet: (hour: Int, minute: Int) -> Unit
 ) {
+    val hostActivity = context.findActivity()
+    val fragmentActivity = hostActivity as? FragmentActivity
+
+    if (fragmentActivity != null && !fragmentActivity.isFinishing) {
+        val picker = MaterialTimePicker.Builder()
+            .setTimeFormat(if (is24HourView) TimeFormat.CLOCK_24H else TimeFormat.CLOCK_12H)
+            .setHour(initialHour.coerceIn(0, 23))
+            .setMinute(initialMinute.coerceIn(0, 59))
+            .setTheme(themeResId)
+            .build()
+
+        picker.addOnPositiveButtonClickListener {
+            onTimeSet(picker.hour, picker.minute)
+        }
+
+        picker.show(fragmentActivity.supportFragmentManager, "microhabit_time_picker")
+        return
+    }
+
     val dialog = TimePickerDialog(
         context,
         themeResId,
@@ -127,6 +156,38 @@ internal fun showThemedDatePicker(
     actionColorArgb: Int,
     onDateSet: (year: Int, month: Int, day: Int) -> Unit
 ) {
+    val hostActivity = context.findActivity()
+    val fragmentActivity = hostActivity as? FragmentActivity
+
+    if (fragmentActivity != null && !fragmentActivity.isFinishing) {
+        val minUtcMillis = minDate?.atStartOfDay(ZoneOffset.UTC)?.toInstant()?.toEpochMilli()
+        val resolvedInitialDate = if (minDate != null && initialDate.isBefore(minDate)) minDate else initialDate
+        val initialUtcMillis = resolvedInitialDate
+            .atStartOfDay(ZoneOffset.UTC)
+            .toInstant()
+            .toEpochMilli()
+
+        val constraintsBuilder = CalendarConstraints.Builder()
+            .setOpenAt(initialUtcMillis)
+        minUtcMillis?.let { constraintsBuilder.setValidator(DateValidatorPointForward.from(it)) }
+
+        val picker = MaterialDatePicker.Builder.datePicker()
+            .setTheme(themeResId)
+            .setSelection(initialUtcMillis)
+            .setCalendarConstraints(constraintsBuilder.build())
+            .build()
+
+        picker.addOnPositiveButtonClickListener { selectedMillis ->
+            val selectedDate = Instant.ofEpochMilli(selectedMillis)
+                .atZone(ZoneOffset.UTC)
+                .toLocalDate()
+            onDateSet(selectedDate.year, selectedDate.monthValue - 1, selectedDate.dayOfMonth)
+        }
+
+        picker.show(fragmentActivity.supportFragmentManager, "microhabit_date_picker")
+        return
+    }
+
     val dialog = DatePickerDialog(
         context,
         themeResId,
@@ -147,7 +208,7 @@ internal fun showThemedDatePicker(
         dialog.getButton(DatePickerDialog.BUTTON_NEGATIVE)?.setTextColor(actionColorArgb)
     }
     minDate?.let {
-        val minMillis = it.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val minMillis = it.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
         dialog.datePicker.minDate = minMillis
     }
     dialog.show()
@@ -188,4 +249,3 @@ internal fun formatTimeForDevice(context: Context, hour: Int, minute: Int): Stri
     }
     return android.text.format.DateFormat.getTimeFormat(context).format(calendar.time)
 }
-

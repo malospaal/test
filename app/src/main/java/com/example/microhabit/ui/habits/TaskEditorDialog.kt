@@ -93,14 +93,14 @@ private object HabitEditorMotion {
             fadeIn(tween(220, easing = FastOutSlowInEasing))
     val exitMedium =
         shrinkVertically(tween(220, easing = FastOutSlowInEasing)) +
-            fadeOut(tween(180, easing = FastOutSlowInEasing))
+            fadeOut(tween(220, easing = FastOutSlowInEasing))
 
     val enterStandard =
         expandVertically(tween(280, easing = FastOutSlowInEasing)) +
             fadeIn(tween(280, easing = FastOutSlowInEasing))
     val exitStandard =
         shrinkVertically(tween(280, easing = FastOutSlowInEasing)) +
-            fadeOut(tween(200, easing = FastOutSlowInEasing))
+            fadeOut(tween(280, easing = FastOutSlowInEasing))
 
     val enterDelayed =
         expandVertically(tween(280, easing = FastOutSlowInEasing)) +
@@ -166,6 +166,28 @@ internal fun TaskEditorDialog(
     var previousReminderEnabled by remember { mutableStateOf(state.editorReminderEnabled) }
     var previousEndDateEnabled by remember { mutableStateOf(state.editorEndDate != null) }
 
+    suspend fun scrollToBottomSmooth(animationSpec: androidx.compose.animation.core.AnimationSpec<Float>) {
+        val target = editorScrollState.maxValue
+        if (target > editorScrollState.value) {
+            editorScrollState.animateScrollTo(target, animationSpec = animationSpec)
+        }
+    }
+
+    suspend fun clampScrollAfterCollapse(
+        animationSpec: androidx.compose.animation.core.AnimationSpec<Float> = HabitEditorMotion.Medium,
+        repeats: Int = 2,
+        settleDelayMillis: Long = 70L
+    ) {
+        repeat(repeats) {
+            val clamped = editorScrollState.value.coerceAtMost(editorScrollState.maxValue)
+            if (clamped != editorScrollState.value) {
+                editorScrollState.animateScrollTo(clamped, animationSpec = animationSpec)
+            }
+            delay(settleDelayMillis)
+        }
+    }
+
+
     val trackingCards = listOf(
         Triple(TrackingType.YES_NO, t("tracking_type_do_it"), t("tracking_type_do_it_sub")),
         Triple(TrackingType.COUNT, t("tracking_type_count"), t("tracking_type_count_sub")),
@@ -207,34 +229,25 @@ internal fun TaskEditorDialog(
 
     LaunchedEffect(state.editorShowAdvanced) {
         if (state.editorShowAdvanced && !previousAdvancedVisible) {
-            delay(220)
-            val target = editorScrollState.maxValue
-            if (target > editorScrollState.value) {
-                editorScrollState.animateScrollTo(target, animationSpec = HabitEditorMotion.Standard)
-            }
+            delay(320)
+            scrollToBottomSmooth(HabitEditorMotion.Standard)
         } else if (!state.editorShowAdvanced && previousAdvancedVisible) {
-            delay(80)
-            val clamped = editorScrollState.value.coerceAtMost(editorScrollState.maxValue)
-            if (clamped != editorScrollState.value) {
-                editorScrollState.animateScrollTo(clamped, animationSpec = HabitEditorMotion.Medium)
-            }
+            delay(300)
+            clampScrollAfterCollapse(
+                animationSpec = HabitEditorMotion.Standard,
+                repeats = 1,
+                settleDelayMillis = 0L
+            )
         }
         previousAdvancedVisible = state.editorShowAdvanced
     }
 
     LaunchedEffect(state.editorReminderEnabled) {
         if (state.editorReminderEnabled && !previousReminderEnabled) {
-            delay(120)
-            val target = editorScrollState.maxValue
-            if (target > editorScrollState.value) {
-                editorScrollState.animateScrollTo(target, animationSpec = HabitEditorMotion.Medium)
-            }
+            delay(260)
+            scrollToBottomSmooth(HabitEditorMotion.Medium)
         } else if (!state.editorReminderEnabled && previousReminderEnabled) {
-            delay(70)
-            val clamped = editorScrollState.value.coerceAtMost(editorScrollState.maxValue)
-            if (clamped != editorScrollState.value) {
-                editorScrollState.animateScrollTo(clamped, animationSpec = HabitEditorMotion.Medium)
-            }
+            // Single-phase hide: no manual post-scroll to avoid two-step feel.
         }
         previousReminderEnabled = state.editorReminderEnabled
     }
@@ -242,17 +255,10 @@ internal fun TaskEditorDialog(
     LaunchedEffect(state.editorEndDate != null) {
         val endDateEnabled = state.editorEndDate != null
         if (endDateEnabled && !previousEndDateEnabled) {
-            delay(120)
-            val target = editorScrollState.maxValue
-            if (target > editorScrollState.value) {
-                editorScrollState.animateScrollTo(target, animationSpec = HabitEditorMotion.Medium)
-            }
+            delay(260)
+            scrollToBottomSmooth(HabitEditorMotion.Medium)
         } else if (!endDateEnabled && previousEndDateEnabled) {
-            delay(70)
-            val clamped = editorScrollState.value.coerceAtMost(editorScrollState.maxValue)
-            if (clamped != editorScrollState.value) {
-                editorScrollState.animateScrollTo(clamped, animationSpec = HabitEditorMotion.Medium)
-            }
+            // Single-phase hide: no manual post-scroll to avoid two-step feel.
         }
         previousEndDateEnabled = endDateEnabled
     }
@@ -494,9 +500,9 @@ internal fun TaskEditorDialog(
                         trackingCards.forEach { (type, title, description) ->
                             val selected = state.editorTrackingType == type
                             val icon = when (type) {
-                                TrackingType.YES_NO -> "✓"
-                                TrackingType.COUNT -> "#"
-                                TrackingType.DURATION -> "◷"
+                                TrackingType.YES_NO -> "✅"
+                                TrackingType.COUNT -> "🔢"
+                                TrackingType.DURATION -> "⏱️"
                             }
 
                             TrackingTypeCard(
@@ -826,13 +832,12 @@ internal fun TaskEditorDialog(
                     enter = HabitEditorMotion.enterStandard,
                     exit = HabitEditorMotion.exitStandard
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(spacing.x1_5)) {
+                    Column {
                         SettingsSwitchRow(
                             title = t("End date"),
                             subtitle = t("Optional challenge finish date"),
                             checked = state.editorEndDate != null,
                             onCheckedChange = { enabled ->
-                                vm.setEditorEndDateEnabled(enabled)
                                 if (enabled) {
                                     val minDate = maxOf(LocalDate.now(), state.editorStartDate)
                                     val initialDate = state.editorEndDate ?: maxOf(LocalDate.now().plusDays(30), state.editorStartDate)
@@ -847,6 +852,9 @@ internal fun TaskEditorDialog(
                                         }
                                     )
                                 }
+                                else {
+                                    vm.setEditorEndDateEnabled(false)
+                                }
                             }
                         )
 
@@ -855,41 +863,63 @@ internal fun TaskEditorDialog(
                             enter = HabitEditorMotion.enterMedium,
                             exit = HabitEditorMotion.exitMedium
                         ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = t("label_finish_on"),
-                                    modifier = Modifier.weight(1f),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = colorScheme.onSurfaceVariant
-                                )
-                                DateChip(
-                                    text = (state.editorEndDate ?: state.editorStartDate)
-                                        .format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)),
-                                    onClick = {
-                                        val minDate = maxOf(LocalDate.now(), state.editorStartDate)
-                                        showThemedDatePicker(
-                                            context = context,
-                                            themeResId = datePickerTheme,
-                                            initialDate = state.editorEndDate ?: minDate,
-                                            minDate = minDate,
-                                            actionColorArgb = pickerActionColor,
-                                            onDateSet = { year, month, day ->
-                                                vm.setEditorEndDate(LocalDate.of(year, month + 1, day))
-                                            }
-                                        )
-                                    }
-                                )
+                            Column {
+                                Spacer(modifier = Modifier.height(spacing.x1_5))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = t("label_finish_on"),
+                                        modifier = Modifier.weight(1f),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = colorScheme.onSurfaceVariant
+                                    )
+                                    DateChip(
+                                        text = (state.editorEndDate ?: state.editorStartDate)
+                                            .format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)),
+                                        onClick = {
+                                            val minDate = maxOf(LocalDate.now(), state.editorStartDate)
+                                            showThemedDatePicker(
+                                                context = context,
+                                                themeResId = datePickerTheme,
+                                                initialDate = state.editorEndDate ?: minDate,
+                                                minDate = minDate,
+                                                actionColorArgb = pickerActionColor,
+                                                onDateSet = { year, month, day ->
+                                                    vm.setEditorEndDate(LocalDate.of(year, month + 1, day))
+                                                }
+                                            )
+                                        }
+                                    )
+                                }
                             }
                         }
+
+                        Spacer(modifier = Modifier.height(spacing.x1_5))
 
                         SettingsSwitchRow(
                             title = t("label_reminder"),
                             subtitle = t("Enable habit reminder notifications"),
                             checked = state.editorReminderEnabled,
-                            onCheckedChange = vm::setEditorReminderEnabled
+                            onCheckedChange = { enabled ->
+                                if (enabled) {
+                                    showThemedTimePicker(
+                                        context = context,
+                                        themeResId = pickerTheme,
+                                        initialHour = state.editorReminderHour,
+                                        initialMinute = state.editorReminderMinute,
+                                        is24HourView = is24HourView,
+                                        actionColorArgb = pickerActionColor,
+                                        onTimeSet = { hour, minute ->
+                                            vm.setEditorReminder(hour, minute)
+                                            vm.setEditorReminderEnabled(true)
+                                        }
+                                    )
+                                } else {
+                                    vm.setEditorReminderEnabled(false)
+                                }
+                            }
                         )
 
                         AnimatedVisibility(
@@ -897,34 +927,37 @@ internal fun TaskEditorDialog(
                             enter = HabitEditorMotion.enterMedium,
                             exit = HabitEditorMotion.exitMedium
                         ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = t("editor_remind_me_at"),
-                                    modifier = Modifier.weight(1f),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = colorScheme.onSurfaceVariant
-                                )
-                                DateChip(
-                                    text = formatTimeForDevice(
-                                        context,
-                                        state.editorReminderHour,
-                                        state.editorReminderMinute
-                                    ),
-                                    onClick = {
-                                        showThemedTimePicker(
-                                            context = context,
-                                            themeResId = pickerTheme,
-                                            initialHour = state.editorReminderHour,
-                                            initialMinute = state.editorReminderMinute,
-                                            is24HourView = is24HourView,
-                                            actionColorArgb = pickerActionColor,
-                                            onTimeSet = vm::setEditorReminder
-                                        )
-                                    }
-                                )
+                            Column {
+                                Spacer(modifier = Modifier.height(spacing.x1_5))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = t("editor_remind_me_at"),
+                                        modifier = Modifier.weight(1f),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = colorScheme.onSurfaceVariant
+                                    )
+                                    DateChip(
+                                        text = formatTimeForDevice(
+                                            context,
+                                            state.editorReminderHour,
+                                            state.editorReminderMinute
+                                        ),
+                                        onClick = {
+                                            showThemedTimePicker(
+                                                context = context,
+                                                themeResId = pickerTheme,
+                                                initialHour = state.editorReminderHour,
+                                                initialMinute = state.editorReminderMinute,
+                                                is24HourView = is24HourView,
+                                                actionColorArgb = pickerActionColor,
+                                                onTimeSet = vm::setEditorReminder
+                                            )
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -977,47 +1010,44 @@ private fun TrackingTypeCard(
             color = cardBorderColor
         )
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 13.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            Box(
+                modifier = Modifier
+                    .size(30.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(iconBgColor),
+                contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(24.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(
-                            iconBgColor
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = iconText,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = iconTint
-                    )
-                }
+                Text(
+                    text = iconText,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = iconTint
+                )
+            }
 
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
                 Text(
                     text = title,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Medium,
                     color = colorScheme.onSurface
                 )
+                Text(
+                    text = subtitle,
+                    fontSize = 12.sp,
+                    color = colorScheme.onSurfaceVariant
+                )
             }
-
-            Text(
-                text = subtitle,
-                modifier = Modifier.padding(start = 36.dp),
-                fontSize = 12.sp,
-                color = colorScheme.onSurfaceVariant
-            )
         }
     }
 }
@@ -1205,6 +1235,14 @@ private fun DateChip(
         }
     }
 }
+
+
+
+
+
+
+
+
 
 
 

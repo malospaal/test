@@ -181,7 +181,7 @@ data class HabitUiState(
     val plan: SubscriptionPlan = SubscriptionPlan.FREE,
     val proAccessSource: ProAccessSource = ProAccessSource.NONE,
     val subscriptionState: SubscriptionState = SubscriptionState.Free,
-    val themeMode: AppThemeMode = AppThemeMode.SYSTEM,
+    val themeMode: AppThemeMode = AppThemeMode.DARK,
     val language: AppLanguage = AppLanguage.RU,
     val minimumCompletionPercent: Int = 100,
     val durationTimerRunning: Boolean = false,

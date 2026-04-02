@@ -80,7 +80,7 @@ Responsibility: Paywall destination, pricing cards, plan labels, premium feature
 ## app/src/main/java/com/example/microhabit/ui/settings/SettingsScreen.kt
 Package: com.example.microhabit.ui.settings  
 Lines: ~376  
-Responsibility: Settings page and shared selection dialog helpers.
+Responsibility: Settings page, section cards, and settings bottom-sheet selectors.
 
 ## app/src/main/java/com/example/microhabit/ui/onboarding/OnboardingWizard.kt
 Package: com.example.microhabit.ui.onboarding  
@@ -130,7 +130,9 @@ Responsibility: App-wide enums/constants/contracts extracted from MainActivity.
 | billingProductIdFor | domain/subscription/BillingMapping.kt | Billing cycle -> product id |
 | proAccessSourceFor | domain/subscription/BillingMapping.kt | Billing cycle -> ProAccessSource |
 | SettingsPage | ui/settings/SettingsScreen.kt | Settings destination |
-| SelectionDialog | ui/settings/SettingsScreen.kt | Generic choice dialog |
+| SelectionBottomSheet | ui/settings/SettingsScreen.kt | Generic settings option bottom sheet |
+| CompletionThresholdBottomSheet | ui/settings/SettingsScreen.kt | Completion threshold slider sheet |
+| DeleteAccountBottomSheet | ui/settings/SettingsScreen.kt | Destructive account-delete confirmation sheet |
 | themeLabel | ui/settings/SettingsScreen.kt | Theme mode label helper |
 | AnalyticsPage | ui/analytics/AnalyticsPage.kt | Analytics destination wrapper |
 | PaywallPage | ui/paywall/PaywallScreen.kt | Paywall destination |

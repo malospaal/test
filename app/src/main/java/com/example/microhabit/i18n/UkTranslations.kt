@@ -184,11 +184,15 @@ internal val ukTranslations: Map<String, String> = mapOf(
     "Data" to "Дані",
     "Control your data and account lifecycle." to "Керуйте даними та життєвим циклом акаунта.",
     "Export data" to "Експорт даних",
+    "settings_export_sub" to "Зберегти всі звички як JSON-файл",
+
     "Save tasks and progress as JSON" to "Зберегти задачі та прогрес у JSON",
     "Data exported: %s" to "Дані експортовано: %s",
     "Export failed: %s" to "Помилка експорту: %s",
     "Unknown error" to "Невідома помилка",
     "Reset progress" to "Скинути прогрес",
+    "settings_reset_sub" to "Очистити всю історію відстеження",
+
     "Clear completion history, keep habits" to "Очистити історію виконання, залишити звички",
     "Delete account" to "Видалити акаунт",
     "Danger zone" to "Небезпечна зона",
@@ -203,6 +207,8 @@ internal val ukTranslations: Map<String, String> = mapOf(
     "Support contact will be connected in the next build." to "Контакт із підтримкою буде підключено в наступній збірці.",
     "Select theme" to "Виберіть тему",
     "System" to "Система",
+    "settings_theme_system_default" to "Системна",
+
     "Light" to "Світла",
     "Dark" to "Темна",
     "Select language" to "Виберіть мову",
@@ -418,6 +424,10 @@ internal val ukTranslations: Map<String, String> = mapOf(
     "Used for count and duration habits" to "Використовується для звичок за кількістю та тривалістю",
     "Applies to count and duration habits" to "Застосовується до звичок за кількістю та тривалістю",
     "Completion threshold" to "Поріг виконання",
+    "settings_threshold_sub" to "Мінімальний % для зарахування дня як виконаного",
+    "settings_threshold_desc_100" to "Для зарахування дня потрібна повна ціль",
+    "settings_threshold_desc_partial" to "Частковий прогрес зараховується як виконаний",
+
     "For example: 100%" to "Наприклад: 100%",
     "Value must be between 1 and 100" to "Значення має бути від 1 до 100",
     "In progress" to "У процесі",

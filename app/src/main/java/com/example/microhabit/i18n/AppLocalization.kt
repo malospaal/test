@@ -593,6 +593,10 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
         "Управляйте данными и жизненным циклом аккаунта."
     ),
     "Export data" to v("Daten exportieren", "Exporter les donnees", "Exportar datos", "Esporta dati", "Экспорт данных"),
+    "settings_export_sub" to (
+        v("Alle Gewohnheiten als JSON-Datei speichern", "Enregistrer toutes les habitudes en fichier JSON", "Guardar todos los habitos en un archivo JSON", "Salva tutte le abitudini come file JSON", "Сохранить все привычки в JSON-файл") +
+            mapOf(AppLanguage.EN to "Save all habits as a JSON file", AppLanguage.CS to "Uložit všechny návyky jako JSON soubor")
+    ),
     "Save tasks and progress as JSON" to v(
         "Aufgaben und Fortschritt als JSON speichern",
         "Sauvegarder taches et progression en JSON",
@@ -604,6 +608,10 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     "Export failed: %s" to v("Export fehlgeschlagen: %s", "Echec de l'export : %s", "Error de exportacion: %s", "Esportazione fallita: %s", "Ошибка экспорта: %s"),
     "Unknown error" to v("Unbekannter Fehler", "Erreur inconnue", "Error desconocido", "Errore sconosciuto", "Неизвестная ошибка"),
     "Reset progress" to v("Fortschritt zurucksetzen", "Reinitialiser la progression", "Restablecer progreso", "Reimposta progressi", "Сбросить прогресс"),
+    "settings_reset_sub" to (
+        v("Gesamte Tracking-Historie loschen", "Effacer tout l'historique de suivi", "Borrar todo el historial de seguimiento", "Cancella tutta la cronologia di monitoraggio", "Очистить всю историю отслеживания") +
+            mapOf(AppLanguage.EN to "Clear all tracking history", AppLanguage.CS to "Vymazat celou historii sledování")
+    ),
     "Clear completion history, keep habits" to v(
         "Abschlussverlauf loschen, Gewohnheiten behalten",
         "Effacer l'historique, conserver les habitudes",
@@ -636,6 +644,10 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
     ),
     "Select theme" to v("Thema auswahlen", "Choisir le theme", "Seleccionar tema", "Seleziona tema", "Выбрать тему"),
     "System" to v("System", "Systeme", "Sistema", "Sistema", "Система"),
+    "settings_theme_system_default" to (
+        v("Systemstandard", "Systeme par defaut", "Predeterminado del sistema", "Predefinito di sistema", "По умолчанию системы") +
+            mapOf(AppLanguage.EN to "System default", AppLanguage.CS to "Výchozí systém")
+    ),
     "Light" to v("Hell", "Clair", "Claro", "Chiaro", "Светлая"),
     "Dark" to v("Dunkel", "Sombre", "Oscuro", "Scuro", "Темная"),
     "Select language" to v("Sprache auswahlen", "Choisir la langue", "Seleccionar idioma", "Seleziona lingua", "Выбрать язык"),
@@ -1131,6 +1143,18 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
         "Применяется к привычкам по количеству и времени"
     ),
     "Completion threshold" to v("Erfullungsschwelle", "Seuil de completion", "Umbral de cumplimiento", "Soglia di completamento", "Порог выполнения"),
+    "settings_threshold_sub" to (
+        v("Mindestprozentsatz fur einen erledigten Tag", "Pourcentage minimum pour valider une journee", "Porcentaje minimo para contar el dia como completado", "Percentuale minima per considerare il giorno completato", "Минимальный % для засчета дня как выполненного") +
+            mapOf(AppLanguage.EN to "Minimum % to count a day as done", AppLanguage.CS to "Minimální % pro započtení dne jako splněného")
+    ),
+    "settings_threshold_desc_100" to (
+        v("Volles Ziel erforderlich, um den Tag abzuschliessen", "Objectif complet requis pour valider la journee", "Se requiere el objetivo completo para completar el dia", "Obiettivo completo richiesto per completare il giorno", "Полная цель нужна, чтобы засчитать день") +
+            mapOf(AppLanguage.EN to "Full goal required to complete a day", AppLanguage.CS to "Pro splnění dne je nutný celý cíl")
+    ),
+    "settings_threshold_desc_partial" to (
+        v("Teilfortschritt zahlt als erledigt", "Le progres partiel compte comme complete", "El progreso parcial cuenta como completado", "Il progresso parziale conta come completato", "Частичный прогресс засчитывается как выполнено") +
+            mapOf(AppLanguage.EN to "Partial progress counts as completed", AppLanguage.CS to "Částečný pokrok se počítá jako splněný")
+    ),
     "For example: 100%" to v("Zum Beispiel: 100%", "Par exemple : 100%", "Por ejemplo: 100%", "Per esempio: 100%", "Например: 100%"),
     "Value must be between 1 and 100" to v(
         "Der Wert muss zwischen 1 und 100 liegen",

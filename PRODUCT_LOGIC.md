@@ -442,9 +442,10 @@ Editor behavior updates:
   - `Appearance` (Theme),
   - `Language`,
   - `Tracking` (completion threshold),
-  - `Subscription` (manage subscription),
   - `Data` (export data, reset progress),
   - `Danger zone` (delete account).
+- Управление подпиской находится на `Account`/`Manage Subscription`, а не в `Settings`.
+- Тема по умолчанию для новых установок/пустых настроек: `Dark` (до явного выбора пользователем).
 
 ### 12.10 Analytics Screen
 - `Analytics` — отдельный primary-экран с обзорной аналитикой по выбранной привычке или по режиму `All habits`.

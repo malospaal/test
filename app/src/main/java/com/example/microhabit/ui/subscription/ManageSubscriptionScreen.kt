@@ -502,7 +502,7 @@ internal fun MilestonePreviewSheet(
     val colorScheme = MaterialTheme.colorScheme
     val darkPrimaryText = if (isDark) Color(0xFFE8F5EF) else colorScheme.onBackground
     val darkMutedText = if (isDark) Color(0xFF6AAA85) else colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
-    val dividerColor = if (isDark) Color(0xFF1A3528) else colorScheme.outline.copy(alpha = 0.45f)
+    val dividerColor = if (isDark) colorScheme.outline.copy(alpha = 0.72f) else colorScheme.outline.copy(alpha = 0.68f)
     val rows = remember {
         streakMilestoneTierDefinitions.map { definition ->
             definition.days to definition.accentColor
@@ -630,7 +630,7 @@ internal fun CancelSubscriptionSheet(
                         Text(activeUntil, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
                     Spacer(Modifier.height(10.dp))
-                    HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.28f))
+                    HorizontalDivider(color = colors.borderSubtle.copy(alpha = 0.62f), thickness = 1.dp)
                     Spacer(Modifier.height(10.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Text(t("Charge"), color = colors.textSecondary, fontSize = 12.sp)

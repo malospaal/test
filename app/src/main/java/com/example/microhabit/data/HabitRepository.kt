@@ -433,8 +433,8 @@ class HabitRepository(private val context: Context) {
     }
 
     fun getThemeMode(): AppThemeMode {
-        val raw = prefs.getString(KEY_THEME_MODE, AppThemeMode.SYSTEM.name) ?: AppThemeMode.SYSTEM.name
-        return runCatching { AppThemeMode.valueOf(raw) }.getOrDefault(AppThemeMode.SYSTEM)
+        val raw = prefs.getString(KEY_THEME_MODE, AppThemeMode.DARK.name) ?: AppThemeMode.DARK.name
+        return runCatching { AppThemeMode.valueOf(raw) }.getOrDefault(AppThemeMode.DARK)
     }
 
     fun setThemeMode(mode: AppThemeMode) {

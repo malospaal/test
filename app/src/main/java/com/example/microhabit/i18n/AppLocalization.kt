@@ -1060,6 +1060,7 @@ private val translations: Map<String, Map<AppLanguage, String>> = mapOf(
         "Необязательная дата завершения челленджа"
     ),
     "Fill required fields to continue." to v("Fulle die erforderlichen Felder aus.", "Remplissez les champs obligatoires.", "Completa los campos requeridos.", "Compila i campi richiesti.", "Заполните обязательные поля."),
+    "This field is required." to v("Dieses Feld ist erforderlich.", "Ce champ est obligatoire.", "Este campo es obligatorio.", "Questo campo e obbligatorio.", "Это поле обязательно."),
     "Save habit" to v("Gewohnheit speichern", "Enregistrer l'habitude", "Guardar habito", "Salva abitudine", "Сохранить привычку"),
     "Save changes" to v("Anderungen speichern", "Enregistrer les modifications", "Guardar cambios", "Salva modifiche", "Сохранить изменения"),
     "Create Habit" to v("Gewohnheit erstellen", "Creer une habitude", "Crear habito", "Crea abitudine", "Создать привычку"),
@@ -1811,6 +1812,8 @@ fun tf(source: String, vararg args: Any): String {
 @Composable
 @ReadOnlyComposable
 fun appLocale(): Locale = localeForLanguage(LocalAppLanguage.current)
+
+
 
 
 

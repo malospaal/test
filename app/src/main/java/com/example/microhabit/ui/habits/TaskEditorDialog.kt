@@ -137,9 +137,14 @@ internal fun TaskEditorDialog(
     var showEmojiPicker by rememberSaveable { mutableStateOf(false) }
     var showCountNumpad by rememberSaveable { mutableStateOf(false) }
     var countNumpadInput by rememberSaveable { mutableStateOf("") }
+    var durationInput by rememberSaveable(state.editingTaskId) {
+        mutableStateOf(state.editorDailyTarget.coerceIn(1, 600).toString())
+    }
     var wasSaveAttempted by rememberSaveable(state.editingTaskId) { mutableStateOf(false) }
 
-    val canSave = vm.canSaveEditor()
+    val isDurationTargetInvalid =
+        state.editorTrackingType == TrackingType.DURATION && durationInput.isBlank()
+    val canSave = vm.canSaveEditor() && !isDurationTargetInvalid
     val isTitleInvalid = wasSaveAttempted && state.editorTitle.isBlank()
     val shortWeekdays = remember(language) { weekdayLabels(language).map { it.take(2) } }
     val editorScrollState = rememberScrollState()
@@ -228,6 +233,9 @@ internal fun TaskEditorDialog(
     LaunchedEffect(state.editorTrackingType) {
         if (state.editorTrackingType != TrackingType.YES_NO) {
             lastTargetTrackingType = state.editorTrackingType
+        }
+        if (state.editorTrackingType == TrackingType.DURATION && durationInput.isBlank()) {
+            durationInput = state.editorDailyTarget.coerceIn(1, 600).toString()
         }
     }
 
@@ -388,7 +396,7 @@ internal fun TaskEditorDialog(
                         verticalArrangement = Arrangement.spacedBy(spacing.x0_5)
                     ) {
                         AnimatedVisibility(
-                            visible = wasSaveAttempted && state.editorTitle.isBlank(),
+                            visible = wasSaveAttempted && (state.editorTitle.isBlank() || isDurationTargetInvalid),
                             enter = fadeIn(HabitEditorMotion.ErrorEnterFloat) + expandVertically(HabitEditorMotion.ErrorEnterSize),
                             exit = fadeOut(HabitEditorMotion.ErrorExitFloat) + shrinkVertically(HabitEditorMotion.ErrorExitSize)
                         ) {
@@ -487,7 +495,7 @@ internal fun TaskEditorDialog(
                             exit = fadeOut(HabitEditorMotion.ErrorExitFloat) + shrinkVertically(HabitEditorMotion.ErrorExitSize)
                         ) {
                             Text(
-                                text = t("Fill required fields to continue."),
+                                text = t("This field is required."),
                                 color = colorScheme.error,
                                 style = MaterialTheme.typography.bodySmall
                             )
@@ -615,22 +623,35 @@ internal fun TaskEditorDialog(
                         if (activeTrackingType == TrackingType.DURATION) {
                             FormSection(title = t("Duration target")) {
                                 OutlinedTextField(
-                                    value = state.editorDailyTarget.toString(),
+                                    value = durationInput,
                                     onValueChange = { raw ->
-                                        val parsed = raw.filter { it.isDigit() }.take(3).toIntOrNull()
-                                        if (parsed != null) {
-                                            vm.setEditorDailyTarget(parsed.coerceIn(1, 600))
+                                        val digits = raw.filter { it.isDigit() }.take(3)
+                                        if (digits.isEmpty()) {
+                                            durationInput = ""
+                                        } else {
+                                            val parsed = digits.toIntOrNull() ?: 1
+                                            val clamped = parsed.coerceIn(1, 600)
+                                            durationInput = clamped.toString()
+                                            vm.setEditorDailyTarget(clamped)
                                         }
                                     },
                                     modifier = Modifier.fillMaxWidth(),
                                     label = { Text(t("Daily minute goal")) },
+                                    isError = wasSaveAttempted && isDurationTargetInvalid,
                                     singleLine = true,
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                     supportingText = {
-                                        Text(
-                                            text = "1-600",
-                                            color = colorScheme.onSurfaceVariant
-                                        )
+                                        if (wasSaveAttempted && isDurationTargetInvalid) {
+                                            Text(
+                                                text = t("This field is required."),
+                                                color = colorScheme.error
+                                            )
+                                        } else {
+                                            Text(
+                                                text = "1-600",
+                                                color = colorScheme.onSurfaceVariant
+                                            )
+                                        }
                                     }
                                 )
                             }
@@ -1240,6 +1261,15 @@ private fun DateChip(
         }
     }
 }
+
+
+
+
+
+
+
+
+
 
 
 

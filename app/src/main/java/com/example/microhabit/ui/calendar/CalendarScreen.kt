@@ -206,7 +206,6 @@ internal fun GlobalCalendarHeatCell(
     val borderWidth = if (selected) stroke.medium else baseBorderWidth
 
     val textColor = when {
-        isToday -> colors.primary
         isFuture -> colors.textTertiary
         completedCount > 0 -> MaterialTheme.colorScheme.onPrimary
         hasManualOverride -> colors.success
@@ -292,4 +291,5 @@ internal fun monthGrid(month: YearMonth): List<List<LocalDate?>> {
     while (days.size % 7 != 0) days += null
     return days.chunked(7)
 }
+
 

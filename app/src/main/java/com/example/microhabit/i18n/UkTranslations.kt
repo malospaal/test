@@ -395,6 +395,7 @@ internal val ukTranslations: Map<String, String> = mapOf(
     "End date: %s" to "Дата завершення: %s",
     "Optional challenge finish date" to "Необов'язкова дата завершення челенджу",
     "Fill required fields to continue." to "Заповніть обов'язкові поля, щоб продовжити.",
+    "This field is required." to "Це поле є обов'язковим.",
     "Save habit" to "Зберегти звичку",
     "Save changes" to "Зберегти зміни",
     "Create Habit" to "Створити звичку",
@@ -677,5 +678,7 @@ internal val ukTranslations: Map<String, String> = mapOf(
     "dd MMM yyyy" to "dd MMM yyyy",
     "LLLL yyyy" to "LLLL yyyy"
 )
+
+
 
 

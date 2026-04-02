@@ -110,7 +110,10 @@ internal fun AccountPage(
                     1.5.dp,
                     if (isDark) Color(0xFF3A1A1A) else colorScheme.error.copy(alpha = 0.45f)
                 )
-                SubscriptionState.Free -> if (isDark) null else BorderStroke(1.dp, Color(0xFFC8D9CA))
+                SubscriptionState.Free -> BorderStroke(
+                    1.5.dp,
+                    if (isDark) accentPrimary else Color(0xFF1D9E75)
+                )
             }
 
             val planCardElevation = when (state.subscriptionState) {
@@ -707,6 +710,7 @@ internal fun AccountActionRow(
         )
     }
 }
+
 
 
 

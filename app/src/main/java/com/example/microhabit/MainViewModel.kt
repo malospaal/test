@@ -488,7 +488,7 @@ class MainViewModel(
         val normalizedTrackingType = prefill?.trackingType ?: TrackingType.YES_NO
         val normalizedTarget = when (normalizedTrackingType) {
             TrackingType.YES_NO -> 1
-            TrackingType.COUNT, TrackingType.DURATION -> (prefill?.dailyTarget ?: 1).coerceAtLeast(1)
+            TrackingType.COUNT, TrackingType.DURATION -> (prefill?.dailyTarget ?: if (normalizedTrackingType == TrackingType.DURATION) 15 else 1).coerceAtLeast(1)
         }
         val normalizedFrequency = prefill?.frequency ?: TaskFrequency.DAILY
         val normalizedCustomDays = if (normalizedFrequency == TaskFrequency.SELECTED_DAYS) {
@@ -593,7 +593,7 @@ class MainViewModel(
                 TrackingType.DURATION -> if (it.editorTrackingType == TrackingType.DURATION) {
                     it.editorDailyTarget.coerceAtLeast(1)
                 } else {
-                    20
+                    15
                 }
             }
             it.copy(
@@ -1584,4 +1584,5 @@ class MainViewModel(
         private const val DEFAULT_REMINDER_MINUTE = 0
     }
 }
+
 

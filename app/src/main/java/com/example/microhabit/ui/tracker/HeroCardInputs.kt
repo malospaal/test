@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.automirrored.rounded.Backspace
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -25,21 +26,38 @@ import com.example.microhabit.ui.theme.AppTheme
 @Composable
 internal fun HeroDetailsButton(onClick: () -> Unit) {
     val semantic = AppTheme.colors
+    val detailsLabel = t("More details →").replace("→", "").trim()
     TextButton(
         onClick = onClick,
-        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
     ) {
-        Text(
-            text = t("More details →"),
-            style = MaterialTheme.typography.labelMedium,
-            color = semantic.primary,
-            fontWeight = FontWeight.Medium
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(3.dp)
+        ) {
+            Text(
+                text = detailsLabel,
+                style = MaterialTheme.typography.labelMedium,
+                fontSize = 14.sp,
+                color = semantic.primary,
+                fontWeight = FontWeight.Medium,
+                lineHeight = 16.sp
+            )
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+                contentDescription = null,
+                tint = semantic.primary,
+                modifier = Modifier.size(14.dp)
+            )
+        }
     }
 }
 
 @Composable
-internal fun EditValueButton(onClick: () -> Unit) {
+internal fun EditValueButton(
+    onClick: () -> Unit,
+    textSize: androidx.compose.ui.unit.TextUnit = 9.sp
+) {
     val colors = AppTheme.colors
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -64,7 +82,7 @@ internal fun EditValueButton(onClick: () -> Unit) {
         Text(
             text = t("edit"),
             style = MaterialTheme.typography.labelSmall,
-            fontSize = 9.sp,
+            fontSize = textSize,
             fontWeight = FontWeight.Medium,
             color = colors.primary
         )
@@ -195,6 +213,3 @@ internal fun ValueNumpad(
     }
 
 }
-
-
-

@@ -64,7 +64,7 @@ internal fun ProgressRing(
         )
         Text(
             text = centerLabel,
-            fontSize = if (centerLabel.contains("%")) 13.sp else 18.sp,
+            fontSize = if (centerLabel.contains("%")) 14.sp else 18.sp,
             fontWeight = if (centerLabel.contains("%")) FontWeight.Bold else FontWeight.Normal,
             color = centerLabelColor
         )
@@ -435,6 +435,7 @@ private fun DayBar(
         )
     }
 }
+
 
 
 

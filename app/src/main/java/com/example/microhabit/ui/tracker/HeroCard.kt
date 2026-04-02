@@ -329,7 +329,7 @@ internal fun HeroCard(
             Text(
                 text = formatHeroDate(selectedDate, locale),
                 style = MaterialTheme.typography.labelSmall,
-                fontSize = 11.sp,
+                fontSize = 12.sp,
                 color = semantic.textSecondary,
                 modifier = Modifier.padding(bottom = 6.dp)
             )
@@ -340,11 +340,12 @@ internal fun HeroCard(
             ) {
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(spacing.x0_5)
+                    verticalArrangement = Arrangement.spacedBy(spacing.x1)
                 ) {
                     Text(
                         text = "${task?.emoji?.ifBlank { "✨" } ?: "✨"}  ${task?.title ?: t("No active habit")}",
                         style = MaterialTheme.typography.titleMedium,
+                        fontSize = 20.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = semantic.textPrimary,
                         maxLines = 1,
@@ -353,6 +354,7 @@ internal fun HeroCard(
                     Text(
                         text = streakMetaText,
                         style = MaterialTheme.typography.labelSmall,
+                        fontSize = 12.sp,
                         color = semantic.textSecondary,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
@@ -646,7 +648,10 @@ internal fun HeroCard(
                                 }
                             }
                             if (selectedValue > 0) {
-                                EditValueButton(onClick = { showValueNumpad = true })
+                                EditValueButton(
+                                    onClick = { showValueNumpad = true },
+                                    textSize = if (isCountTracking) 10.sp else 9.sp
+                                )
                             }
                         }
 
@@ -680,6 +685,7 @@ internal fun HeroCard(
                                     Text(
                                         text = "$displayPercent%",
                                         style = MaterialTheme.typography.labelSmall,
+                                        fontSize = if (isCountTracking || isDurationTracking) 12.sp else 11.sp,
                                         fontWeight = FontWeight.Medium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.widthIn(min = 32.dp),
@@ -689,6 +695,7 @@ internal fun HeroCard(
                                 Text(
                                     text = goalStatusText,
                                     style = MaterialTheme.typography.labelSmall,
+                                    fontSize = if (isCountTracking || isDurationTracking) 12.sp else 11.sp,
                                     color = goalStatusColor,
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -706,7 +713,7 @@ internal fun HeroCard(
                                             modifier = Modifier.weight(1f),
                                             shape = RoundedCornerShape(radius.full)
                                         ) {
-                                            Text("−")
+                                            Text("−", fontSize = 18.sp)
                                         }
                                         Surface(
                                             modifier = Modifier
@@ -729,7 +736,7 @@ internal fun HeroCard(
                                             modifier = Modifier.weight(1f),
                                             shape = RoundedCornerShape(radius.full)
                                         ) {
-                                            Text("+")
+                                            Text("+", fontSize = 18.sp)
                                         }
                                     }
                                 }
@@ -999,7 +1006,4 @@ internal fun HeroCard(
         )
     }
 }
-
-
-
 

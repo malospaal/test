@@ -98,6 +98,7 @@ internal data class StreakMilestoneTier(
     val message: String,
     val ctaLabel: String,
     val accentColor: Color,
+    val innerAccentColor: Color,
     val backgroundColor: Color,
     val nextMilestoneDays: Int?,
     val nextMilestoneIcon: String
@@ -106,25 +107,26 @@ internal data class StreakMilestoneTier(
 internal data class StreakMilestoneTierDefinition(
     val days: Int,
     val accentColor: Color,
+    val innerAccentColor: Color,
     val backgroundColor: Color,
     val nextMilestoneDays: Int?,
     val nextMilestoneIcon: String
 )
 
 internal val streakMilestoneTierDefinitions = listOf(
-    StreakMilestoneTierDefinition(1, Color(0xFF2DCF96), Color(0xFF0A2318), 3, "🎯"),
-    StreakMilestoneTierDefinition(3, Color(0xFF2DCF96), Color(0xFF0A2318), 7, "🔥"),
-    StreakMilestoneTierDefinition(7, Color(0xFFF59E42), Color(0xFF1F1008), 14, "⚡"),
-    StreakMilestoneTierDefinition(14, Color(0xFFF59E42), Color(0xFF1F1008), 21, "⭐"),
-    StreakMilestoneTierDefinition(21, Color(0xFFEAB308), Color(0xFF1A1200), 30, "🏅"),
-    StreakMilestoneTierDefinition(30, Color(0xFFEAB308), Color(0xFF1A1200), 50, "💪"),
-    StreakMilestoneTierDefinition(50, Color(0xFFFBBF24), Color(0xFF160E00), 66, "⚡"),
-    StreakMilestoneTierDefinition(66, Color(0xFFFBBF24), Color(0xFF160E00), 100, "💎"),
-    StreakMilestoneTierDefinition(100, Color(0xFFFBBF24), Color(0xFF160E00), 180, "🌟"),
-    StreakMilestoneTierDefinition(180, Color(0xFFA78BFA), Color(0xFF0F0820), 365, "👑"),
-    StreakMilestoneTierDefinition(365, Color(0xFFA78BFA), Color(0xFF0F0820), 500, "🔮"),
-    StreakMilestoneTierDefinition(500, Color(0xFFC084FC), Color(0xFF0C0618), 1000, "∞"),
-    StreakMilestoneTierDefinition(1000, Color(0xFFE879F9), Color(0xFF080818), null, "")
+    StreakMilestoneTierDefinition(1, Color(0xFF2DCF96), Color(0xFFB8FFE8), Color(0xFF0A2318), 3, "🎯"),
+    StreakMilestoneTierDefinition(3, Color(0xFF2DCF96), Color(0xFFB8FFE8), Color(0xFF0A2318), 7, "🔥"),
+    StreakMilestoneTierDefinition(7, Color(0xFFF59E42), Color(0xFFFFF0BC), Color(0xFF1F1008), 14, "⚡"),
+    StreakMilestoneTierDefinition(14, Color(0xFFF59E42), Color(0xFFFFF0BC), Color(0xFF1F1008), 21, "⭐"),
+    StreakMilestoneTierDefinition(21, Color(0xFFEAB308), Color(0xFFFEFBB0), Color(0xFF1A1200), 30, "🏅"),
+    StreakMilestoneTierDefinition(30, Color(0xFFEAB308), Color(0xFFFEFBB0), Color(0xFF1A1200), 50, "💪"),
+    StreakMilestoneTierDefinition(50, Color(0xFFFBBF24), Color(0xFFFFF5C0), Color(0xFF160E00), 66, "⚡"),
+    StreakMilestoneTierDefinition(66, Color(0xFFFBBF24), Color(0xFFFFF5C0), Color(0xFF160E00), 100, "💎"),
+    StreakMilestoneTierDefinition(100, Color(0xFFFBBF24), Color(0xFFFFF5C0), Color(0xFF160E00), 180, "🌟"),
+    StreakMilestoneTierDefinition(180, Color(0xFFA78BFA), Color(0xFFEDE0FF), Color(0xFF0F0820), 365, "👑"),
+    StreakMilestoneTierDefinition(365, Color(0xFFA78BFA), Color(0xFFEDE0FF), Color(0xFF0F0820), 500, "🔮"),
+    StreakMilestoneTierDefinition(500, Color(0xFFC084FC), Color(0xFFF3DCFF), Color(0xFF0C0618), 1000, "∞"),
+    StreakMilestoneTierDefinition(1000, Color(0xFFE879F9), Color(0xFFFFD6FF), Color(0xFF080818), null, "")
 )
 
 internal data class OnboardingHabitDraft(

@@ -46,6 +46,7 @@ internal fun streakMilestoneTier(days: Int): StreakMilestoneTier? {
         message = t("milestone_message_${definition.days}"),
         ctaLabel = t("milestone_cta_${definition.days}"),
         accentColor = definition.accentColor,
+        innerAccentColor = definition.innerAccentColor,
         backgroundColor = definition.backgroundColor,
         nextMilestoneDays = definition.nextMilestoneDays,
         nextMilestoneIcon = definition.nextMilestoneIcon
@@ -139,14 +140,22 @@ internal fun StreakMilestoneScreen(
         isPlaying = true,
         speed = 1f
     )
-    val flameFilter = remember(tier.accentColor) {
+    val outerFlameFilter = remember(tier.accentColor) {
         PorterDuffColorFilter(tier.accentColor.toArgb(), PorterDuff.Mode.SRC_ATOP)
+    }
+    val innerFlameFilter = remember(tier.innerAccentColor) {
+        PorterDuffColorFilter(tier.innerAccentColor.toArgb(), PorterDuff.Mode.SRC_ATOP)
     }
     val lottieDynamicProperties = rememberLottieDynamicProperties(
         rememberLottieDynamicProperty(
             property = LottieProperty.COLOR_FILTER,
-            value = flameFilter,
-            keyPath = arrayOf("**")
+            value = outerFlameFilter,
+            keyPath = arrayOf("Flame ")
+        ),
+        rememberLottieDynamicProperty(
+            property = LottieProperty.COLOR_FILTER,
+            value = innerFlameFilter,
+            keyPath = arrayOf("Mid ")
         )
     )
 
@@ -180,7 +189,7 @@ internal fun StreakMilestoneScreen(
                 } else {
                     Text(
                         text = "🔥",
-                        fontSize = 44.sp,
+                        fontSize = 46.sp,
                         color = tier.accentColor
                     )
                 }
@@ -193,7 +202,7 @@ internal fun StreakMilestoneScreen(
                 Text(
                     text = tier.badgeLabel,
                     color = tier.accentColor,
-                    fontSize = 12.sp,
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier
                         .clip(RoundedCornerShape(999.dp))
@@ -203,16 +212,16 @@ internal fun StreakMilestoneScreen(
                 Text(
                     text = tier.days.toString(),
                     fontSize = when {
-                        tier.days >= 1000 -> 48.sp
-                        tier.days >= 100 -> 52.sp
-                        else -> 64.sp
+                        tier.days >= 1000 -> 50.sp
+                        tier.days >= 100 -> 54.sp
+                        else -> 66.sp
                     },
                     fontWeight = FontWeight.ExtraBold,
                     color = tier.accentColor
                 )
                 Text(
                     text = streakDaysUnit(tier.days),
-                    fontSize = 15.sp,
+                    fontSize = 17.sp,
                     color = tier.accentColor.copy(alpha = 0.65f)
                 )
             }
@@ -223,14 +232,14 @@ internal fun StreakMilestoneScreen(
             ) {
                 Text(
                     text = tier.headline,
-                    fontSize = 19.sp,
+                    fontSize = 21.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White.copy(alpha = 0.95f),
                     textAlign = TextAlign.Center
                 )
                 Text(
                     text = tier.message,
-                    fontSize = 13.sp,
+                    fontSize = 15.sp,
                     color = tier.accentColor.copy(alpha = 0.75f),
                     textAlign = TextAlign.Center,
                     maxLines = 2,
@@ -254,12 +263,12 @@ internal fun StreakMilestoneScreen(
                     ) {
                         Text(
                             text = t("milestone_next_goal"),
-                            fontSize = 11.sp,
+                            fontSize = 13.sp,
                             color = tier.accentColor.copy(alpha = 0.65f)
                         )
                         Text(
                             text = "${tier.nextMilestoneIcon} ${tier.nextMilestoneDays} ${streakDaysUnit(tier.nextMilestoneDays)}",
-                            fontSize = 11.sp,
+                            fontSize = 13.sp,
                             color = tier.accentColor,
                             fontWeight = FontWeight.Bold
                         )
@@ -277,7 +286,7 @@ internal fun StreakMilestoneScreen(
             } else {
                 Text(
                     text = t("milestone_top_percent"),
-                    fontSize = 12.sp,
+                    fontSize = 14.sp,
                     color = tier.accentColor,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
@@ -297,7 +306,7 @@ internal fun StreakMilestoneScreen(
             ) {
                 Text(
                     text = tier.ctaLabel,
-                    fontSize = 15.sp,
+                    fontSize = 17.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center
                 )
